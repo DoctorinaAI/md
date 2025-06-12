@@ -1,0 +1,65 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "flutter:pub:get",
+      "detail": "Get dependencies for the project",
+      "icon": {
+        "color": "terminal.ansiGreen",
+        "id": "cloud-download"
+      },
+      "dependsOn": [],
+      "type": "shell",
+      "command": "flutter pub get",
+      "args": [],
+      "group": {
+        "kind": "none",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": false,
+      "presentation": {
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false,
+        "clear": false,
+        "group": "dart"
+      }
+    },
+    {
+      "label": "dart:format",
+      "detail": "Format all files in the project",
+      "icon": {
+        "color": "terminal.ansiGreen",
+        "id": "lightbulb-autofix"
+      },
+      "type": "shell",
+      "command": [
+        "dart format --fix -l 80 lib test"
+      ],
+      "dependsOn": [],
+      "args": [],
+      "group": {
+        "kind": "none",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": false,
+      "presentation": {
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false,
+        "clear": false,
+        "group": "dart"
+      }
+    }
+  ]
+}

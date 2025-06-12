@@ -1,0 +1,51 @@
+# ==============================================================================
+# PROJECT METADATA
+# ==============================================================================
+
+name: md
+
+description: >
+  Markdown library written in Dart.
+  It can parse and display Markdown.
+
+version: 0.0.1
+
+homepage: https://github.com/DoctorinaAI/md
+repository: https://github.com/DoctorinaAI/md
+issue_tracker: https://github.com/DoctorinaAI/md/issues
+
+topics:
+  - markdown
+  - rendering
+  - selectable
+  - chatgpt
+  - gemini
+
+platforms:
+  linux:
+  macos:
+  windows:
+  android:
+  ios:
+  web:
+
+# ==============================================================================
+# PROJECT STRUCTURE
+# ==============================================================================
+
+# ==============================================================================
+# DEPENDENCIES
+# ==============================================================================
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.29.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
