@@ -29,8 +29,27 @@ extension type const MD$Style(int value) implements int {
   /// Link text style, used for hyperlinks.
   static const MD$Style link = MD$Style(1 << 5);
 
+  /// Inline image text style, used for images within text.
+  static const MD$Style image = MD$Style(1 << 6);
+
   /// Highlight text style, used for emphasizing text.
-  static const MD$Style highlight = MD$Style(1 << 6);
+  static const MD$Style highlight = MD$Style(1 << 7);
+
+  // --- Can be expanded up to 1 << 31 --- //
+
+  /// A list of all styles available in the MD$Style enum.
+  /// This is useful for iterating over styles or checking if a style exists.
+  static const List<MD$Style> values = <MD$Style>[
+    none,
+    bold,
+    italic,
+    underline,
+    strikethrough,
+    monospace,
+    link,
+    image,
+    highlight,
+  ];
 
   /// Check if the style contains a specific flag.
   /// This is useful for checking if a specific style is applied to the text.
@@ -41,6 +60,15 @@ extension type const MD$Style(int value) implements int {
 
   /// Remove a style flag from the current style.
   MD$Style remove(MD$Style flag) => MD$Style(value & ~flag.value);
+
+  /// Toggle a style flag in the current style.
+  MD$Style toggle(MD$Style flag) => MD$Style(value ^ flag.value);
+
+  /// Check if the style is empty (no styles applied).
+  bool get isEmpty => value == 0;
+
+  /// Check if the style is not empty (at least one style is applied).
+  bool get isNotEmpty => value != 0;
 
   /// Returns a set of style flags that are currently applied to the text.
   /// Useful for debugging or displaying the styles applied to the text.
@@ -56,6 +84,7 @@ extension type const MD$Style(int value) implements int {
         if (contains(MD$Style.strikethrough)) 'strikethrough',
         if (contains(MD$Style.monospace)) 'monospace',
         if (contains(MD$Style.link)) 'link',
+        if (contains(MD$Style.image)) 'image',
         if (contains(MD$Style.highlight)) 'highlight',
       };
 }
@@ -83,7 +112,7 @@ final class MD$Span {
   /// Extra properties for the inline text.
   /// This can include additional metadata or attributes.
   /// For example, you can use it to store links or color information.
-  final Map<int, Object?>? extra;
+  final Map<String, Object?>? extra;
 
   @override
   String toString() => text;
@@ -257,3 +286,24 @@ final class MD$Image extends MD$Block {
   /// The inline text spans for the alt text of the image.
   final List<MD$Span> spans;
 }
+
+/// A block representing an empty row in Markdown.
+/// This is used to represent a block that has no content.
+/// It can be used to create spacing or separation in the document.
+class MD$Spacing extends MD$Block {
+  /// Creates a new instance of [MD$Spacing].
+  /// {@macro markdown_block}
+  const MD$Spacing({
+    this.count = 1,
+  }) : text = '\n' * count;
+
+  @override
+  final String text;
+
+  /// The number of empty rows to create.
+  /// This is used to create spacing in the document.
+  final int count;
+}
+
+// TODO(plugfox): Add html block support.
+// Mike Matiunin <plugfox@gmail.com>, 12 June 2025
