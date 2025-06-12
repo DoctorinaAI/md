@@ -16,11 +16,11 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
 
   @override
   List<MD$Block> convert(String input) {
+    final lines = LineSplitter.split(input).toList(growable: false);
+    if (lines.isEmpty) return const <MD$Block>[];
     final result = Queue<MD$Block>();
-    final lines = LineSplitter.split(input).iterator;
-
-    while (lines.moveNext()) {
-      final line = lines.current.trimRight();
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trimRight();
       // Here you would implement the logic to parse the line
       // and create the appropriate MD$Block instances.
       // This is a placeholder for demonstration purposes.
@@ -47,6 +47,6 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
       }
     }
 
-    return result.toList(growable: false);
+    return List.unmodifiable(result);
   }
 }

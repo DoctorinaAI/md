@@ -7,6 +7,7 @@ import 'package:meta/meta.dart';
 /// For example, to create a bold and italic style,
 /// you can use `MD$Style.bold | MD$Style.italic`.
 /// {@endtemplate}
+@immutable
 extension type const MD$Style(int value) implements int {
   /// No style applied to the text.
   static const MD$Style none = MD$Style(0);
@@ -92,6 +93,7 @@ extension type const MD$Style(int value) implements int {
 /// {@template markdown_span}
 /// Markdown inline text representation.
 /// {@endtemplate}
+@immutable
 final class MD$Span {
   /// Creates a new instance of [MD$Span].
   /// The [text] is the content of the inline text,
@@ -121,6 +123,7 @@ final class MD$Span {
 /// {@template markdown_block}
 /// A base class for all Markdown blocks.
 /// {@endtemplate}
+@immutable
 sealed class MD$Block {
   /// {@macro markdown_block}
   const MD$Block();
@@ -139,7 +142,7 @@ sealed class MD$Block {
 final class MD$Paragraph extends MD$Block {
   /// Creates a new instance of [MD$Paragraph].
   /// {@macro markdown_block}
-  MD$Paragraph({required this.text, required this.spans});
+  const MD$Paragraph({required this.text, required this.spans});
 
   @override
   final String text;
@@ -156,7 +159,8 @@ final class MD$Paragraph extends MD$Block {
 final class MD$Heading extends MD$Block {
   /// Creates a new instance of [MD$Heading].
   /// {@macro markdown_block}
-  MD$Heading({required this.text, required this.level, required this.spans});
+  const MD$Heading(
+      {required this.text, required this.level, required this.spans});
 
   @override
   final String text;
@@ -175,7 +179,7 @@ final class MD$Heading extends MD$Block {
 final class MD$Quote extends MD$Block {
   /// Creates a new instance of [MD$Quote].
   /// {@macro markdown_block}
-  MD$Quote({required this.text, required this.spans});
+  const MD$Quote({required this.text, required this.spans});
 
   @override
   final String text;
@@ -191,7 +195,7 @@ final class MD$Quote extends MD$Block {
 final class MD$Code extends MD$Block {
   /// Creates a new instance of [MD$Code].
   /// {@macro markdown_block}
-  MD$Code({required this.text, required this.language});
+  const MD$Code({required this.text, required this.language});
 
   @override
   final String text;
@@ -208,7 +212,7 @@ final class MD$Code extends MD$Block {
 final class MD$List extends MD$Block {
   /// Creates a new instance of [MD$List].
   /// {@macro markdown_block}
-  MD$List({
+  const MD$List({
     required this.text,
     required this.items,
     this.indent = 0,
@@ -247,7 +251,8 @@ final class MD$Divider extends MD$Block {
 final class MD$Table extends MD$Block {
   /// Creates a new instance of [MD$Table].
   /// {@macro markdown_block}
-  MD$Table({required this.text, required this.header, required this.rows});
+  const MD$Table(
+      {required this.text, required this.header, required this.rows});
 
   @override
   final String text;
@@ -267,7 +272,7 @@ final class MD$Table extends MD$Block {
 final class MD$Image extends MD$Block {
   /// Creates a new instance of [MD$Image].
   /// {@macro markdown_block}
-  MD$Image({
+  const MD$Image({
     required this.text,
     required this.src,
     required this.spans,
