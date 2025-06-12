@@ -35,6 +35,25 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
     if (lines.isEmpty) return const <MD$Block>[];
     final result = Queue<MD$Block>();
     final length = lines.length;
+
+    final paragraph = StringBuffer(); // To accumulate lines for paragraphs
+
+    @pragma('vm:prefer-inline')
+    void maybeCommitParagraph() {
+      if (paragraph.isEmpty) return;
+      final text = paragraph.toString();
+      paragraph.clear();
+      result.addLast(MD$Paragraph(
+        text: text,
+        spans: _parseInlineSpans(text),
+      ));
+    }
+
+    void pushBlock(MD$Block block) {
+      maybeCommitParagraph();
+      result.addLast(block);
+    }
+
     for (var i = 0; i < length; i++) {
       // Trim trailing whitespace for consistent parsing
       final line = lines[i];
@@ -45,20 +64,20 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
         /// Parse empty lines and combine them into a spacing block.
         var j = i + 1;
         for (; j < length && _emptyPattern.hasMatch(lines[j]); j++) continue;
-        result.addLast(MD$Spacer(count: j - i));
+        pushBlock(MD$Spacer(count: j - i));
         if (j == length - 1) break; // Last line is empty
         i = j - 1; // Skip the empty lines
         continue;
       } else if (line.startsWith('---')) {
         // Parse horizontal rules
-        result.addLast(const MD$Divider());
+        pushBlock(const MD$Divider());
         continue;
       } else if (line.startsWith('#')) {
         // Parse headings
         final level =
             _headerPattern.firstMatch(line)?.group(0)?.length.clamp(1, 6) ?? 1;
         final text = line.substring(level).trim();
-        result.addLast(MD$Heading(
+        pushBlock(MD$Heading(
             level: level, text: text, spans: _parseInlineSpans(text)));
         continue;
       } else if (line.startsWith('>')) {
@@ -68,7 +87,7 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
         for (; j < length && lines[j].startsWith('>'); j++)
           buffer.writeln(lines[j].substring(1).trim());
         final text = buffer.toString();
-        result.addLast(MD$Quote(
+        pushBlock(MD$Quote(
           text: text,
           spans: _parseInlineSpans(text),
         ));
@@ -81,16 +100,22 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
         var j = i + 1;
         for (; j < length && !lines[j].startsWith('```'); j++) continue;
         final codeText = lines.sublist(i + 1, j).join('\n');
-        result.addLast(MD$Code(
+        pushBlock(MD$Code(
           text: codeText,
           language: language,
         ));
         if (j == length - 1) break; // Last line is a code block
         i = j; // Skip to the end of the code block
         continue;
-      } else if (_listPattern.hasMatch(line)) {
-        final list = <({int intent, String text})>[];
-        var j = i;
+      } else if (_listPattern.firstMatch(line) case RegExpMatch match
+          when match.namedGroup('indent')?.isEmpty == true) {
+        final list = <({int intent, String text})>[
+          (
+            intent: 0,
+            text: line.trim(),
+          )
+        ];
+        var j = i + 1;
         for (; j < length; j++) {
           final line = lines[j];
           final indent =
@@ -102,23 +127,62 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
           ));
         }
         // Convert to tree structure of [MD$ListItem]s
+        List<MD$ListItem> traverse({required int start, int indent = 0}) {
+          final items = <MD$ListItem>[];
+          for (var k = start; k < list.length; k++) {
+            final item = list[k];
+            if (item.intent == indent) {
+              // If the current item's indent matches,
+              // we create a new list item at this level.
+              items.add(MD$ListItem(
+                text: item.text,
+                spans: _parseInlineSpans(item.text),
+                indent: item.intent,
+              ));
+            } else if (item.intent > indent) {
+              // If the current item's indent is greater,
+              // we continue traversing deeper into the list.
+              final children = traverse(start: k, indent: item.intent);
+              if (items.isNotEmpty) {
+                // If we have a parent item, add children to it
+                items.last = items.last.copyWith(children: children);
+              } else {
+                // If this is the first item, just add children
+                items.add(MD$ListItem(
+                  text: item.text,
+                  spans: _parseInlineSpans(item.text),
+                  indent: item.intent,
+                  children: children,
+                ));
+              }
+            } else {
+              // If the indent is less, we stop traversing
+              break;
+            }
+          }
+          if (items.isEmpty) return const <MD$ListItem>[];
+          return items; // Return the list of items at this level
+        }
+
+        // Create the list block with the items
+        pushBlock(MD$List(
+          text: lines.sublist(i, j).join('\n'),
+          items: traverse(start: 0),
+        ));
 
         if (j == length - 1) break; // Last line is a list item
         i = j - 1; // Skip the list items
         continue;
       } else {
-        // TODO(plugfox): Implement ordered and unordered lists
-        // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
-
-        // TODO(plugfox): Implement tables
-        // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
-
-        // TODO(plugfox): Implement images
-        // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
-
         // Parse paragraphs or other blocks
+        paragraph.writeln(line);
         continue;
       }
+      // TODO(plugfox): Implement tables
+      // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
+
+      // TODO(plugfox): Implement images
+      // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
     }
 
     return List<MD$Block>.unmodifiable(result);
@@ -128,5 +192,8 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
 List<MD$Span> _parseInlineSpans(String text) {
   // This function would parse inline spans like bold, italic, links, etc.
   // For now, it returns an empty list as a placeholder.
-  return const <MD$Span>[];
+  return text
+      .split(' ')
+      .map<MD$Span>((word) => MD$Span(text: word))
+      .toList(growable: false);
 }

@@ -233,6 +233,22 @@ final class MD$ListItem {
   /// The sub-items of the list item.
   /// This is used to represent nested lists within the list item.
   final List<MD$ListItem> children;
+
+  /// Returns a copy of the list item with modified properties.
+  /// This is useful for creating a new instance with some properties changed,
+  MD$ListItem copyWith({
+    String? text,
+    List<MD$Span>? spans,
+    int? indent,
+    List<MD$ListItem>? children,
+  }) {
+    return MD$ListItem(
+      text: text ?? this.text,
+      spans: spans ?? this.spans,
+      indent: indent ?? this.indent,
+      children: children ?? this.children,
+    );
+  }
 }
 
 /// A block representing a list in Markdown.
