@@ -295,10 +295,10 @@ final class MD$Image extends MD$Block {
 /// A block representing an empty row in Markdown.
 /// This is used to represent a block that has no content.
 /// It can be used to create spacing or separation in the document.
-class MD$Spacing extends MD$Block {
-  /// Creates a new instance of [MD$Spacing].
+class MD$Spacer extends MD$Block {
+  /// Creates a new instance of [MD$Spacer].
   /// {@macro markdown_block}
-  const MD$Spacing({
+  const MD$Spacer({
     this.count = 1,
   }) : text = '\n' * count;
 
