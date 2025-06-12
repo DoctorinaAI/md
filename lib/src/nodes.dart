@@ -241,14 +241,16 @@ final class MD$ListItem {
     List<MD$Span>? spans,
     int? indent,
     List<MD$ListItem>? children,
-  }) {
-    return MD$ListItem(
-      text: text ?? this.text,
-      spans: spans ?? this.spans,
-      indent: indent ?? this.indent,
-      children: children ?? this.children,
-    );
-  }
+  }) =>
+      MD$ListItem(
+        text: text ?? this.text,
+        spans: spans ?? this.spans,
+        indent: indent ?? this.indent,
+        children: children ?? this.children,
+      );
+
+  @override
+  String toString() => text;
 }
 
 /// A block representing a list in Markdown.
@@ -285,6 +287,28 @@ final class MD$Divider extends MD$Block {
   final String text = '---'; // Represents a horizontal rule.
 }
 
+/// {@template table_row}
+/// A row in a Markdown table.
+/// Each row contains text and a list of inline text spans for each cell.
+/// {@endtemplate}
+@immutable
+final class MD$TableRow {
+  /// Creates a new instance of [MD$TableRow].
+  /// The [text] is the content of the row,
+  /// and [cells] are the inline text spans within the row.
+  /// {@macro table_row}
+  const MD$TableRow({required this.text, required this.cells});
+
+  /// The text content of the row.
+  final String text;
+
+  /// The inline text spans within the row's cells.
+  final List<List<MD$Span>> cells;
+
+  @override
+  String toString() => text;
+}
+
 /// A block representing a table in Markdown.
 /// Contains a header row and a list of rows,
 /// each represented as a list of inline text spans.
@@ -300,10 +324,10 @@ final class MD$Table extends MD$Block {
   final String text;
 
   /// The header row of the table.
-  final List<MD$Span> header;
+  final MD$TableRow header;
 
   /// The rows of the table.
-  final List<List<MD$Span>> rows;
+  final List<MD$TableRow> rows;
 }
 
 /// A block representing an image in Markdown.

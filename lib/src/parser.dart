@@ -3,6 +3,10 @@ import 'dart:convert';
 
 import 'nodes.dart';
 
+/// Decodes Markdown formatted strings
+/// into a list of [MD$Block] objects.
+const Converter<String, List<MD$Block>> mdDecoder = MarkdownDecoder();
+
 /// {@template markdown_decoder}
 /// A [Converter] that decodes Markdown formatted strings
 /// into list of [MD$Block] objects.
@@ -172,6 +176,44 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
 
         if (j == length - 1) break; // Last line is a list item
         i = j - 1; // Skip the list items
+        continue;
+      } else if (line.startsWith('|')) {
+        // Parse tables
+        MD$TableRow textToRow(String text) {
+          final cells = text.split('|');
+          return MD$TableRow(
+            text: text,
+            cells: List<List<MD$Span>>.unmodifiable(cells
+                .sublist(1, cells.length - 1)
+                .map((cell) => cell.trim())
+                .map(_parseInlineSpans)),
+          );
+        }
+
+        final header = textToRow(line);
+        final rows = <MD$TableRow>[];
+        var j = i + 2; // Skip the header and separator line
+        for (; j < length && lines[j].startsWith('|'); j++)
+          rows.add(textToRow(lines[j]));
+        // Validate
+        final columns = header.cells.length;
+        if (rows.every((row) => row.cells.length == columns)) {
+          // All rows have the same number of cells as the header
+          pushBlock(MD$Table(
+            text: lines.sublist(i, j).join('\n'),
+            header: header,
+            rows: List<MD$TableRow>.unmodifiable(rows),
+          ));
+        } else {
+          assert(
+            false,
+            'Table rows have different number of cells: '
+            'header has $columns, but some rows have different counts.',
+          );
+        }
+
+        if (j == length - 1) break; // Last line is a table row
+        i = j - 1; // Skip the table rows
         continue;
       } else {
         // Parse paragraphs or other blocks
