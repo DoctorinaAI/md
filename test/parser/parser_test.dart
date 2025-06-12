@@ -28,7 +28,13 @@ void main() => group('Parse', () {
             '- Fourth item\n';
 
         final blocks = mdDecoder.convert(sample);
-        expect(blocks, isNotEmpty);
+        expect(
+            blocks,
+            allOf(
+              isNotEmpty,
+              hasLength(equals(1)),
+              everyElement(isA<MD$ListItem>()),
+            ));
       });
 
       test('Parse ordered lists', () {
@@ -41,7 +47,13 @@ void main() => group('Parse', () {
             '3. Final step\n';
 
         final blocks = mdDecoder.convert(sample);
-        expect(blocks, isNotEmpty);
+        expect(
+            blocks,
+            allOf(
+              isNotEmpty,
+              hasLength(equals(1)),
+              everyElement(isA<MD$ListItem>()),
+            ));
       });
     });
 

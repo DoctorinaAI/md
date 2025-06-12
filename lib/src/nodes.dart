@@ -250,7 +250,22 @@ final class MD$ListItem {
       );
 
   @override
-  String toString() => text;
+  String toString() {
+    if (children.isEmpty) return text;
+
+    final buffer = StringBuffer(text);
+
+    void traverse(List<MD$ListItem> items) {
+      for (final item in items) {
+        buffer.writeln('\n${'  ' * (item.indent - indent)}${item.text}');
+        if (item.children.isNotEmpty) traverse(item.children);
+      }
+    }
+
+    traverse(children);
+
+    return buffer.toString();
+  }
 }
 
 /// A block representing a list in Markdown.
