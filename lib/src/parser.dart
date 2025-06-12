@@ -23,6 +23,12 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
   /// non-space character. Line may end with any number of `#` characters,.
   static final RegExp _headerPattern = RegExp(r'^(#{1,6})');
 
+  /// A regular expression pattern to match ordered lists.
+  /// Matches lines that start with a number followed by a period
+  /// or parenthesis, or with a bullet point (`*`, `+`, or `-`).
+  static final RegExp _listPattern =
+      RegExp(r'^(?<indent>[ ]{0,6})(?:(\d{1,9})[\.)]|[*+-])(?:[ \t]+(.*))?$');
+
   @override
   List<MD$Block> convert(String input) {
     final lines = LineSplitter.split(input).toList(growable: false);
@@ -82,6 +88,14 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
         if (j == length - 1) break; // Last line is a code block
         i = j; // Skip to the end of the code block
         continue;
+      } else if (_listPattern.hasMatch(line)) {
+        final indent = _listPattern.firstMatch(line)?.namedGroup('indent');
+        var j = i + 1;
+        for (; j < length; j++) {
+          // Check if the next line is part of the same list with the same indent
+          if (indent != _listPattern.firstMatch(lines[j])?.namedGroup('indent'))
+            break;
+        }
       } else {
         // TODO(plugfox): Implement ordered and unordered lists
         // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
