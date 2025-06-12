@@ -204,6 +204,37 @@ final class MD$Code extends MD$Block {
   final String? language;
 }
 
+/// {@template list_item}
+/// A items of a list in Markdown.
+/// Each item can have its own text and inline text spans.
+/// It can also have nested items, allowing for hierarchical lists.
+/// {@endtemplate}
+@immutable
+final class MD$ListItem {
+  /// Creates a new instance of [MD$ListItem].
+  /// {@macro list_item}
+  const MD$ListItem({
+    required this.text,
+    required this.spans,
+    this.indent = 0,
+    this.children = const <MD$ListItem>[],
+  });
+
+  /// The indent of the list block in the document.
+  /// This is used to determine the indentation level of the list.
+  final int indent;
+
+  /// The text content of the list item.
+  final String text;
+
+  /// The inline text spans within the list item.
+  final List<MD$Span> spans;
+
+  /// The sub-items of the list item.
+  /// This is used to represent nested lists within the list item.
+  final List<MD$ListItem> children;
+}
+
 /// A block representing a list in Markdown.
 /// Contains a list of items, each represented as a list of inline text spans.
 /// The [indent] property indicates the indentation level of the list.
@@ -215,18 +246,13 @@ final class MD$List extends MD$Block {
   const MD$List({
     required this.text,
     required this.items,
-    this.indent = 0,
   });
 
   @override
   final String text;
 
-  /// The indent of the list block in the document.
-  /// This is used to determine the indentation level of the list.
-  final int indent;
-
   /// The list items in the list block.
-  final List<List<MD$Span>> items;
+  final List<MD$ListItem> items;
 }
 
 /// A block representing a horizontal rule in Markdown.

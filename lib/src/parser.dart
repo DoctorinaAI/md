@@ -89,13 +89,23 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
         i = j; // Skip to the end of the code block
         continue;
       } else if (_listPattern.hasMatch(line)) {
-        final indent = _listPattern.firstMatch(line)?.namedGroup('indent');
-        var j = i + 1;
+        final list = <({int intent, String text})>[];
+        var j = i;
         for (; j < length; j++) {
-          // Check if the next line is part of the same list with the same indent
-          if (indent != _listPattern.firstMatch(lines[j])?.namedGroup('indent'))
-            break;
+          final line = lines[j];
+          final indent =
+              _listPattern.firstMatch(line)?.namedGroup('indent')?.length;
+          if (indent == null) break;
+          list.add((
+            intent: indent,
+            text: line.substring(indent).trim(),
+          ));
         }
+        // Convert to tree structure of [MD$ListItem]s
+
+        if (j == length - 1) break; // Last line is a list item
+        i = j - 1; // Skip the list items
+        continue;
       } else {
         // TODO(plugfox): Implement ordered and unordered lists
         // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
