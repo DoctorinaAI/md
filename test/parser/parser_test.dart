@@ -18,6 +18,51 @@ void main() => group('Parse', () {
         );
       });
 
+      test('Empty input', () {
+        expect(mdDecoder.convert(''), isEmpty);
+      });
+
+      test('Divider', () {
+        expect(
+          mdDecoder.convert('---\n---'),
+          allOf(
+            isNotEmpty,
+            hasLength(equals(2)),
+            everyElement(isA<MD$Divider>()),
+          ),
+        );
+      });
+
+      test('Space', () {
+        expect(
+          mdDecoder.convert(' '),
+          allOf(
+            isNotEmpty,
+            hasLength(equals(1)),
+            everyElement(isA<MD$Spacer>().having(
+              (s) => s.count,
+              'count',
+              equals(1),
+            )),
+          ),
+        );
+      });
+
+      test('Spacer', () {
+        expect(
+          mdDecoder.convert('\n\n\n'),
+          allOf(
+            isNotEmpty,
+            hasLength(equals(1)),
+            everyElement(isA<MD$Spacer>().having(
+              (s) => s.count,
+              'count',
+              equals(3),
+            )),
+          ),
+        );
+      });
+
       test('Parse unordered lists', () {
         // TODO(plugfox): Fix this test
         // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
@@ -25,7 +70,7 @@ void main() => group('Parse', () {
             '- Second item with *italic*\n'
             '  - Subitem with **bold**\n'
             '    - Third level ~~strikethrough~~\n'
-            '- Fourth item\n';
+            '- Fourth item';
 
         final blocks = mdDecoder.convert(sample);
         expect(
@@ -33,8 +78,16 @@ void main() => group('Parse', () {
             allOf(
               isNotEmpty,
               hasLength(equals(1)),
-              everyElement(isA<MD$ListItem>()),
+              everyElement(isA<MD$Block>()),
             ));
+        expect(
+          blocks.single,
+          isA<MD$List>().having(
+            (list) => list.items.length,
+            'items length',
+            equals(3),
+          ),
+        );
       });
 
       test('Parse ordered lists', () {
@@ -44,7 +97,7 @@ void main() => group('Parse', () {
             '2. Second step\n'
             '   1. Substep 2.1\n'
             '   2. Substep 2.2\n'
-            '3. Final step\n';
+            '3. Final step';
 
         final blocks = mdDecoder.convert(sample);
         expect(
@@ -52,8 +105,16 @@ void main() => group('Parse', () {
             allOf(
               isNotEmpty,
               hasLength(equals(1)),
-              everyElement(isA<MD$ListItem>()),
+              everyElement(isA<MD$Block>()),
             ));
+        expect(
+          blocks.single,
+          isA<MD$List>().having(
+            (list) => list.items.length,
+            'items length',
+            equals(3),
+          ),
+        );
       });
     });
 

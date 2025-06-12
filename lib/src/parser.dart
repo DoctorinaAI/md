@@ -42,7 +42,6 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
 
     final paragraph = StringBuffer(); // To accumulate lines for paragraphs
 
-    @pragma('vm:prefer-inline')
     void maybeCommitParagraph() {
       if (paragraph.isEmpty) return;
       final text = paragraph.toString();
@@ -131,10 +130,11 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
           ));
         }
         // Convert to tree structure of [MD$ListItem]s
-        List<MD$ListItem> traverse({required int start, int indent = 0}) {
+        var offset = 0;
+        List<MD$ListItem> traverse({int indent = 0}) {
           final items = <MD$ListItem>[];
-          for (var k = start; k < list.length; k++) {
-            final item = list[k];
+          for (; offset < list.length; offset++) {
+            final item = list[offset];
             if (item.intent == indent) {
               // If the current item's indent matches,
               // we create a new list item at this level.
@@ -146,10 +146,11 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
             } else if (item.intent > indent) {
               // If the current item's indent is greater,
               // we continue traversing deeper into the list.
-              final children = traverse(start: k, indent: item.intent);
+              final children = traverse(indent: item.intent);
               if (items.isNotEmpty) {
                 // If we have a parent item, add children to it
-                items.last = items.last.copyWith(children: children);
+                items.last = items.last.copyWith(
+                    children: List<MD$ListItem>.unmodifiable(children));
               } else {
                 // If this is the first item, just add children
                 items.add(MD$ListItem(
@@ -161,6 +162,7 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
               }
             } else {
               // If the indent is less, we stop traversing
+              offset--; // Step back to reprocess this item
               break;
             }
           }
@@ -171,7 +173,7 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
         // Create the list block with the items
         pushBlock(MD$List(
           text: lines.sublist(i, j).join('\n'),
-          items: traverse(start: 0),
+          items: traverse(),
         ));
 
         if (j == length - 1) break; // Last line is a list item
@@ -226,6 +228,9 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
       // TODO(plugfox): Implement images
       // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
     }
+
+    // If there's any remaining text in the paragraph buffer, commit it
+    maybeCommitParagraph();
 
     return List<MD$Block>.unmodifiable(result);
   }
