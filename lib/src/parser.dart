@@ -239,12 +239,12 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
 
 /// Type of special inline markers
 final Uint8List _kind = Uint8List(128)
-  ..[42] = 1 // * - bold and italic
-  ..[61] = 1 // = - highlight
-  ..[95] = 1 // _ - underline
-  ..[96] = 1 // ` - monospace
-  ..[124] = 1 // | - spoiler
-  ..[126] = 1; // ~ - strikethrough
+  ..[42] = 1 // * - italic and bold (single and double)
+  ..[61] = 1 // = - highlight (double)
+  ..[95] = 1 // _ - underline (double)
+  ..[96] = 1 // ` - monospace (single)
+  ..[124] = 1 // | - spoiler (double)
+  ..[126] = 1; // ~ - strikethrough (double)
 
 List<MD$Span> _parseInlineSpans(String text) {
   if (text.isEmpty) return const <MD$Span>[];
@@ -270,7 +270,7 @@ List<MD$Span> _parseInlineSpans(String text) {
       final ch = codes[i];
 
       // Check for escaped characters
-      if (ch == esc) {
+      if (ch == esc /* \ */) {
         i++; // skip next char
         continue;
       }
@@ -285,7 +285,7 @@ List<MD$Span> _parseInlineSpans(String text) {
       var labelEnd = -1;
       for (var j = i + 1; j < codes.length; j++) {
         final cj = codes[j];
-        if (cj == esc) {
+        if (cj == esc /* \ */) {
           j++; // skip escaped char
           continue;
         }
@@ -320,7 +320,6 @@ List<MD$Span> _parseInlineSpans(String text) {
       if (urlEnd == -1) break;
 
       // Create a link or image span
-      skip[img ? i - 1 : i] = urlEnd + 1;
       links.add(
         MD$Span(
           start: img ? i - 1 : i, // include the '!' for images
@@ -336,33 +335,133 @@ List<MD$Span> _parseInlineSpans(String text) {
         ),
       );
 
-      i = urlEnd; // jump past the processed link
+      // Index of the link/image within `links` array.
+      // This is used to skip the link/image during inline parsing.
+      skip[img ? i - 1 : i] = links.length;
+
+      // jump past the processed link
+      i = urlEnd;
     }
   }
 
   // Phase 2: Parse inline spans
   // This is a simplified version that only handles basic inline styles.
+  var start = 0; // Start index for the current span
+  var mask = MD$Style.none; // Current style mask
   final spans = <MD$Span>[];
   {
     for (var i = 0; i < length; i++) {
+      final ch = codes[i];
+
       // Check for escaped characters
-      if (codes[i] == 0x5C) {
-        // '\'
+      if (ch == esc /* \ */) {
         i++; // skip next char
         continue;
       }
 
       // If this character is part of a link or image, skip it
-      if (skip[i] > 0) {
-        i = skip[i] - 1; // -1 because the loop will increment i
+      if (skip[i] != 0) {
+        final span = links[skip[i] - 1];
+        spans.add(span);
+        i = span.end - 1; // -1 because the loop will increment i
         continue;
       }
 
-      // ...
+      // If the character is not a special inline marker, continue
+      if (_kind[ch] == 0) continue;
+
+      // If we reach here, it means we have a special inline marker
+      if (start < i)
+        spans.add(
+          MD$Span(
+            start: start,
+            end: i,
+            text: text.substring(start, i),
+            style: mask,
+          ),
+        );
+
+      // Check if the next character is the same kind
+      // This is used to determine if it's a single or double marker.
+      final isDouble = i + 1 < length && codes[i + 1] == ch;
+
+      // Find the style for this marker
+      switch (ch) {
+        case 42: // '*'
+          // Can be used for italic (single) or bold (double)
+          if (isDouble) {
+            // Bold (double)
+            mask ^= MD$Style.bold;
+            start = i + 2;
+          } else {
+            // Italic (single)
+            mask ^= MD$Style.italic;
+            start = i + 1;
+          }
+        case 61: // '='
+          // Highlight (double)
+          if (isDouble) {
+            // Highlight
+            mask ^= MD$Style.highlight;
+            start = i + 2;
+          } else {
+            // This is just a single `=` character, so we skip it
+            continue;
+          }
+        case 95: // '_'
+          // Underline (double)
+          if (isDouble) {
+            // Underline
+            mask ^= MD$Style.underline;
+            start = i + 2;
+          } else {
+            // This is just a single `_` character, so we skip it
+            continue;
+          }
+        case 96: // '`'
+          // Monospace (single)
+          if (isDouble) {
+            // This is a double backtick, we should skip as it is not valid
+            i++; // skip next character
+            continue;
+          } else {
+            // Monospace
+            mask ^= MD$Style.monospace;
+            start = i + 1;
+          }
+        case 124: // '|'
+          // Spoiler (double)
+          if (isDouble) {
+            // Spoiler
+            mask ^= MD$Style.spoiler;
+            start = i + 2;
+          } else {
+            // Single - this is just a single `|` character, so we skip it
+            continue;
+          }
+        case 126: // '~'
+          // Strikethrough (double)
+          if (isDouble) {
+            // Strikethrough
+            mask ^= MD$Style.strikethrough;
+            start = i + 2;
+          } else {
+            // Single - this is just a single `~` character, so we skip it
+            continue;
+          }
+        default:
+          assert(
+            false,
+            'Unknown inline marker: $ch at position $i in "$text"',
+          );
+          continue; // Skip unknown markers
+      }
+
+      if (isDouble) i++; // if it's a double marker, skip the next character
     }
   }
 
   // This function would parse inline spans like bold, italic, links, etc.
   // For now, it returns an empty list as a placeholder.
-  return links;
+  return spans;
 }

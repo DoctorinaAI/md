@@ -12,13 +12,13 @@ extension type const MD$Style(int value) implements int {
   /// No style applied to the text.
   static const MD$Style none = MD$Style(0);
 
-  /// Bold text style.
-  /// Symbol: `**text**`.
-  static const MD$Style bold = MD$Style(1 << 0);
-
   /// Italic text style.
   /// Symbol: `*text*`.
-  static const MD$Style italic = MD$Style(1 << 1);
+  static const MD$Style italic = MD$Style(1 << 0);
+
+  /// Bold text style.
+  /// Symbol: `**text**`.
+  static const MD$Style bold = MD$Style(1 << 1);
 
   /// Underline text style.
   /// Symbol: `__text__` (double underscore).
@@ -54,8 +54,8 @@ extension type const MD$Style(int value) implements int {
   /// This is useful for iterating over styles or checking if a style exists.
   static const List<MD$Style> values = <MD$Style>[
     none,
-    bold,
     italic,
+    bold,
     underline,
     strikethrough,
     monospace,
@@ -91,17 +91,22 @@ extension type const MD$Style(int value) implements int {
   /// ```dart
   /// print(span.style.styles.join('|'));
   /// ```
-  Set<String> get styles => <String>{
-        if (contains(MD$Style.bold)) 'bold',
-        if (contains(MD$Style.italic)) 'italic',
-        if (contains(MD$Style.underline)) 'underline',
-        if (contains(MD$Style.strikethrough)) 'strikethrough',
-        if (contains(MD$Style.monospace)) 'monospace',
-        if (contains(MD$Style.link)) 'link',
-        if (contains(MD$Style.image)) 'image',
-        if (contains(MD$Style.highlight)) 'highlight',
-        if (contains(MD$Style.spoiler)) 'spoiler',
-      };
+  Set<String> get styles => value == 0
+      ? const <String>{}
+      : <String>{
+          if (contains(MD$Style.italic)) 'italic',
+          if (contains(MD$Style.bold)) 'bold',
+          if (contains(MD$Style.underline)) 'underline',
+          if (contains(MD$Style.strikethrough)) 'strikethrough',
+          if (contains(MD$Style.monospace)) 'monospace',
+          if (contains(MD$Style.link)) 'link',
+          if (contains(MD$Style.image)) 'image',
+          if (contains(MD$Style.highlight)) 'highlight',
+          if (contains(MD$Style.spoiler)) 'spoiler',
+        };
+
+  /// Toggle a style flag in the current style.
+  MD$Style operator ^(MD$Style other) => MD$Style(value ^ other.value);
 }
 
 /// {@template markdown_span}
