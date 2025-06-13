@@ -2,6 +2,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "[Flutter] Example (debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/example",
+      "env": {},
+      "console": "debugConsole",
+      "runTestsOnDevice": false,
+      "args": [],
+      /* "preLaunchTask": "flutter:pub:get", */
+    },
+    {
       "name": "[Dart] Unit test (vm)",
       "request": "launch",
       "type": "dart",
