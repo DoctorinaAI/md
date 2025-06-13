@@ -4,6 +4,19 @@ import 'package:benchmark_harness/benchmark_harness.dart';
 import 'package:markdown/markdown.dart' as markdown;
 import 'package:md/md.dart';
 
+/// This benchmark compares the performance of the `md` package against the
+/// `markdown` package from Google.
+///
+/// To run this benchmark, use the following command:
+/// ```shell
+/// dart run benchmark/parse_benchmark.dart
+/// ```
+///
+/// Or compile it to a native executable:
+/// ```shell
+/// dart compile exe benchmark/parse_benchmark.dart -o benchmark/parse_benchmark
+/// ./benchmark/parse_benchmark
+/// ```
 void main() {
   final current = Current$Benchmark().measure();
   final google = Google$Benchmark().measure();
