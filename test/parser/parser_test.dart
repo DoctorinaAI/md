@@ -116,6 +116,81 @@ void main() => group('Parse', () {
           ),
         );
       });
+
+      test('Parse links', () {
+        expect(
+          mdDecoder.convert('[link](https://example.com/path)'),
+          allOf(
+            isNotEmpty,
+            hasLength(equals(1)),
+            everyElement(
+              isA<MD$Paragraph>().having(
+                (s) => s.spans,
+                'spans',
+                allOf(
+                  isNotEmpty,
+                  hasLength(equals(1)),
+                  everyElement(
+                    isA<MD$Span>()
+                        .having(
+                          (l) => l.style,
+                          'style',
+                          equals(MD$Style.link),
+                        )
+                        .having(
+                          (l) => l.extra,
+                          'extra',
+                          allOf(
+                            isA<Map<String, Object?>>(),
+                            isNotEmpty,
+                            containsPair('url', 'https://example.com/path'),
+                          ),
+                        ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      });
+
+      test('Parse images', () {
+        expect(
+          mdDecoder.convert('![](https://example.com/image.jpg)'),
+          allOf(
+            isNotEmpty,
+            hasLength(equals(1)),
+            everyElement(
+              isA<MD$Paragraph>().having(
+                (s) => s.spans,
+                'spans',
+                allOf(
+                  isNotEmpty,
+                  hasLength(equals(1)),
+                  everyElement(
+                    isA<MD$Span>()
+                        .having(
+                          (l) => l.style,
+                          'style',
+                          equals(MD$Style.image),
+                        )
+                        .having(
+                          (l) => l.extra,
+                          'extra',
+                          allOf(
+                            isA<Map<String, Object?>>(),
+                            isNotEmpty,
+                            containsPair(
+                                'url', 'https://example.com/image.jpg'),
+                          ),
+                        ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      });
     });
 
 const String _testSample = r'''

@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'nodes.dart';
 
@@ -236,11 +237,132 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
   }
 }
 
+/// Type of special inline markers
+final Uint8List _kind = Uint8List(128)
+  ..[42] = 1 // * - bold and italic
+  ..[61] = 1 // = - highlight
+  ..[95] = 1 // _ - underline
+  ..[96] = 1 // ` - monospace
+  ..[124] = 1 // | - spoiler
+  ..[126] = 1; // ~ - strikethrough
+
 List<MD$Span> _parseInlineSpans(String text) {
+  if (text.isEmpty) return const <MD$Span>[];
+
+  // Convert the text to a list of code units for easier processing
+  // This allows us to handle UTF-16 characters correctly.
+  final codes = text.codeUnits;
+  final length = codes.length;
+
+  /// Escaped characters in Markdown
+  const int esc = 0x5C; // '\'
+
+  // Phase 1: Extract links and images
+  final links = <MD$Span>[];
+  final skip = Uint16List(length); // Skip links during inline parsing
+  {
+    const img$symbol = 0x21, // '!' (33)
+        label$start = 0x5B, // '[' (91)
+        label$end = 0x5D, // ']' (93)
+        url$start = 0x28, // '(' (40)
+        url$end = 0x29; // ')' (41)
+    for (var i = 0; i < length; i++) {
+      final ch = codes[i];
+
+      // Check for escaped characters
+      if (ch == esc) {
+        i++; // skip next char
+        continue;
+      }
+
+      // Check for links and images
+      if (ch != label$start) continue;
+
+      // Check if it's an image or a link
+      final img = i > 0 && codes[i - 1] == img$symbol;
+
+      // find closing ']' to determine the end of the label text
+      var labelEnd = -1;
+      for (var j = i + 1; j < codes.length; j++) {
+        final cj = codes[j];
+        if (cj == esc) {
+          j++; // skip escaped char
+          continue;
+        }
+        if (cj == label$end) {
+          labelEnd = j;
+          break;
+        }
+      }
+
+      // If there is no closing ']', there is no more links or images
+      if (labelEnd == -1) break;
+
+      // Check if the next character is a '(' for the URL
+      final urlIdx = labelEnd + 1;
+      if (urlIdx >= codes.length || codes[urlIdx] != url$start) continue;
+
+      // find closing ')'
+      var urlEnd = -1;
+      for (var k = urlIdx + 1; k < codes.length; k++) {
+        final ck = codes[k];
+        if (ck == esc) {
+          k++;
+          continue;
+        }
+        if (ck == url$end) {
+          urlEnd = k;
+          break;
+        }
+      }
+
+      // If there is no closing ')', there is no more links or images
+      if (urlEnd == -1) break;
+
+      // Create a link or image span
+      skip[img ? i - 1 : i] = urlEnd + 1;
+      links.add(
+        MD$Span(
+          start: img ? i - 1 : i, // include the '!' for images
+          end: urlEnd + 1, // include the closing ')'
+          text: text.substring(i + 1, labelEnd),
+          style: img
+              ? MD$Style.image // image style
+              : MD$Style.link, // link style
+          extra: <String, Object?>{
+            'type': img ? 'image' : 'link',
+            'url': text.substring(urlIdx + 1, urlEnd),
+          },
+        ),
+      );
+
+      i = urlEnd; // jump past the processed link
+    }
+  }
+
+  // Phase 2: Parse inline spans
+  // This is a simplified version that only handles basic inline styles.
+  final spans = <MD$Span>[];
+  {
+    for (var i = 0; i < length; i++) {
+      // Check for escaped characters
+      if (codes[i] == 0x5C) {
+        // '\'
+        i++; // skip next char
+        continue;
+      }
+
+      // If this character is part of a link or image, skip it
+      if (skip[i] > 0) {
+        i = skip[i] - 1; // -1 because the loop will increment i
+        continue;
+      }
+
+      // ...
+    }
+  }
+
   // This function would parse inline spans like bold, italic, links, etc.
   // For now, it returns an empty list as a placeholder.
-  return text
-      .split(' ')
-      .map<MD$Span>((word) => MD$Span(text: word))
-      .toList(growable: false);
+  return links;
 }

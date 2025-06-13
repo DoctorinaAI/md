@@ -13,28 +13,40 @@ extension type const MD$Style(int value) implements int {
   static const MD$Style none = MD$Style(0);
 
   /// Bold text style.
+  /// Symbol: `**text**`.
   static const MD$Style bold = MD$Style(1 << 0);
 
   /// Italic text style.
+  /// Symbol: `*text*`.
   static const MD$Style italic = MD$Style(1 << 1);
 
   /// Underline text style.
+  /// Symbol: `__text__` (double underscore).
   static const MD$Style underline = MD$Style(1 << 2);
 
   /// Strikethrough text style.
+  /// Symbol: `~~text~~`.
   static const MD$Style strikethrough = MD$Style(1 << 3);
 
   /// Monospace text style, typically used for code.
+  /// Symbol: `` `text` `` (backticks).
   static const MD$Style monospace = MD$Style(1 << 4);
 
   /// Link text style, used for hyperlinks.
+  /// Symbol: `[text](url)` or `<url>`.
   static const MD$Style link = MD$Style(1 << 5);
 
   /// Inline image text style, used for images within text.
+  /// Symbol: `![alt text](image_url)` or `![alt text](image_url "title")`.
   static const MD$Style image = MD$Style(1 << 6);
 
   /// Highlight text style, used for emphasizing text.
+  /// Symbol: `==text==`.
   static const MD$Style highlight = MD$Style(1 << 7);
+
+  /// Spoiler text style, used for hiding text until revealed.
+  /// Symbol: `||text||`.
+  static const MD$Style spoiler = MD$Style(1 << 8);
 
   // --- Can be expanded up to 1 << 31 --- //
 
@@ -50,6 +62,7 @@ extension type const MD$Style(int value) implements int {
     link,
     image,
     highlight,
+    spoiler,
   ];
 
   /// Check if the style contains a specific flag.
@@ -87,6 +100,7 @@ extension type const MD$Style(int value) implements int {
         if (contains(MD$Style.link)) 'link',
         if (contains(MD$Style.image)) 'image',
         if (contains(MD$Style.highlight)) 'highlight',
+        if (contains(MD$Style.spoiler)) 'spoiler',
       };
 }
 
@@ -99,7 +113,19 @@ final class MD$Span {
   /// The [text] is the content of the inline text,
   /// and [style] is the text style applied to it.
   /// {@macro markdown_span}
-  const MD$Span({required this.text, this.style = 0, this.extra});
+  const MD$Span({
+    required this.start,
+    required this.end,
+    required this.text,
+    this.style = 0,
+    this.extra,
+  });
+
+  /// The start index of the inline text in the parent block.
+  final int start;
+
+  /// The end index of the inline text in the parent block.
+  final int end;
 
   /// The text content of the inline text.
   final String text;
