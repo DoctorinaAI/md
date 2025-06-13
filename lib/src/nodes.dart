@@ -162,6 +162,19 @@ sealed class MD$Block {
   /// Text content of the block.
   abstract final String text;
 
+  /// Pattern for matching the block type.
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  });
+
   @override
   String toString() => text;
 }
@@ -181,6 +194,20 @@ final class MD$Paragraph extends MD$Block {
   /// The inline text spans within the paragraph.
   /// Each span can have its own style.
   final List<MD$Span> spans;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      paragraph(this);
 }
 
 /// A block representing a heading in Markdown.
@@ -201,6 +228,20 @@ final class MD$Heading extends MD$Block {
 
   /// The inline text spans within the heading.
   final List<MD$Span> spans;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      heading(this);
 }
 
 /// A block representing a quote in Markdown.
@@ -217,6 +258,20 @@ final class MD$Quote extends MD$Block {
 
   /// The inline text spans within the quote.
   final List<MD$Span> spans;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      quote(this);
 }
 
 /// A block representing a code block in Markdown.
@@ -233,6 +288,20 @@ final class MD$Code extends MD$Block {
 
   /// The programming language of the code block.
   final String? language;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      code(this);
 }
 
 /// {@template list_item}
@@ -317,6 +386,20 @@ final class MD$List extends MD$Block {
 
   /// The list items in the list block.
   final List<MD$ListItem> items;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      list(this);
 }
 
 /// A block representing a horizontal rule in Markdown.
@@ -331,6 +414,20 @@ final class MD$Divider extends MD$Block {
 
   @override
   final String text = '---'; // Represents a horizontal rule.
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      divider(this);
 }
 
 /// {@template table_row}
@@ -374,6 +471,20 @@ final class MD$Table extends MD$Block {
 
   /// The rows of the table.
   final List<MD$TableRow> rows;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      table(this);
 }
 
 /// A block representing an image in Markdown.
@@ -402,6 +513,20 @@ final class MD$Image extends MD$Block {
 
   /// The inline text spans for the alt text of the image.
   final List<MD$Span> spans;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      image(this);
 }
 
 /// A block representing an empty row in Markdown.
@@ -420,6 +545,20 @@ class MD$Spacer extends MD$Block {
   /// The number of empty rows to create.
   /// This is used to create spacing in the document.
   final int count;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Image i) image,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      spacer(this);
 }
 
 // TODO(plugfox): Add html block support.
