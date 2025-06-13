@@ -423,12 +423,13 @@ List<MD$Span> _parseInlineSpans(String text) {
         case 95: // '_'
           // Underline (double)
           if (isDouble) {
-            // Underline
+            // Underline (double)
             mask ^= MD$Style.underline;
             start = i + 2;
           } else {
-            // This is just a single `_` character, so we skip it
-            continue;
+            // Italic (single)
+            mask ^= MD$Style.italic;
+            start = i + 1;
           }
         case 96: // '`'
           // Monospace (single)
