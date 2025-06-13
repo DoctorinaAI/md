@@ -361,9 +361,21 @@ List<MD$Span> _parseInlineSpans(String text) {
 
       // If this character is part of a link or image, skip it
       if (skip[i] != 0) {
+        // Finish the current span if it exists
+        if (start < i)
+          spans.add(
+            MD$Span(
+              start: start,
+              end: i,
+              text: text.substring(start, i),
+              style: mask,
+            ),
+          );
+
         final span = links[skip[i] - 1];
         spans.add(span);
         i = span.end - 1; // -1 because the loop will increment i
+        start = i + 1;
         continue;
       }
 
@@ -459,6 +471,16 @@ List<MD$Span> _parseInlineSpans(String text) {
 
       if (isDouble) i++; // if it's a double marker, skip the next character
     }
+    // If we have any remaining text after the last marker, add it as a span
+    if (start < length)
+      spans.add(
+        MD$Span(
+          start: start,
+          end: length,
+          text: text.substring(start, length),
+          style: mask,
+        ),
+      );
   }
 
   // This function would parse inline spans like bold, italic, links, etc.
