@@ -13,7 +13,13 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   MarkdownThemeData({
     this.textDirection = TextDirection.ltr,
     this.textScaler = TextScaler.noScaling,
-    this.textStyle = const TextStyle(),
+    this.textStyle = const TextStyle(fontSize: 14.0),
+    this.h1Style = const TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
+    this.h2Style = const TextStyle(fontSize: 22.0, fontWeight: FontWeight.bold),
+    this.h3Style = const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
+    this.h4Style = const TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+    this.h5Style = const TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+    this.h6Style = const TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold),
   }) : _textStyles = HashMap<int, TextStyle>();
 
   @override
@@ -28,12 +34,30 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// The default text style to use for Markdown widgets.
   final TextStyle textStyle;
 
+  /// Default text style for headings h1.
+  final TextStyle h1Style;
+
+  /// Default text style for headings h2.
+  final TextStyle h2Style;
+
+  /// Default text style for headings h3.
+  final TextStyle h3Style;
+
+  /// Default text style for headings h4.
+  final TextStyle h4Style;
+
+  /// Default text style for headings h5.
+  final TextStyle h5Style;
+
+  /// Default text style for headings h6.
+  final TextStyle h6Style;
+
   final HashMap<int, TextStyle> _textStyles;
 
   /// Returns a [TextStyle] for the given [MD$Style].
   TextStyle textStyleFor(MD$Style style) => _textStyles.putIfAbsent(
         style.hashCode,
-        () => textStyle.copyWith(
+        () => TextStyle(
           fontWeight: style.contains(MD$Style.bold)
               ? FontWeight.bold
               : FontWeight.normal,
