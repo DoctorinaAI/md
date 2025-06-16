@@ -147,6 +147,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
               // If the current item's indent matches,
               // we create a new list item at this level.
               items.add(MD$ListItem(
+                marker: '•',
                 text: item.text,
                 spans: _parseInlineSpans(item.text),
                 indent: item.intent,
@@ -162,6 +163,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
               } else {
                 // If this is the first item, just add children
                 items.add(MD$ListItem(
+                  marker: '•',
                   text: item.text,
                   spans: _parseInlineSpans(item.text),
                   indent: item.intent,

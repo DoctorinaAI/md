@@ -203,8 +203,8 @@ class MarkdownPainter {
               count: 1,
               theme: _theme,
             ),
-            list: (l) => BlockPainter$Spacer(
-              count: 1,
+            list: (l) => BlockPainter$List(
+              items: l.items,
               theme: _theme,
             ),
             divider: (d) => BlockPainter$Divider(
@@ -281,7 +281,7 @@ class MarkdownPainter {
 }
 
 TextSpan _paragraphFromMarkdownSpans({
-  required List<MD$Span> spans,
+  required Iterable<MD$Span> spans,
   required MarkdownThemeData theme,
   TextStyle? textStyle,
 }) =>
@@ -406,7 +406,7 @@ class BlockPainter$Heading extends BlockPainter {
   }
 }
 
-/// A class for painting a paragraph block in markdown.
+/// A class for painting a quote block in markdown.
 @internal
 class BlockPainter$Quote extends BlockPainter {
   BlockPainter$Quote({
@@ -458,6 +458,86 @@ class BlockPainter$Quote extends BlockPainter {
       Offset(4, offset + _size.height),
       linePaint,
     );
+    painter.paint(
+      canvas,
+      Offset(indent, offset),
+    );
+  }
+}
+
+/// A class for painting a list block in markdown.
+@internal
+class BlockPainter$List extends BlockPainter {
+  BlockPainter$List({
+    required List<MD$ListItem> items,
+    required this.theme,
+  }) : painter = TextPainter(
+          /* text: _paragraphFromMarkdownSpans(
+            spans: items.isEmpty
+                ? const []
+                : [
+                    ...items.first.spans,
+                    TextSpan('\n'),
+                    for (var i = 1; i < items.length; i++) ...items[i].spans,
+                  ],
+            theme: theme,
+            textStyle: theme.quoteStyle,
+          ), */
+          textAlign: TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        ) {
+    if (items.isEmpty) {
+      painter.text = const TextSpan();
+    } else {
+      final spans = <TextSpan>[];
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        if (i > 0) spans.add(const TextSpan(text: '\n'));
+        spans
+          ..add(
+            TextSpan(
+              text: '${item.marker} ',
+              style: theme.textStyle,
+            ),
+          )
+          ..addAll(
+            item.spans.map(
+              (span) => TextSpan(
+                text: span.text,
+                style: theme.textStyleFor(span.style),
+              ),
+            ),
+          );
+      }
+      painter.text = TextSpan(children: spans);
+    }
+  }
+
+  final MarkdownThemeData theme;
+
+  final TextPainter painter;
+
+  static const double indent = 8.0; // Indentation for list blocks.
+
+  @override
+  Size get size => _size;
+  Size _size = Size.zero;
+
+  @override
+  Size layout(double width) {
+    painter.layout(
+      minWidth: 0,
+      maxWidth: math.max(width - indent, 0), // Adjust width for indentation.
+    );
+    return _size = Size(
+      painter.size.width + indent, // Add indentation to the width.
+      painter.size.height,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size, double offset) {
     painter.paint(
       canvas,
       Offset(indent, offset),

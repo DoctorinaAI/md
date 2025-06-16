@@ -324,6 +324,7 @@ final class MD$ListItem {
   /// Creates a new instance of [MD$ListItem].
   /// {@macro list_item}
   const MD$ListItem({
+    required this.marker,
     required this.text,
     required this.spans,
     this.indent = 0,
@@ -333,6 +334,9 @@ final class MD$ListItem {
   /// The indent of the list block in the document.
   /// This is used to determine the indentation level of the list.
   final int indent;
+
+  /// The marker used for the list item.
+  final String marker;
 
   /// The text content of the list item.
   final String text;
@@ -347,12 +351,14 @@ final class MD$ListItem {
   /// Returns a copy of the list item with modified properties.
   /// This is useful for creating a new instance with some properties changed,
   MD$ListItem copyWith({
+    String? marker,
     String? text,
     List<MD$Span>? spans,
     int? indent,
     List<MD$ListItem>? children,
   }) =>
       MD$ListItem(
+        marker: marker ?? this.marker,
         text: text ?? this.text,
         spans: spans ?? this.spans,
         indent: indent ?? this.indent,
