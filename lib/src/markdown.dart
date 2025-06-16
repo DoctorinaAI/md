@@ -63,24 +63,25 @@ final class Markdown {
         case MD$Code(:String text):
           buffer.write(text);
         case MD$List(:List<MD$ListItem> items):
-          for (var i = 0; i < items.length; i++) {
-            if (i > 0) buffer.writeln();
-            final item = items[i];
+          for (var j = 0; j < items.length; j++) {
+            if (j > 0) buffer.writeln();
+            final item = items[j];
             for (final span in item.spans) buffer.write(span.text);
           }
         case MD$Table(:List<MD$TableRow> rows):
-          for (var i = 0; i < rows.length; i++) {
-            if (i > 0) buffer.writeln();
-            final row = rows[i];
-            for (var j = 0; j < row.cells.length; j++) {
-              //if (j > 0) buffer.write(' | ');
-              final spans = row.cells[j];
+          for (var j = 0; j < rows.length; j++) {
+            if (j > 0) buffer.writeln();
+            final row = rows[j];
+            for (var k = 0; k < row.cells.length; k++) {
+              //if (k > 0) buffer.write(' | ');
+              final spans = row.cells[k];
               for (final span in spans) buffer.write(span.text);
             }
           }
         case MD$Divider():
           buffer.write('---');
-        case MD$Spacer():
+        case MD$Spacer(:int count):
+          buffer.write('\n' * count);
           break;
       }
     }

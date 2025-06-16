@@ -91,6 +91,19 @@ void main() => group('Parse', () {
         expect(markdownDecoder.convert('').blocks, isEmpty);
       });
 
+      test('Paragraph+Space+Paragraph', () {
+        const text = 'a\n\na';
+        final markdown = markdownDecoder.convert(text);
+        expect(
+          markdown.blocks,
+          allOf(
+            isNotEmpty,
+            hasLength(equals(3)),
+            everyElement(isA<MD$Block>()),
+          ),
+        );
+      });
+
       test('Divider', () {
         expect(
           markdownDecoder.convert('---\n---').blocks,

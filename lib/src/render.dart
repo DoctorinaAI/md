@@ -59,6 +59,7 @@ class MarkdownRenderObject extends RenderBox {
     } else {
       // TODO(plugfox): Split markdown text into spans based on the theme.
       // Mike Matiunin <plugfox@gmail.com>, 16 June 2025
+      _markdown.blocks;
       _painter.text = TextSpan(
         text: _markdown.text,
         /* style: _theme.textStyle, */

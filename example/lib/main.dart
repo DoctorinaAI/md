@@ -173,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
               LayoutId(
                 id: 1,
                 child: Align(
-                  alignment: Alignment.center,
+                  alignment: Alignment.topLeft,
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),

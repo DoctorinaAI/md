@@ -70,8 +70,9 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         /// Parse empty lines and combine them into a spacing block.
         var j = i + 1;
         for (; j < length && _emptyPattern.hasMatch(lines[j]); j++) continue;
-        pushBlock(MD$Spacer(count: j - i));
-        if (j == length - 1) break; // Last line is empty
+        final count = j - i;
+        pushBlock(MD$Spacer(count: count));
+        if (i + count == length) break; // Last line is empty
         i = j - 1; // Skip the empty lines
         continue;
       } else if (line.startsWith('---')) {
@@ -200,13 +201,18 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         }
 
         final header = textToRow(line);
+        final separator = lines.length > i + 1
+            ? lines[i + 1]
+            : null; // Separator line for the table header
         final rows = <MD$TableRow>[];
         var j = i + 2; // Skip the header and separator line
         for (; j < length && lines[j].startsWith('|'); j++)
           rows.add(textToRow(lines[j]));
         // Validate
         final columns = header.cells.length;
-        if (rows.every((row) => row.cells.length == columns)) {
+        if (columns > 0 &&
+            separator != null &&
+            rows.every((row) => row.cells.length == columns)) {
           // All rows have the same number of cells as the header
           final text = lines.sublist(i, j).join('\n');
           pushBlock(MD$Table(
@@ -215,11 +221,10 @@ class MarkdownDecoder extends Converter<String, Markdown> {
             rows: List<MD$TableRow>.unmodifiable(rows),
           ));
         } else {
-          assert(
-            false,
-            'Table rows have different number of cells: '
-            'header has $columns, but some rows have different counts.',
-          );
+          // Table is malformed, treat it as a paragraph
+          if (paragraph.isNotEmpty) paragraph.writeln();
+          paragraph.write(line);
+          continue;
         }
 
         if (j == length - 1) break; // Last line is a table row
@@ -360,7 +365,8 @@ List<MD$Span> _parseInlineSpans(String text) {
   late final excluded = HashSet<int>(); // Set of excluded indices
   {
     // Add span to the list of spans
-    void pushSpan(int end) {
+    void maybePushSpan(int end) {
+      if (start >= end) return; // No valid span to push
       if (hasExcluded) {
         // If we have excluded characters, we should create a new span
         // from the bytes that are not excluded.
@@ -415,7 +421,7 @@ List<MD$Span> _parseInlineSpans(String text) {
       // If this character is part of a link or image, skip it
       if (skip[i] != 0) {
         // Finish the current span if it exists
-        if (start < i) pushSpan(i);
+        maybePushSpan(i);
 
         final span = links[skip[i] - 1];
         spans.add(span);
@@ -427,9 +433,6 @@ List<MD$Span> _parseInlineSpans(String text) {
       // If the character is not a special inline marker, continue
       if (_kind[ch] == 0) continue;
 
-      // If we reach here, it means we have a special inline marker
-      if (start < i) pushSpan(i);
-
       // Check if the next character is the same kind
       // This is used to determine if it's a single or double marker.
       final isDouble = i + 1 < length && codes[i + 1] == ch;
@@ -439,10 +442,12 @@ List<MD$Span> _parseInlineSpans(String text) {
         case 42: // '*'
           // Can be used for italic (single) or bold (double)
           if (isDouble) {
+            maybePushSpan(i);
             // Bold (double)
             mask ^= MD$Style.bold;
             start = i + 2;
           } else {
+            maybePushSpan(i);
             // Italic (single)
             mask ^= MD$Style.italic;
             start = i + 1;
@@ -450,6 +455,7 @@ List<MD$Span> _parseInlineSpans(String text) {
         case 61: // '='
           // Highlight (double)
           if (isDouble) {
+            maybePushSpan(i);
             // Highlight
             mask ^= MD$Style.highlight;
             start = i + 2;
@@ -460,10 +466,12 @@ List<MD$Span> _parseInlineSpans(String text) {
         case 95: // '_'
           // Underline (double)
           if (isDouble) {
+            maybePushSpan(i);
             // Underline (double)
             mask ^= MD$Style.underline;
             start = i + 2;
           } else {
+            maybePushSpan(i);
             // Italic (single)
             mask ^= MD$Style.italic;
             start = i + 1;
@@ -475,6 +483,7 @@ List<MD$Span> _parseInlineSpans(String text) {
             i++; // skip next character
             continue;
           } else {
+            maybePushSpan(i);
             // Monospace
             mask ^= MD$Style.monospace;
             start = i + 1;
@@ -482,6 +491,7 @@ List<MD$Span> _parseInlineSpans(String text) {
         case 124: // '|'
           // Spoiler (double)
           if (isDouble) {
+            maybePushSpan(i);
             // Spoiler
             mask ^= MD$Style.spoiler;
             start = i + 2;
@@ -492,6 +502,7 @@ List<MD$Span> _parseInlineSpans(String text) {
         case 126: // '~'
           // Strikethrough (double)
           if (isDouble) {
+            maybePushSpan(i);
             // Strikethrough
             mask ^= MD$Style.strikethrough;
             start = i + 2;
@@ -510,7 +521,7 @@ List<MD$Span> _parseInlineSpans(String text) {
       if (isDouble) i++; // if it's a double marker, skip the next character
     }
     // If we have any remaining text after the last marker, add it as a span
-    if (start < length) pushSpan(length);
+    maybePushSpan(length);
   }
 
   // This function would parse inline spans like bold, italic, links, etc.
