@@ -32,8 +32,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// A regular expression pattern to match ordered lists.
   /// Matches lines that start with a number followed by a period
   /// or parenthesis, or with a bullet point (`*`, `+`, or `-`).
-  static final RegExp _listPattern =
-      RegExp(r'^(?<indent>[ ]{0,6})(?:(\d{1,9})[\.)]|[*+-])(?:[ \t]+(.*))?$');
+  static final RegExp _listPattern = RegExp(
+      r'^(?<indent>[ \t]{0,8})(?<marker>(\d{1,9})[\.)]|[*+-])(?<text>[ \t]+(.*))?$');
 
   @override
   Markdown convert(String input) {
@@ -98,7 +98,10 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         }
         final text = buffer.toString();
         final count = j - i;
+        // TODO(plugfox): Implement indentation for quotes
+        // Mike Matiunin <plugfox@gmail.com>, 16 June 2025
         pushBlock(MD$Quote(
+          indent: 1, // Indentation level for quotes
           text: text,
           spans: _parseInlineSpans(text),
         ));
@@ -120,21 +123,24 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         continue;
       } else if (_listPattern.firstMatch(line) case RegExpMatch match
           when match.namedGroup('indent')?.isEmpty == true) {
-        final list = <({int intent, String text})>[
+        final marker = match.namedGroup('marker') ?? '*';
+        final list = <({int intent, String marker, String text})>[
           (
             intent: 0,
-            text: line.trim(),
+            marker: marker,
+            text: match.namedGroup('text')?.trim() ?? '',
           )
         ];
         var j = i + 1;
         for (; j < length; j++) {
           final line = lines[j];
-          final indent =
-              _listPattern.firstMatch(line)?.namedGroup('indent')?.length;
+          final match = _listPattern.firstMatch(line);
+          final indent = match?.namedGroup('indent')?.length;
           if (indent == null) break;
           list.add((
             intent: indent,
-            text: line.substring(indent).trim(),
+            marker: match?.namedGroup('marker') ?? '*',
+            text: match?.namedGroup('text')?.trim() ?? '',
           ));
         }
         // Convert to tree structure of [MD$ListItem]s
@@ -147,8 +153,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
               // If the current item's indent matches,
               // we create a new list item at this level.
               items.add(MD$ListItem(
-                marker: '•',
                 text: item.text,
+                marker: item.marker, // '•',
                 spans: _parseInlineSpans(item.text),
                 indent: item.intent,
               ));
@@ -163,7 +169,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
               } else {
                 // If this is the first item, just add children
                 items.add(MD$ListItem(
-                  marker: '•',
+                  marker: item.marker, // '•',
                   text: item.text,
                   spans: _parseInlineSpans(item.text),
                   indent: item.intent,

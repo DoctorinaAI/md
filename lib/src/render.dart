@@ -197,6 +197,7 @@ class MarkdownPainter {
             ),
             quote: (q) => BlockPainter$Quote(
               spans: q.spans,
+              indent: q.indent,
               theme: _theme,
             ),
             code: (c) => BlockPainter$Spacer(
@@ -411,6 +412,7 @@ class BlockPainter$Heading extends BlockPainter {
 class BlockPainter$Quote extends BlockPainter {
   BlockPainter$Quote({
     required List<MD$Span> spans,
+    required this.indent,
     required this.theme,
   }) : painter = TextPainter(
           text: _paragraphFromMarkdownSpans(
@@ -427,7 +429,9 @@ class BlockPainter$Quote extends BlockPainter {
 
   final TextPainter painter;
 
-  static const double indent = 16.0; // Indentation for quote blocks.
+  final int indent; // Indentation for quote blocks.
+
+  static const double lineIndent = 8.0; // Indentation for quote blocks.
 
   static final Paint linePaint = Paint()
     ..color = const Color(0x7F7F7F7F) // Gray color for the line.
@@ -443,24 +447,26 @@ class BlockPainter$Quote extends BlockPainter {
   Size layout(double width) {
     painter.layout(
       minWidth: 0,
-      maxWidth: math.max(width - indent, 0), // Adjust width for indentation.
+      // Adjust width for indentation.
+      maxWidth: math.max(width - lineIndent + indent * lineIndent, 0),
     );
     return _size = Size(
-      painter.size.width + indent, // Add indentation to the width.
+      painter.size.width + indent * 8, // Add indentation to the width.
       painter.size.height,
     );
   }
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
-    canvas.drawLine(
-      Offset(4, offset),
-      Offset(4, offset + _size.height),
-      linePaint,
-    );
+    for (var i = 1; i <= indent; i++)
+      canvas.drawLine(
+        Offset(i * lineIndent - lineIndent / 2, offset),
+        Offset(i * lineIndent - lineIndent / 2, offset + _size.height),
+        linePaint,
+      );
     painter.paint(
       canvas,
-      Offset(indent, offset),
+      Offset(lineIndent + indent * lineIndent, offset),
     );
   }
 }
@@ -491,25 +497,7 @@ class BlockPainter$List extends BlockPainter {
       painter.text = const TextSpan();
     } else {
       final spans = <TextSpan>[];
-      for (var i = 0; i < items.length; i++) {
-        final item = items[i];
-        if (i > 0) spans.add(const TextSpan(text: '\n'));
-        spans
-          ..add(
-            TextSpan(
-              text: '${item.marker} ',
-              style: theme.textStyle,
-            ),
-          )
-          ..addAll(
-            item.spans.map(
-              (span) => TextSpan(
-                text: span.text,
-                style: theme.textStyleFor(span.style),
-              ),
-            ),
-          );
-      }
+      drawListSpans(spans: spans, items: items, theme: theme);
       painter.text = TextSpan(children: spans);
     }
   }
@@ -519,6 +507,43 @@ class BlockPainter$List extends BlockPainter {
   final TextPainter painter;
 
   static const double indent = 8.0; // Indentation for list blocks.
+
+  /// Create a list of spans from the list items.
+  static void drawListSpans({
+    required List<TextSpan> spans,
+    required List<MD$ListItem> items,
+    required MarkdownThemeData theme,
+  }) {
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i];
+      if (spans.isNotEmpty) spans.add(const TextSpan(text: '\n'));
+      spans
+        ..add(
+          TextSpan(
+            text: '${' ' * item.indent}${switch (item.marker) {
+              '-' => '•',
+              '*' => '•',
+              '+' => '•',
+              _ => item.marker,
+            }} ',
+            style: theme.textStyle,
+          ),
+        )
+        ..addAll(
+          item.spans.map<TextSpan>(
+            (span) => TextSpan(
+              text: span.text,
+              style: theme.textStyleFor(span.style),
+            ),
+          ),
+        );
+      drawListSpans(
+        spans: spans,
+        items: item.children,
+        theme: theme,
+      ); // Recursively draw children if any.
+    }
+  }
 
   @override
   Size get size => _size;

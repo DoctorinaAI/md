@@ -257,10 +257,19 @@ final class MD$Heading extends MD$Block {
 final class MD$Quote extends MD$Block {
   /// Creates a new instance of [MD$Quote].
   /// {@macro markdown_block}
-  const MD$Quote({required this.text, required this.spans});
+  const MD$Quote({
+    required this.indent,
+    required this.text,
+    required this.spans,
+  });
 
   @override
   String get type => 'quote';
+
+  /// The indent of the quote block in the document.
+  /// For example, a quote with an indent of 2 would be represented as:
+  /// >> This is a quote.
+  final int indent;
 
   @override
   final String text;
