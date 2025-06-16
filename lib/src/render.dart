@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
 import 'package:meta/meta.dart';
 
@@ -7,19 +8,23 @@ import 'theme.dart';
 @internal
 class MarkdownRenderObject extends RenderBox {
   MarkdownRenderObject({
-    required this.markdown,
-    required this.theme,
-    required this.painter,
-  });
+    required Markdown markdown,
+    required MarkdownThemeData theme,
+    required TextPainter painter,
+  })  : _painter = painter,
+        _theme = theme,
+        _markdown = markdown {
+    _updateInlineSpans();
+  }
 
   /// Current markdown entity to render.
-  Markdown markdown;
+  Markdown _markdown;
 
   /// Current theme for the markdown widget.
-  MarkdownThemeData theme;
+  MarkdownThemeData _theme;
 
   /// Text painter used for rendering text.
-  final TextPainter painter;
+  final TextPainter _painter;
 
   /// Current size of the render box.
   @override
@@ -43,6 +48,15 @@ class MarkdownRenderObject extends RenderBox {
     _size = value;
   }
 
+  /// Updates the inline spans in the text painter.
+  void _updateInlineSpans() {
+    // Update the text painter with the current markdown text.
+    _painter.text = TextSpan(
+      text: _markdown.text,
+      /* style: _theme.textStyle, */
+    );
+  }
+
   @override
   @protected
   void debugResetSize() {
@@ -54,6 +68,30 @@ class MarkdownRenderObject extends RenderBox {
   @override
   @protected
   Size computeDryLayout(BoxConstraints constraints) => constraints.biggest;
+
+  /* @override
+  double computeMinIntrinsicWidth(double height) {
+    return 0;
+  } */
+
+  @override
+  void performLayout() {
+    // Layout the text painter with the current size.
+    _painter
+      ..text = TextSpan(text: _markdown.text)
+      ..layout(
+        minWidth: 0,
+        maxWidth: size.width,
+      );
+    // Set the size of the render box to match the painter's size.
+    size = constraints.constrainDimensions(_painter.width, _painter.height);
+  }
+
+  @override
+  // ignore: unnecessary_overrides
+  void performResize() {
+    super.performResize();
+  }
 
   @override
   bool hitTestSelf(Offset position) => true;
@@ -85,6 +123,30 @@ class MarkdownRenderObject extends RenderBox {
     // Ensure the painter is mounted when the render object is attached.
   }
 
+  /// Updates the render object with a new values.
+  /// This method should be called whenever the markdown or theme changes.
+  @internal
+  void update({
+    required Markdown markdown,
+    required MarkdownThemeData theme,
+    required TextDirection direction,
+    required TextScaler textScaler,
+  }) {
+    if (identical(_markdown, markdown) &&
+        identical(_theme, theme) &&
+        identical(_painter.textDirection, direction) &&
+        identical(_painter.textScaler, textScaler)) return;
+    this
+      .._markdown = markdown
+      .._theme = theme
+      .._painter.textDirection = direction
+      .._painter.textScaler = textScaler;
+    // Update the inline spans in the text painter.
+    _updateInlineSpans();
+    // Mark the render object as needing layout.
+    markNeedsLayout();
+  }
+
   @override
   @protected
   void detach() {
@@ -97,7 +159,15 @@ class MarkdownRenderObject extends RenderBox {
     // ignore: unused_local_variable
     final canvas = context.canvas
       ..save()
-      ..translate(offset.dx, offset.dy);
+      ..translate(offset.dx, offset.dy)
+      ..clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    _painter
+      ..layout(
+        minWidth: 0,
+        maxWidth: size.width,
+      )
+      ..paint(canvas, Offset.zero);
 
     // Implement the painting logic here.
     // This is where you would use the painter to draw the markdown content.

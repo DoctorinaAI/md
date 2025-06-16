@@ -355,12 +355,50 @@ List<MD$Span> _parseInlineSpans(String text) {
   var start = 0; // Start index for the current span
   var mask = MD$Style.none; // Current style mask
   final spans = <MD$Span>[];
+  final excluded = HashSet<int>(); // Set of excluded indices
   {
+    // Add span to the list of spans
+    void pushSpan(int end) {
+      if (excluded.isEmpty) {
+        final txt = text.substring(start, end);
+        spans.add(
+          MD$Span(
+            start: start,
+            end: end,
+            text: txt,
+            style: mask,
+          ),
+        );
+      } else {
+        final spanLength = end - start - excluded.length;
+        if (spanLength > 0) {
+          // If the span has any valid text
+          final bytes = Uint8List(spanLength);
+          var j = 0; // Index for the new bytes array
+          for (var i = start; i < end; i++) {
+            if (excluded.contains(i)) continue; // Skip excluded indices
+            bytes[j++] = codes[i]; // Copy the character to the new array
+          }
+          final txt = String.fromCharCodes(bytes);
+          spans.add(
+            MD$Span(
+              start: start,
+              end: end - excluded.length,
+              text: txt,
+              style: mask,
+            ),
+          );
+        }
+        excluded.clear(); // Clear excluded indices for the next span
+      }
+    }
+
     for (var i = 0; i < length; i++) {
       final ch = codes[i];
 
       // Check for escaped characters
-      if (ch == esc /* \ */) {
+      if (ch == esc /* \ */ && i != length - 1) {
+        excluded.add(i); // Exclude this character as it is escaped
         i++; // skip next char
         continue;
       }
@@ -368,15 +406,7 @@ List<MD$Span> _parseInlineSpans(String text) {
       // If this character is part of a link or image, skip it
       if (skip[i] != 0) {
         // Finish the current span if it exists
-        if (start < i)
-          spans.add(
-            MD$Span(
-              start: start,
-              end: i,
-              text: text.substring(start, i),
-              style: mask,
-            ),
-          );
+        if (start < i) pushSpan(i);
 
         final span = links[skip[i] - 1];
         spans.add(span);
@@ -389,15 +419,7 @@ List<MD$Span> _parseInlineSpans(String text) {
       if (_kind[ch] == 0) continue;
 
       // If we reach here, it means we have a special inline marker
-      if (start < i)
-        spans.add(
-          MD$Span(
-            start: start,
-            end: i,
-            text: text.substring(start, i),
-            style: mask,
-          ),
-        );
+      if (start < i) pushSpan(i);
 
       // Check if the next character is the same kind
       // This is used to determine if it's a single or double marker.
@@ -479,15 +501,7 @@ List<MD$Span> _parseInlineSpans(String text) {
       if (isDouble) i++; // if it's a double marker, skip the next character
     }
     // If we have any remaining text after the last marker, add it as a span
-    if (start < length)
-      spans.add(
-        MD$Span(
-          start: start,
-          end: length,
-          text: text.substring(start, length),
-          style: mask,
-        ),
-      );
+    if (start < length) pushSpan(length);
   }
 
   // This function would parse inline spans like bold, italic, links, etc.

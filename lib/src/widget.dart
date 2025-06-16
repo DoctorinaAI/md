@@ -11,41 +11,42 @@ class MarkdownWidget extends LeafRenderObjectWidget {
   /// {@macro markdown_widget}
   const MarkdownWidget({
     required this.markdown,
+    this.theme,
     super.key, // ignore: unused_element
   });
 
   /// Current markdown entity to render.
   final Markdown markdown;
 
+  /// Current theme for the markdown widget.
+  final MarkdownThemeData? theme;
+
   @override
-  RenderObject createRenderObject(BuildContext context) {
-    final theme = MarkdownTheme.maybeOf(context);
-    final direction = Directionality.maybeOf(context);
-    final scaler = MediaQuery.maybeTextScalerOf(context);
-    return MarkdownRenderObject(
-      markdown: markdown,
-      theme: theme ?? const MarkdownThemeData(),
-      painter: TextPainter(
-        textAlign: TextAlign.start,
-        textDirection: direction ?? TextDirection.ltr,
-        textScaler: scaler ?? TextScaler.noScaling,
-      ),
-    );
-  }
+  RenderObject createRenderObject(BuildContext context) => MarkdownRenderObject(
+        markdown: markdown,
+        theme: theme ??
+            MarkdownTheme.maybeOf(context) ??
+            const MarkdownThemeData(),
+        painter: TextPainter(
+          textAlign: TextAlign.start,
+          textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
+          textScaler:
+              MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
+        ),
+      );
 
   @override
   void updateRenderObject(
     BuildContext context,
     MarkdownRenderObject renderObject,
-  ) {
-    final theme = MarkdownTheme.maybeOf(context) ?? const MarkdownThemeData();
-    final direction = Directionality.maybeOf(context);
-    final scaler = MediaQuery.maybeTextScalerOf(context);
-    renderObject
-      ..markdown = markdown
-      ..theme = theme
-      ..painter.textAlign = TextAlign.start
-      ..painter.textDirection = direction ?? TextDirection.ltr
-      ..painter.textScaler = scaler ?? TextScaler.noScaling;
-  }
+  ) =>
+      renderObject.update(
+        markdown: markdown,
+        theme: theme ??
+            MarkdownTheme.maybeOf(context) ??
+            const MarkdownThemeData(),
+        direction: Directionality.maybeOf(context) ?? TextDirection.ltr,
+        textScaler:
+            MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
+      );
 }

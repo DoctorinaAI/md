@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:md/md.dart';
 
 void main() => runZonedGuarded<void>(
       () => runApp(const App()),
@@ -43,12 +44,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final MultiChildLayoutDelegate _layoutDelegate = _HomeScreenLayoutDelegate();
   final TextEditingController _inputController = TextEditingController();
-  final ValueNotifier<String> _outputController = ValueNotifier<String>('');
+  final ValueNotifier<Markdown> _outputController =
+      ValueNotifier<Markdown>(const Markdown.empty());
 
   @override
   void initState() {
     super.initState();
-    _outputController.value = _inputController.text;
+    _outputController.value = Markdown.fromString(_inputController.text);
     _inputController.addListener(_onInputChanged);
   }
 
@@ -61,7 +63,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onInputChanged() {
     // Handle input changes
-    _outputController.value = _inputController.text;
+    final text = _inputController.text;
+    if (text.isEmpty && _outputController.value.isNotEmpty) {
+      _outputController.value = const Markdown.empty();
+    } else if (text == _outputController.value.markdown) {
+      return; // No change, no need to update
+    } else {
+      final markdown = Markdown.fromString(text);
+      _outputController.value = markdown;
+    }
   }
 
   @override
@@ -167,11 +177,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.all(8.0),
                     child: ValueListenableBuilder(
                       valueListenable: _outputController,
-                      builder: (context, value, child) => Text(
-                        value,
-                        style: const TextStyle(
-                          fontSize: 16.0,
-                        ),
+                      builder: (context, value, child) => MarkdownWidget(
+                        markdown: value,
                       ),
                     ),
                   ),

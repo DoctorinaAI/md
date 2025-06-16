@@ -24,9 +24,24 @@ final class Markdown {
   /// Creates a [Markdown] instance from a markdown string.
   /// This method uses the [markdownDecoder] to parse the string
   /// and convert it into a list of [MD$Block] objects.
+  ///
+  /// This method is relatively expensive and should be used
+  /// sparingly, outside build phase, especially for large markdown strings.
   /// {@macro markdown}
   factory Markdown.fromString(String markdown) =>
       markdownDecoder.convert(markdown);
+
+  /// The original markdown string.
+  final String markdown;
+
+  /// List of blocks in the markdown.
+  final List<MD$Block> blocks;
+
+  /// Returns true if the markdown contains no blocks.
+  bool get isEmpty => blocks.isEmpty;
+
+  /// Returns true if the markdown contains any blocks.
+  bool get isNotEmpty => blocks.isNotEmpty;
 
   /// Plain text representation of the markdown.
   ///
@@ -71,12 +86,6 @@ final class Markdown {
     }
     return buffer.toString();
   }
-
-  /// The original markdown string.
-  final String markdown;
-
-  /// List of blocks in the markdown.
-  final List<MD$Block> blocks;
 
   @override
   String toString() => markdown;
