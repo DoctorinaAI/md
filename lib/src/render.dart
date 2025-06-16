@@ -185,7 +185,7 @@ class MarkdownPainter {
     _isEmpty = markdown.isEmpty;
     _blockPainters = _markdown.blocks
         .map<BlockPainter>(
-          (b) => b.map(
+          (b) => b.map<BlockPainter>(
             paragraph: (p) => BlockPainter$Paragraph(
               spans: p.spans,
               theme: _theme,
@@ -195,8 +195,8 @@ class MarkdownPainter {
               spans: h.spans,
               theme: _theme,
             ),
-            quote: (q) => BlockPainter$Spacer(
-              count: 1,
+            quote: (q) => BlockPainter$Quote(
+              spans: q.spans,
               theme: _theme,
             ),
             code: (c) => BlockPainter$Spacer(
@@ -402,6 +402,65 @@ class BlockPainter$Heading extends BlockPainter {
     painter.paint(
       canvas,
       Offset(0, offset),
+    );
+  }
+}
+
+/// A class for painting a paragraph block in markdown.
+@internal
+class BlockPainter$Quote extends BlockPainter {
+  BlockPainter$Quote({
+    required List<MD$Span> spans,
+    required this.theme,
+  }) : painter = TextPainter(
+          text: _paragraphFromMarkdownSpans(
+            spans: spans,
+            theme: theme,
+            textStyle: theme.quoteStyle,
+          ),
+          textAlign: TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        );
+
+  final MarkdownThemeData theme;
+
+  final TextPainter painter;
+
+  static const double indent = 16.0; // Indentation for quote blocks.
+
+  static final Paint linePaint = Paint()
+    ..color = const Color(0x7F7F7F7F) // Gray color for the line.
+    ..isAntiAlias = false
+    ..strokeWidth = 4.0
+    ..style = PaintingStyle.fill;
+
+  @override
+  Size get size => _size;
+  Size _size = Size.zero;
+
+  @override
+  Size layout(double width) {
+    painter.layout(
+      minWidth: 0,
+      maxWidth: math.max(width - indent, 0), // Adjust width for indentation.
+    );
+    return _size = Size(
+      painter.size.width + indent, // Add indentation to the width.
+      painter.size.height,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size, double offset) {
+    canvas.drawLine(
+      Offset(4, offset),
+      Offset(4, offset + _size.height),
+      linePaint,
+    );
+    painter.paint(
+      canvas,
+      Offset(indent, offset),
     );
   }
 }

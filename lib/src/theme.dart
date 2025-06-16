@@ -14,12 +14,33 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.textDirection = TextDirection.ltr,
     this.textScaler = TextScaler.noScaling,
     this.textStyle = const TextStyle(fontSize: 14.0),
-    this.h1Style = const TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
-    this.h2Style = const TextStyle(fontSize: 22.0, fontWeight: FontWeight.bold),
-    this.h3Style = const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
-    this.h4Style = const TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-    this.h5Style = const TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-    this.h6Style = const TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold),
+    this.h1Style = const TextStyle(
+      fontSize: 24.0,
+      fontWeight: FontWeight.bold,
+    ),
+    this.h2Style = const TextStyle(
+      fontSize: 22.0,
+      fontWeight: FontWeight.bold,
+    ),
+    this.h3Style = const TextStyle(
+      fontSize: 20.0,
+      fontWeight: FontWeight.bold,
+    ),
+    this.h4Style = const TextStyle(
+      fontSize: 18.0,
+      fontWeight: FontWeight.bold,
+    ),
+    this.h5Style = const TextStyle(
+      fontSize: 16.0,
+      fontWeight: FontWeight.bold,
+    ),
+    this.h6Style = const TextStyle(
+      fontSize: 14.0,
+      fontWeight: FontWeight.bold,
+    ),
+    this.quoteStyle = const TextStyle(
+      fontSize: 14.0,
+    ),
   }) : _textStyles = HashMap<int, TextStyle>();
 
   @override
@@ -51,6 +72,9 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// Default text style for headings h6.
   final TextStyle h6Style;
+
+  /// Default text style for quote blocks.
+  final TextStyle quoteStyle;
 
   final HashMap<int, TextStyle> _textStyles;
 

@@ -97,11 +97,12 @@ class MarkdownDecoder extends Converter<String, Markdown> {
             ..write(lines[j].substring(1).trim());
         }
         final text = buffer.toString();
+        final count = j - i;
         pushBlock(MD$Quote(
           text: text,
           spans: _parseInlineSpans(text),
         ));
-        if (j == length - 1) break; // Last line is a quote
+        if (i + count == length) break; // Last line is quote
         i = j - 1; // Skip the empty lines
         continue;
       } else if (line.startsWith('```')) {
@@ -178,13 +179,14 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         }
 
         // Create the list block with the items
+        final count = j - i;
         final text = lines.sublist(i, j).join('\n');
         pushBlock(MD$List(
           text: text,
           items: traverse(),
         ));
 
-        if (j == length - 1) break; // Last line is a list item
+        if (i + count == length) break; // Last line is a list item
         i = j - 1; // Skip the list items
         continue;
       } else if (line.startsWith('|')) {
@@ -202,8 +204,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
 
         final header = textToRow(line);
         final separator = lines.length > i + 1
-            ? lines[i + 1]
-            : null; // Separator line for the table header
+            ? RegExp(r'^\|[ -:]+[ -|:]*\|$').hasMatch(lines[i + 1])
+            : false; // Separator line for the table header
         final rows = <MD$TableRow>[];
         var j = i + 2; // Skip the header and separator line
         for (; j < length && lines[j].startsWith('|'); j++)
@@ -211,7 +213,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         // Validate
         final columns = header.cells.length;
         if (columns > 0 &&
-            separator != null &&
+            separator &&
             rows.every((row) => row.cells.length == columns)) {
           // All rows have the same number of cells as the header
           final text = lines.sublist(i, j).join('\n');
@@ -227,7 +229,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
           continue;
         }
 
-        if (j == length - 1) break; // Last line is a table row
+        final count = j - i;
+        if (i + count == length) break; // Last line is a table row
         i = j - 1; // Skip the table rows
         continue;
       } else {
