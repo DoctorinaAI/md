@@ -72,16 +72,16 @@ void main() => group('Parse', () {
             '    - Third level ~~strikethrough~~\n'
             '- Fourth item';
 
-        final blocks = markdownDecoder.convert(sample);
+        final markdown = markdownDecoder.convert(sample);
         expect(
-            blocks,
+            markdown,
             allOf(
               isNotEmpty,
               hasLength(equals(1)),
               everyElement(isA<MD$Block>()),
             ));
         expect(
-          blocks.single,
+          markdown.blocks.single,
           isA<MD$List>().having(
             (list) => list.items.length,
             'items length',
@@ -99,16 +99,16 @@ void main() => group('Parse', () {
             '   2. Substep 2.2\n'
             '3. Final step';
 
-        final blocks = markdownDecoder.convert(sample);
+        final markdown = markdownDecoder.convert(sample);
         expect(
-            blocks,
+            markdown,
             allOf(
               isNotEmpty,
               hasLength(equals(1)),
               everyElement(isA<MD$Block>()),
             ));
         expect(
-          blocks.single,
+          markdown.blocks.single,
           isA<MD$List>().having(
             (list) => list.items.length,
             'items length',
