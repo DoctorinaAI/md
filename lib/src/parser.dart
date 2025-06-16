@@ -2,11 +2,12 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'markdown.dart';
 import 'nodes.dart';
 
 /// Decodes Markdown formatted strings
 /// into a list of [MD$Block] objects.
-const Converter<String, List<MD$Block>> mdDecoder = MarkdownDecoder();
+const Converter<String, Markdown> markdownDecoder = MarkdownDecoder();
 
 /// {@template markdown_decoder}
 /// A [Converter] that decodes Markdown formatted strings
@@ -14,7 +15,7 @@ const Converter<String, List<MD$Block>> mdDecoder = MarkdownDecoder();
 /// This class is designed to parse Markdown syntax
 /// and convert it into a structured format
 /// {@endtemplate}
-class MarkdownDecoder extends Converter<String, List<MD$Block>> {
+class MarkdownDecoder extends Converter<String, Markdown> {
   /// Creates a new instance of [MarkdownDecoder].
   /// {@macro markdown_decoder}
   const MarkdownDecoder();
@@ -35,10 +36,10 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
       RegExp(r'^(?<indent>[ ]{0,6})(?:(\d{1,9})[\.)]|[*+-])(?:[ \t]+(.*))?$');
 
   @override
-  List<MD$Block> convert(String input) {
+  Markdown convert(String input) {
     final lines = LineSplitter.split(input).toList(growable: false);
-    if (lines.isEmpty) return const <MD$Block>[];
-    final result = Queue<MD$Block>();
+    if (lines.isEmpty) return const Markdown.empty();
+    final blocks = Queue<MD$Block>(); // Queue to accumulate blocks
     final length = lines.length;
 
     final paragraph = StringBuffer(); // To accumulate lines for paragraphs
@@ -47,7 +48,7 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
       if (paragraph.isEmpty) return;
       final text = paragraph.toString();
       paragraph.clear();
-      result.addLast(MD$Paragraph(
+      blocks.addLast(MD$Paragraph(
         text: text,
         spans: _parseInlineSpans(text),
       ));
@@ -55,7 +56,7 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
 
     void pushBlock(MD$Block block) {
       maybeCommitParagraph();
-      result.addLast(block);
+      blocks.addLast(block);
     }
 
     for (var i = 0; i < length; i++) {
@@ -223,9 +224,6 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
         paragraph.writeln(line);
         continue;
       }
-      // TODO(plugfox): Implement tables
-      // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
-
       // TODO(plugfox): Implement images
       // Mike Matiunin <plugfox@gmail.com>, 12 June 2025
     }
@@ -233,7 +231,9 @@ class MarkdownDecoder extends Converter<String, List<MD$Block>> {
     // If there's any remaining text in the paragraph buffer, commit it
     maybeCommitParagraph();
 
-    return List<MD$Block>.unmodifiable(result);
+    return Markdown(
+      blocks: blocks,
+    );
   }
 }
 

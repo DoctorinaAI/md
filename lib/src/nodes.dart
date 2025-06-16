@@ -122,7 +122,7 @@ final class MD$Span {
     required this.start,
     required this.end,
     required this.text,
-    this.style = 0,
+    this.style = MD$Style.none,
     this.extra,
   });
 
@@ -140,7 +140,7 @@ final class MD$Span {
   /// Using bitmasking, you can combine multiple styles.
   /// For example, you can have both bold and italic styles applied.
   /// This is an optional property that can be used to set the text style.
-  final int style;
+  final MD$Style style;
 
   /// Extra properties for the inline text.
   /// This can include additional metadata or attributes.
@@ -159,6 +159,9 @@ sealed class MD$Block {
   /// {@macro markdown_block}
   const MD$Block();
 
+  /// The type of the block.
+  abstract final String type;
+
   /// Text content of the block.
   abstract final String text;
 
@@ -171,7 +174,6 @@ sealed class MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   });
 
@@ -189,6 +191,9 @@ final class MD$Paragraph extends MD$Block {
   const MD$Paragraph({required this.text, required this.spans});
 
   @override
+  String get type => 'paragraph';
+
+  @override
   final String text;
 
   /// The inline text spans within the paragraph.
@@ -204,7 +209,6 @@ final class MD$Paragraph extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   }) =>
       paragraph(this);
@@ -219,6 +223,9 @@ final class MD$Heading extends MD$Block {
   /// {@macro markdown_block}
   const MD$Heading(
       {required this.text, required this.level, required this.spans});
+
+  @override
+  String get type => 'heading';
 
   @override
   final String text;
@@ -238,7 +245,6 @@ final class MD$Heading extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   }) =>
       heading(this);
@@ -252,6 +258,9 @@ final class MD$Quote extends MD$Block {
   /// Creates a new instance of [MD$Quote].
   /// {@macro markdown_block}
   const MD$Quote({required this.text, required this.spans});
+
+  @override
+  String get type => 'quote';
 
   @override
   final String text;
@@ -268,7 +277,6 @@ final class MD$Quote extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   }) =>
       quote(this);
@@ -282,6 +290,9 @@ final class MD$Code extends MD$Block {
   /// Creates a new instance of [MD$Code].
   /// {@macro markdown_block}
   const MD$Code({required this.text, required this.language});
+
+  @override
+  String get type => 'code';
 
   @override
   final String text;
@@ -298,7 +309,6 @@ final class MD$Code extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   }) =>
       code(this);
@@ -382,6 +392,9 @@ final class MD$List extends MD$Block {
   });
 
   @override
+  String get type => 'list';
+
+  @override
   final String text;
 
   /// The list items in the list block.
@@ -396,7 +409,6 @@ final class MD$List extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   }) =>
       list(this);
@@ -413,6 +425,9 @@ final class MD$Divider extends MD$Block {
   const MD$Divider();
 
   @override
+  String get type => 'divider';
+
+  @override
   final String text = '---'; // Represents a horizontal rule.
 
   @override
@@ -424,7 +439,6 @@ final class MD$Divider extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   }) =>
       divider(this);
@@ -464,6 +478,9 @@ final class MD$Table extends MD$Block {
       {required this.text, required this.header, required this.rows});
 
   @override
+  String get type => 'table';
+
+  @override
   final String text;
 
   /// The header row of the table.
@@ -481,13 +498,12 @@ final class MD$Table extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   }) =>
       table(this);
 }
 
-/// A block representing an image in Markdown.
+/* /// A block representing an image in Markdown.
 /// Contains the image source URL, an optional title,
 /// and inline text spans for the alt text.
 /// Always a leaf node in the Markdown tree.
@@ -501,6 +517,9 @@ final class MD$Image extends MD$Block {
     required this.spans,
     this.title,
   });
+
+  @override
+  String get type => 'image';
 
   @override
   final String text;
@@ -527,7 +546,7 @@ final class MD$Image extends MD$Block {
     required T Function(MD$Spacer s) spacer,
   }) =>
       image(this);
-}
+} */
 
 /// A block representing an empty row in Markdown.
 /// This is used to represent a block that has no content.
@@ -538,6 +557,9 @@ class MD$Spacer extends MD$Block {
   const MD$Spacer({
     this.count = 1,
   }) : text = '\n' * count;
+
+  @override
+  String get type => 'spacer';
 
   @override
   final String text;
@@ -555,7 +577,6 @@ class MD$Spacer extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
-    required T Function(MD$Image i) image,
     required T Function(MD$Spacer s) spacer,
   }) =>
       spacer(this);

@@ -35,11 +35,11 @@ void main() {
 class Current$Benchmark extends BenchmarkBase {
   Current$Benchmark() : super('Current package');
 
-  List<MD$Block>? result;
+  Markdown? result;
 
   @override
   void run() {
-    result = mdDecoder.convert(_testSample);
+    result = Markdown.fromString(_testSample);
   }
 
   @override

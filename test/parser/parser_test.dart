@@ -4,11 +4,11 @@ import 'package:md/md.dart';
 void main() => group('Parse', () {
       test('Should returns normally', () {
         expect(
-          () => mdDecoder.convert(_testSample),
+          () => markdownDecoder.convert(_testSample),
           returnsNormally,
         );
         expect(
-          mdDecoder.convert(_testSample),
+          markdownDecoder.convert(_testSample),
           allOf(
             isList,
             isNotEmpty,
@@ -19,12 +19,12 @@ void main() => group('Parse', () {
       });
 
       test('Empty input', () {
-        expect(mdDecoder.convert(''), isEmpty);
+        expect(markdownDecoder.convert(''), isEmpty);
       });
 
       test('Divider', () {
         expect(
-          mdDecoder.convert('---\n---'),
+          markdownDecoder.convert('---\n---'),
           allOf(
             isNotEmpty,
             hasLength(equals(2)),
@@ -35,7 +35,7 @@ void main() => group('Parse', () {
 
       test('Space', () {
         expect(
-          mdDecoder.convert(' '),
+          markdownDecoder.convert(' '),
           allOf(
             isNotEmpty,
             hasLength(equals(1)),
@@ -50,7 +50,7 @@ void main() => group('Parse', () {
 
       test('Spacer', () {
         expect(
-          mdDecoder.convert('\n\n\n'),
+          markdownDecoder.convert('\n\n\n'),
           allOf(
             isNotEmpty,
             hasLength(equals(1)),
@@ -72,7 +72,7 @@ void main() => group('Parse', () {
             '    - Third level ~~strikethrough~~\n'
             '- Fourth item';
 
-        final blocks = mdDecoder.convert(sample);
+        final blocks = markdownDecoder.convert(sample);
         expect(
             blocks,
             allOf(
@@ -99,7 +99,7 @@ void main() => group('Parse', () {
             '   2. Substep 2.2\n'
             '3. Final step';
 
-        final blocks = mdDecoder.convert(sample);
+        final blocks = markdownDecoder.convert(sample);
         expect(
             blocks,
             allOf(
@@ -119,7 +119,7 @@ void main() => group('Parse', () {
 
       test('Parse links', () {
         expect(
-          mdDecoder.convert('[link](https://example.com/path)'),
+          markdownDecoder.convert('[link](https://example.com/path)'),
           allOf(
             isNotEmpty,
             hasLength(equals(1)),
@@ -156,7 +156,7 @@ void main() => group('Parse', () {
 
       test('Parse images', () {
         expect(
-          mdDecoder.convert('![](https://example.com/image.jpg)'),
+          markdownDecoder.convert('![](https://example.com/image.jpg)'),
           allOf(
             isNotEmpty,
             hasLength(equals(1)),
