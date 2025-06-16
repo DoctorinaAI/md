@@ -4,27 +4,58 @@ import 'package:md/md.dart';
 void main() => group('Parse', () {
       test('Should returns normally', () {
         expect(
-          () => markdownDecoder.convert(_testSample),
+          () => markdownDecoder.convert(_testSample).blocks,
           returnsNormally,
         );
         expect(
           markdownDecoder.convert(_testSample),
+          isA<Markdown>()
+              .having(
+                (md) => md.blocks,
+                'blocks',
+                allOf(
+                  isList,
+                  isNotEmpty,
+                  hasLength(greaterThan(0)),
+                  everyElement(isA<MD$Block>()),
+                ),
+              )
+              .having(
+                (md) => md.text,
+                'text',
+                allOf(
+                  isA<String>(),
+                  isNotEmpty,
+                  contains('Markdown Parser Test'),
+                ),
+              ),
+        );
+      });
+
+      test('Should contain three blocks', () {
+        const text = '# Header\n'
+            '---\n'
+            'This is a paragraph with **bold** text.\n'
+            'And another line.\n';
+        final markdown = markdownDecoder.convert(text);
+        markdown.text; // Force text computation
+        expect(
+          markdown.blocks,
           allOf(
-            isList,
             isNotEmpty,
-            hasLength(greaterThan(0)),
+            hasLength(equals(3)),
             everyElement(isA<MD$Block>()),
           ),
         );
       });
 
       test('Empty input', () {
-        expect(markdownDecoder.convert(''), isEmpty);
+        expect(markdownDecoder.convert('').blocks, isEmpty);
       });
 
       test('Divider', () {
         expect(
-          markdownDecoder.convert('---\n---'),
+          markdownDecoder.convert('---\n---').blocks,
           allOf(
             isNotEmpty,
             hasLength(equals(2)),
@@ -35,7 +66,7 @@ void main() => group('Parse', () {
 
       test('Space', () {
         expect(
-          markdownDecoder.convert(' '),
+          markdownDecoder.convert(' ').blocks,
           allOf(
             isNotEmpty,
             hasLength(equals(1)),
@@ -50,7 +81,7 @@ void main() => group('Parse', () {
 
       test('Spacer', () {
         expect(
-          markdownDecoder.convert('\n\n\n'),
+          markdownDecoder.convert('\n\n\n').blocks,
           allOf(
             isNotEmpty,
             hasLength(equals(1)),
@@ -74,7 +105,7 @@ void main() => group('Parse', () {
 
         final markdown = markdownDecoder.convert(sample);
         expect(
-            markdown,
+            markdown.blocks,
             allOf(
               isNotEmpty,
               hasLength(equals(1)),
@@ -101,7 +132,7 @@ void main() => group('Parse', () {
 
         final markdown = markdownDecoder.convert(sample);
         expect(
-            markdown,
+            markdown.blocks,
             allOf(
               isNotEmpty,
               hasLength(equals(1)),
@@ -119,7 +150,7 @@ void main() => group('Parse', () {
 
       test('Parse links', () {
         expect(
-          markdownDecoder.convert('[link](https://example.com/path)'),
+          markdownDecoder.convert('[link](https://example.com/path)').blocks,
           allOf(
             isNotEmpty,
             hasLength(equals(1)),
@@ -156,7 +187,7 @@ void main() => group('Parse', () {
 
       test('Parse images', () {
         expect(
-          markdownDecoder.convert('![](https://example.com/image.jpg)'),
+          markdownDecoder.convert('![](https://example.com/image.jpg)').blocks,
           allOf(
             isNotEmpty,
             hasLength(equals(1)),
