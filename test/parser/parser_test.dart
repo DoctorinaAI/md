@@ -49,6 +49,44 @@ void main() => group('Parse', () {
         );
       });
 
+      test('Quote', () {
+        const text = '> A\n'
+            '> B\n'
+            '> C';
+        final markdown = markdownDecoder.convert(text);
+        markdown.text; // Force text computation
+        expect(
+          markdown.blocks,
+          allOf(
+            isNotEmpty,
+            hasLength(equals(1)),
+            everyElement(isA<MD$Quote>()),
+          ),
+        );
+        expect(
+          markdown.markdown,
+          allOf(
+            isA<String>(),
+            isNotEmpty,
+            contains('A'),
+            contains('B'),
+            contains('C'),
+            equals('> A\n> B\n> C'),
+          ),
+        );
+        expect(
+          markdown.text,
+          allOf(
+            isA<String>(),
+            isNotEmpty,
+            contains('A'),
+            contains('B'),
+            contains('C'),
+            equals('A\nB\nC'),
+          ),
+        );
+      });
+
       test('Empty input', () {
         expect(markdownDecoder.convert('').blocks, isEmpty);
       });

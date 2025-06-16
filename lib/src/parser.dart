@@ -88,10 +88,13 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         continue;
       } else if (line.startsWith('>')) {
         // Parse quotes
-        final buffer = StringBuffer()..writeln(line.substring(1).trim());
+        final buffer = StringBuffer()..write(line.substring(1).trim());
         var j = i + 1;
-        for (; j < length && lines[j].startsWith('>'); j++)
-          buffer.writeln(lines[j].substring(1).trim());
+        for (; j < length && lines[j].startsWith('>'); j++) {
+          buffer
+            ..writeln()
+            ..write(lines[j].substring(1).trim());
+        }
         final text = buffer.toString();
         pushBlock(MD$Quote(
           text: text,
