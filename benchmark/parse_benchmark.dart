@@ -2,7 +2,7 @@
 
 import 'package:benchmark_harness/benchmark_harness.dart';
 import 'package:markdown/markdown.dart' as markdown;
-import 'package:md/md.dart';
+import 'package:md/src/markdown.dart' show Markdown;
 
 /// This benchmark compares the performance of the `md` package against the
 /// `markdown` package from Google.

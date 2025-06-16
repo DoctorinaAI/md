@@ -39,6 +39,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   Markdown convert(String input) {
     final lines = LineSplitter.split(input).toList(growable: false);
     if (lines.isEmpty) return const Markdown.empty();
+    final textBuffer = StringBuffer(); // To accumulate the text of the markdown
     final blocks = Queue<MD$Block>(); // Queue to accumulate blocks
     final length = lines.length;
 
@@ -48,6 +49,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
       if (paragraph.isEmpty) return;
       final text = paragraph.toString();
       paragraph.clear();
+      textBuffer.writeln(text);
       blocks.addLast(MD$Paragraph(
         text: text,
         spans: _parseInlineSpans(text),
@@ -82,6 +84,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         final level =
             _headerPattern.firstMatch(line)?.group(0)?.length.clamp(1, 6) ?? 1;
         final text = line.substring(level).trim();
+        textBuffer.writeln(text);
         pushBlock(MD$Heading(
             level: level, text: text, spans: _parseInlineSpans(text)));
         continue;
@@ -92,6 +95,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         for (; j < length && lines[j].startsWith('>'); j++)
           buffer.writeln(lines[j].substring(1).trim());
         final text = buffer.toString();
+        textBuffer.writeln(text);
         pushBlock(MD$Quote(
           text: text,
           spans: _parseInlineSpans(text),
@@ -105,6 +109,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         var j = i + 1;
         for (; j < length && !lines[j].startsWith('```'); j++) continue;
         final codeText = lines.sublist(i + 1, j).join('\n');
+        textBuffer.writeln(codeText);
         pushBlock(MD$Code(
           text: codeText,
           language: language,
@@ -173,8 +178,10 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         }
 
         // Create the list block with the items
+        final text = lines.sublist(i, j).join('\n');
+        textBuffer.writeln(text);
         pushBlock(MD$List(
-          text: lines.sublist(i, j).join('\n'),
+          text: text,
           items: traverse(),
         ));
 
@@ -203,8 +210,10 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         final columns = header.cells.length;
         if (rows.every((row) => row.cells.length == columns)) {
           // All rows have the same number of cells as the header
+          final text = lines.sublist(i, j).join('\n');
+          textBuffer.writeln(text);
           pushBlock(MD$Table(
-            text: lines.sublist(i, j).join('\n'),
+            text: text,
             header: header,
             rows: List<MD$TableRow>.unmodifiable(rows),
           ));
@@ -231,8 +240,34 @@ class MarkdownDecoder extends Converter<String, Markdown> {
     // If there's any remaining text in the paragraph buffer, commit it
     maybeCommitParagraph();
 
+    /* final styles = <MD$Style>{}; // All styles used in the markdown.
+    for (final block in blocks) {
+      switch (block) {
+        case MD$Paragraph(:List<MD$Span> spans):
+          for (final span in spans) styles.add(span.style);
+        case MD$Heading(:List<MD$Span> spans):
+          for (final span in spans) styles.add(span.style);
+        case MD$Quote(:List<MD$Span> spans):
+          for (final span in spans) styles.add(span.style);
+        case MD$Code():
+          styles.add(MD$Style.monospace);
+        case MD$List(:List<MD$ListItem> items):
+          for (final item in items)
+            for (final span in item.spans) styles.add(span.style);
+        case MD$Table():
+          for (final row in block.rows)
+            for (final spans in row.cells)
+              for (final span in spans) styles.add(span.style);
+        case MD$Divider():
+          break;
+        case MD$Spacer():
+          break;
+      }
+    } */
+
     return Markdown(
-      blocks: blocks,
+      text: textBuffer.toString(),
+      blocks: List<MD$Block>.unmodifiable(blocks),
     );
   }
 }
