@@ -537,6 +537,7 @@ class BlockPainter$List extends BlockPainter {
             ),
           ),
         );
+      if (item.children.isEmpty) continue;
       drawListSpans(
         spans: spans,
         items: item.children,
