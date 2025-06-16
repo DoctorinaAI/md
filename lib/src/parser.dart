@@ -355,21 +355,15 @@ List<MD$Span> _parseInlineSpans(String text) {
   var start = 0; // Start index for the current span
   var mask = MD$Style.none; // Current style mask
   final spans = <MD$Span>[];
-  final excluded = HashSet<int>(); // Set of excluded indices
+
+  var hasExcluded = false; // Flag to check if we have excluded characters
+  late final excluded = HashSet<int>(); // Set of excluded indices
   {
     // Add span to the list of spans
     void pushSpan(int end) {
-      if (excluded.isEmpty) {
-        final txt = text.substring(start, end);
-        spans.add(
-          MD$Span(
-            start: start,
-            end: end,
-            text: txt,
-            style: mask,
-          ),
-        );
-      } else {
+      if (hasExcluded) {
+        // If we have excluded characters, we should create a new span
+        // from the bytes that are not excluded.
         final spanLength = end - start - excluded.length;
         if (spanLength > 0) {
           // If the span has any valid text
@@ -390,6 +384,20 @@ List<MD$Span> _parseInlineSpans(String text) {
           );
         }
         excluded.clear(); // Clear excluded indices for the next span
+        hasExcluded = false; // Reset the flag
+      } else {
+        // If there are no excluded characters, we can directly create the span
+        // from the original text as substring.
+        //final txt = String.fromCharCodes(codes, start, end);
+        final txt = text.substring(start, end);
+        spans.add(
+          MD$Span(
+            start: start,
+            end: end,
+            text: txt,
+            style: mask,
+          ),
+        );
       }
     }
 
@@ -398,6 +406,7 @@ List<MD$Span> _parseInlineSpans(String text) {
 
       // Check for escaped characters
       if (ch == esc /* \ */ && i != length - 1) {
+        hasExcluded = true; // We have an escaped character
         excluded.add(i); // Exclude this character as it is escaped
         i++; // skip next char
         continue;
