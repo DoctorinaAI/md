@@ -216,7 +216,7 @@ class MarkdownPainter {
               theme: _theme,
             ),
             spacer: (s) => BlockPainter$Spacer(
-              count: 1,
+              count: s.count,
               theme: _theme,
             ),
           ),
@@ -285,14 +285,22 @@ TextSpan _paragraphFromMarkdownSpans({
   required Iterable<MD$Span> spans,
   required MarkdownThemeData theme,
   TextStyle? textStyle,
-}) =>
-    TextSpan(
-      style: textStyle ?? theme.textStyle,
-      children: spans
-          .map((span) =>
-              TextSpan(text: span.text, style: theme.textStyleFor(span.style)))
-          .toList(growable: false),
-    );
+}) {
+  final style = textStyle ?? theme.textStyle;
+  return TextSpan(
+    style: textStyle ?? theme.textStyle,
+    children: textStyle != null
+        ? spans
+            .map((span) => TextSpan(
+                text: span.text,
+                style: theme.textStyleFor(span.style).merge(style)))
+            .toList(growable: false)
+        : spans
+            .map((span) => TextSpan(
+                text: span.text, style: theme.textStyleFor(span.style)))
+            .toList(growable: false),
+  );
+}
 
 /// A class for painting blocks in markdown.
 @internal
@@ -594,7 +602,12 @@ class BlockPainter$Spacer extends BlockPainter {
   }
 
   @override
-  void paint(Canvas canvas, Size size, double offset) {}
+  void paint(Canvas canvas, Size size, double offset) {
+    /* canvas.drawRect(
+      Rect.fromLTWH(0, offset, size.width, _size.height),
+      Paint()..color = theme.textStyle.color ?? const Color(0x00000000),
+    ); */
+  }
 }
 
 /// A class for painting a spacer block in markdown.

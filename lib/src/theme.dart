@@ -17,6 +17,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.h1Style = const TextStyle(
       fontSize: 24.0,
       fontWeight: FontWeight.bold,
+      decoration: TextDecoration.underline,
+      decorationStyle: TextDecorationStyle.solid,
     ),
     this.h2Style = const TextStyle(
       fontSize: 22.0,
@@ -99,6 +101,9 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
           color: style.contains(MD$Style.highlight)
               ? Colors.yellow
               : textStyle.color,
+          backgroundColor: style.contains(MD$Style.monospace)
+              ? Colors.black12
+              : textStyle.backgroundColor,
         ),
       );
 
