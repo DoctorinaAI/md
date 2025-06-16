@@ -1,24 +1,75 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
+
+import '../md.dart';
 
 /// {@template markdown_theme_data}
 /// Theme data for Markdown widgets.
 /// {@endtemplate}
-@immutable
 class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// Creates a [MarkdownThemeData] instance.
   /// {@macro markdown_theme_data}
-  const MarkdownThemeData();
+  MarkdownThemeData({
+    this.textDirection = TextDirection.ltr,
+    this.textScaler = TextScaler.noScaling,
+    this.textStyle = const TextStyle(),
+  }) : _textStyles = HashMap<int, TextStyle>();
 
   @override
   Object get type => MarkdownThemeData;
 
+  /// The text direction to use for rendering Markdown widgets.
+  final TextDirection textDirection;
+
+  /// The text scaler to use for scaling text in Markdown widgets.
+  final TextScaler textScaler;
+
+  /// The default text style to use for Markdown widgets.
+  final TextStyle textStyle;
+
+  final HashMap<int, TextStyle> _textStyles;
+
+  /// Returns a [TextStyle] for the given [MD$Style].
+  TextStyle textStyleFor(MD$Style style) => _textStyles.putIfAbsent(
+        style.hashCode,
+        () => textStyle.copyWith(
+          fontWeight: style.contains(MD$Style.bold)
+              ? FontWeight.bold
+              : FontWeight.normal,
+          fontStyle: style.contains(MD$Style.italic)
+              ? FontStyle.italic
+              : FontStyle.normal,
+          decoration: style.contains(MD$Style.underline)
+              ? TextDecoration.underline
+              : style.contains(MD$Style.strikethrough)
+                  ? TextDecoration.lineThrough
+                  : TextDecoration.none,
+          fontFamily: style.contains(MD$Style.monospace)
+              ? 'monospace'
+              : textStyle.fontFamily,
+          color: style.contains(MD$Style.highlight)
+              ? Colors.yellow
+              : textStyle.color,
+        ),
+      );
+
   @override
-  ThemeExtension<MarkdownThemeData> copyWith() => const MarkdownThemeData();
+  ThemeExtension<MarkdownThemeData> copyWith({
+    TextDirection? textDirection,
+    TextScaler? textScaler,
+    TextStyle? textStyle,
+  }) =>
+      MarkdownThemeData(
+        textDirection: textDirection ?? this.textDirection,
+        textScaler: textScaler ?? this.textScaler,
+        textStyle: textStyle ?? this.textStyle,
+      );
 
   @override
   ThemeExtension<MarkdownThemeData> lerp(
           covariant ThemeExtension<MarkdownThemeData>? other, double t) =>
-      const MarkdownThemeData();
+      MarkdownThemeData();
 
   @override
   String toString() => 'MarkdownThemeData{}';

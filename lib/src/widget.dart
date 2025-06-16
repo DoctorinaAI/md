@@ -22,31 +22,37 @@ class MarkdownWidget extends LeafRenderObjectWidget {
   final MarkdownThemeData? theme;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => MarkdownRenderObject(
-        markdown: markdown,
-        theme: theme ??
-            MarkdownTheme.maybeOf(context) ??
-            const MarkdownThemeData(),
-        painter: TextPainter(
-          textAlign: TextAlign.start,
+  RenderObject createRenderObject(BuildContext context) {
+    final theme = this.theme ??
+        MarkdownTheme.maybeOf(context) ??
+        MarkdownThemeData(
+          textStyle: DefaultTextStyle.of(context).style,
           textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
           textScaler:
               MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
-        ),
-      );
+        );
+    return MarkdownRenderObject(
+      markdown: markdown,
+      theme: theme,
+    );
+  }
 
   @override
   void updateRenderObject(
     BuildContext context,
     MarkdownRenderObject renderObject,
-  ) =>
-      renderObject.update(
-        markdown: markdown,
-        theme: theme ??
-            MarkdownTheme.maybeOf(context) ??
-            const MarkdownThemeData(),
-        direction: Directionality.maybeOf(context) ?? TextDirection.ltr,
-        textScaler:
-            MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
-      );
+  ) {
+    final theme = this.theme ??
+        MarkdownTheme.maybeOf(context) ??
+        MarkdownThemeData(
+          textStyle: DefaultTextStyle.of(context).style,
+          textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
+          textScaler:
+              MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
+        );
+    renderObject.update(
+      markdown: markdown,
+      theme: theme,
+    );
+  }
 }

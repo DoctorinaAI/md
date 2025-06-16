@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
 import 'package:meta/meta.dart';
 
 import 'markdown.dart';
+import 'nodes.dart';
 import 'theme.dart';
 
 @internal
@@ -10,25 +13,13 @@ class MarkdownRenderObject extends RenderBox {
   MarkdownRenderObject({
     required Markdown markdown,
     required MarkdownThemeData theme,
-    required TextPainter painter,
-  })  : _painter = painter,
-        _theme = theme,
-        _markdown = markdown,
-        _isEmpty = markdown.isEmpty {
-    _updateInlineSpans();
-  }
+  }) : _painter = MarkdownPainter(
+          markdown: markdown,
+          theme: theme,
+        );
 
-  /// Is the markdown entity empty?
-  bool _isEmpty;
-
-  /// Current markdown entity to render.
-  Markdown _markdown;
-
-  /// Current theme for the markdown widget.
-  MarkdownThemeData _theme;
-
-  /// Text painter used for rendering text.
-  final TextPainter _painter;
+  /// Painter for rendering markdown content.
+  final MarkdownPainter _painter;
 
   /// Current size of the render box.
   @override
@@ -52,23 +43,7 @@ class MarkdownRenderObject extends RenderBox {
     _size = value;
   }
 
-  /// Updates the inline spans in the text painter.
-  void _updateInlineSpans() {
-    if (_isEmpty) {
-      _painter.text = const TextSpan();
-    } else {
-      // TODO(plugfox): Split markdown text into spans based on the theme.
-      // Mike Matiunin <plugfox@gmail.com>, 16 June 2025
-      _markdown.blocks;
-      _painter.text = TextSpan(
-        text: _markdown.text,
-        /* style: _theme.textStyle, */
-      );
-    }
-  }
-
   @override
-  @protected
   void debugResetSize() {
     super.debugResetSize();
     if (!super.hasSize) return;
@@ -76,29 +51,13 @@ class MarkdownRenderObject extends RenderBox {
   }
 
   @override
-  @protected
   Size computeDryLayout(BoxConstraints constraints) => constraints.biggest;
-
-  /* @override
-  double computeMinIntrinsicWidth(double height) {
-    return 0;
-  } */
 
   @override
   void performLayout() {
-    if (_isEmpty) {
-      // If the markdown is empty, set size as the smallest constraints.
-      size = constraints.smallest;
-      return;
-    }
-
-    // Layout the text painter with the current size.
-    _painter.layout(
-      minWidth: .0,
-      maxWidth: constraints.maxWidth,
-    );
     // Set the size of the render box to match the painter's size.
-    size = constraints.constrainDimensions(_painter.width, _painter.height);
+    size =
+        constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
   }
 
   @override
@@ -143,23 +102,14 @@ class MarkdownRenderObject extends RenderBox {
   void update({
     required Markdown markdown,
     required MarkdownThemeData theme,
-    required TextDirection direction,
-    required TextScaler textScaler,
   }) {
-    if (identical(_markdown, markdown) &&
-        identical(_theme, theme) &&
-        identical(_painter.textDirection, direction) &&
-        identical(_painter.textScaler, textScaler)) return;
-    this
-      .._markdown = markdown
-      .._theme = theme
-      .._painter.textDirection = direction
-      .._painter.textScaler = textScaler
-      .._isEmpty = markdown.isEmpty;
-    // Update the inline spans in the text painter.
-    _updateInlineSpans();
-    // Mark the render object as needing layout.
-    markNeedsLayout();
+    if (_painter.update(
+      markdown: markdown,
+      theme: theme,
+    )) {
+      // Mark the render object as needing layout.
+      markNeedsLayout();
+    }
   }
 
   @override
@@ -171,7 +121,8 @@ class MarkdownRenderObject extends RenderBox {
   @override
   @protected
   void paint(PaintingContext context, Offset offset) {
-    if (_isEmpty) return; // If the markdown is empty, do not paint anything.
+    if (_painter.isEmpty)
+      return; // If the markdown is empty, do not paint anything.
 
     // ignore: unused_local_variable
     final canvas = context.canvas
@@ -179,7 +130,7 @@ class MarkdownRenderObject extends RenderBox {
       ..translate(offset.dx, offset.dy)
       ..clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    _painter.paint(canvas, Offset.zero);
+    _painter.paint(canvas: canvas);
 
     // Implement the painting logic here.
     // This is where you would use the painter to draw the markdown content.
@@ -188,3 +139,210 @@ class MarkdownRenderObject extends RenderBox {
     canvas.restore();
   }
 }
+
+/// A painter for rendering markdown content via blocks and spans.
+@internal
+class MarkdownPainter {
+  /// Creates a [MarkdownPainter] instance.
+  MarkdownPainter({
+    required Markdown markdown,
+    required MarkdownThemeData theme,
+  })  : _markdown = markdown,
+        _theme = theme,
+        _isEmpty = markdown.isEmpty,
+        _size = Size.zero;
+
+  /// Is the markdown entity empty?
+  bool get isEmpty => _isEmpty;
+  bool _isEmpty;
+
+  /// Current markdown entity to render.
+  Markdown _markdown;
+
+  /// Current theme for the markdown widget.
+  MarkdownThemeData _theme;
+
+  /// The size of the painted markdown content.
+  Size get size => _size;
+  Size _size;
+
+  List<BlockPainter> _blockPainters = const <BlockPainter>[];
+
+  /// Update the painter with new values.
+  /// If the values are the same,
+  /// no update is required and the method returns false.
+  bool update({
+    required Markdown markdown,
+    required MarkdownThemeData theme,
+  }) {
+    if (identical(_markdown, markdown) && identical(_theme, theme))
+      return false;
+    _markdown = markdown;
+    _theme = theme;
+    _isEmpty = markdown.isEmpty;
+    _blockPainters = _markdown.blocks
+        .map<BlockPainter>(
+          (b) => b.map(
+            paragraph: (p) => BlockPainter$Paragraph(
+              spans: p.spans,
+              theme: _theme,
+            ),
+            heading: (h) => BlockPainter$Spacer(
+              count: h.level,
+              theme: _theme,
+            ),
+            quote: (q) => BlockPainter$Spacer(
+              count: 1,
+              theme: _theme,
+            ),
+            code: (c) => BlockPainter$Spacer(
+              count: 1,
+              theme: _theme,
+            ),
+            list: (l) => BlockPainter$Spacer(
+              count: 1,
+              theme: _theme,
+            ),
+            divider: (d) => BlockPainter$Spacer(
+              count: 1,
+              theme: _theme,
+            ),
+            table: (t) => BlockPainter$Spacer(
+              count: 1,
+              theme: _theme,
+            ),
+            spacer: (s) => BlockPainter$Spacer(
+              count: 1,
+              theme: _theme,
+            ),
+          ),
+        )
+        .toList(growable: false);
+    return true; // Indicate that the painter was updated.
+  }
+
+  /// Layouts the markdown content with the given width.
+  Size layout({required double maxWidth}) {
+    if (_isEmpty) {
+      _size = Size.zero;
+      return _size; // If the markdown is empty, return zero size.
+    }
+    var width = .0, height = .0;
+    for (var p in _blockPainters) {
+      final size = p.layout(maxWidth);
+      width = math.max(width, size.width);
+      height += size.height;
+    }
+    return _size = Size(width, height);
+  }
+
+  /// The markdown content to paint.
+  void paint({required Canvas canvas}) {
+    if (_isEmpty) return; // If the markdown is empty, do not paint anything.
+
+    // Paint each block painter on the canvas.
+    var offset = .0;
+    for (var painter in _blockPainters) {
+      painter.paint(canvas, offset);
+      offset += painter.size.height; // Update the offset for the next block.
+    }
+  }
+}
+
+/// A class for painting blocks in markdown.
+@internal
+sealed class BlockPainter {
+  const BlockPainter();
+
+  abstract final Size size;
+
+  Size layout(double width);
+
+  void paint(Canvas canvas, double offset);
+}
+
+/// A class for painting a paragraph block in markdown.
+@internal
+class BlockPainter$Paragraph extends BlockPainter {
+  BlockPainter$Paragraph({
+    required List<MD$Span> spans,
+    required this.theme,
+  }) : painter = TextPainter(
+          text: _paragraphFromMarkdownSpans(
+            spans: spans,
+            theme: theme,
+          ),
+          textAlign: TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        );
+
+  final MarkdownThemeData theme;
+
+  final TextPainter painter;
+
+  @override
+  Size get size => _size;
+  Size _size = Size.zero;
+
+  @override
+  Size layout(double width) {
+    painter.layout(
+      minWidth: 0,
+      maxWidth: width,
+    );
+    return _size = painter.size;
+  }
+
+  @override
+  void paint(Canvas canvas, double offset) {
+    painter.paint(
+      canvas,
+      Offset(0, offset),
+    ); // Paint the text at the given offset.
+  }
+}
+
+/// A class for painting a spacer block in markdown.
+@internal
+class BlockPainter$Spacer extends BlockPainter {
+  BlockPainter$Spacer({
+    required this.count,
+    required this.theme,
+  });
+
+  final int count;
+
+  final MarkdownThemeData theme;
+
+  @override
+  Size get size => _size;
+  Size _size = Size.zero;
+
+  final TextPainter painter = TextPainter(
+    textAlign: TextAlign.start,
+    textDirection: TextDirection.ltr,
+    textScaler: TextScaler.noScaling,
+  );
+
+  @override
+  Size layout(double width) {
+    final height = theme.textStyle.fontSize ?? 14.0;
+    return _size = Size(0, height * count);
+  }
+
+  @override
+  void paint(Canvas canvas, double offset) {}
+}
+
+TextSpan _paragraphFromMarkdownSpans({
+  required List<MD$Span> spans,
+  required MarkdownThemeData theme,
+}) =>
+    TextSpan(
+      style: theme.textStyle,
+      children: spans
+          .map((span) =>
+              TextSpan(text: span.text, style: theme.textStyleFor(span.style)))
+          .toList(growable: false),
+    );
