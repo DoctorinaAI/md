@@ -13,9 +13,13 @@ class MarkdownRenderObject extends RenderBox {
     required TextPainter painter,
   })  : _painter = painter,
         _theme = theme,
-        _markdown = markdown {
+        _markdown = markdown,
+        _isEmpty = markdown.isEmpty {
     _updateInlineSpans();
   }
+
+  /// Is the markdown entity empty?
+  bool _isEmpty;
 
   /// Current markdown entity to render.
   Markdown _markdown;
@@ -50,11 +54,16 @@ class MarkdownRenderObject extends RenderBox {
 
   /// Updates the inline spans in the text painter.
   void _updateInlineSpans() {
-    // Update the text painter with the current markdown text.
-    _painter.text = TextSpan(
-      text: _markdown.text,
-      /* style: _theme.textStyle, */
-    );
+    if (_isEmpty) {
+      _painter.text = const TextSpan();
+    } else {
+      // TODO(plugfox): Split markdown text into spans based on the theme.
+      // Mike Matiunin <plugfox@gmail.com>, 16 June 2025
+      _painter.text = TextSpan(
+        text: _markdown.text,
+        /* style: _theme.textStyle, */
+      );
+    }
   }
 
   @override
@@ -76,13 +85,17 @@ class MarkdownRenderObject extends RenderBox {
 
   @override
   void performLayout() {
+    if (_isEmpty) {
+      // If the markdown is empty, set size as the smallest constraints.
+      size = constraints.smallest;
+      return;
+    }
+
     // Layout the text painter with the current size.
-    _painter
-      ..text = TextSpan(text: _markdown.text)
-      ..layout(
-        minWidth: 0,
-        maxWidth: size.width,
-      );
+    _painter.layout(
+      minWidth: .0,
+      maxWidth: constraints.maxWidth,
+    );
     // Set the size of the render box to match the painter's size.
     size = constraints.constrainDimensions(_painter.width, _painter.height);
   }
@@ -140,7 +153,8 @@ class MarkdownRenderObject extends RenderBox {
       .._markdown = markdown
       .._theme = theme
       .._painter.textDirection = direction
-      .._painter.textScaler = textScaler;
+      .._painter.textScaler = textScaler
+      .._isEmpty = markdown.isEmpty;
     // Update the inline spans in the text painter.
     _updateInlineSpans();
     // Mark the render object as needing layout.
@@ -156,18 +170,15 @@ class MarkdownRenderObject extends RenderBox {
   @override
   @protected
   void paint(PaintingContext context, Offset offset) {
+    if (_isEmpty) return; // If the markdown is empty, do not paint anything.
+
     // ignore: unused_local_variable
     final canvas = context.canvas
       ..save()
       ..translate(offset.dx, offset.dy)
       ..clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    _painter
-      ..layout(
-        minWidth: 0,
-        maxWidth: size.width,
-      )
-      ..paint(canvas, Offset.zero);
+    _painter.paint(canvas, Offset.zero);
 
     // Implement the painting logic here.
     // This is where you would use the painter to draw the markdown content.

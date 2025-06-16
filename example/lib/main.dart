@@ -172,13 +172,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               LayoutId(
                 id: 1,
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ValueListenableBuilder(
-                      valueListenable: _outputController,
-                      builder: (context, value, child) => MarkdownWidget(
-                        markdown: value,
+                child: Align(
+                  alignment: Alignment.center,
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ValueListenableBuilder(
+                        valueListenable: _outputController,
+                        builder: (context, value, child) => MarkdownWidget(
+                          markdown: value,
+                        ),
                       ),
                     ),
                   ),
