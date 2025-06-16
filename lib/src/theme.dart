@@ -84,9 +84,10 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   TextStyle textStyleFor(MD$Style style) => _textStyles.putIfAbsent(
         style.hashCode,
         () => TextStyle(
-          fontWeight: style.contains(MD$Style.bold)
-              ? FontWeight.bold
-              : FontWeight.normal,
+          fontWeight:
+              style.contains(MD$Style.bold) || style.contains(MD$Style.link)
+                  ? FontWeight.bold
+                  : FontWeight.normal,
           fontStyle: style.contains(MD$Style.italic)
               ? FontStyle.italic
               : FontStyle.normal,
@@ -98,9 +99,11 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
           fontFamily: style.contains(MD$Style.monospace)
               ? 'monospace'
               : textStyle.fontFamily,
-          color: style.contains(MD$Style.highlight)
-              ? Colors.yellow
-              : textStyle.color,
+          color: style.contains(MD$Style.link)
+              ? Colors.purple
+              : style.contains(MD$Style.highlight)
+                  ? Colors.yellow
+                  : textStyle.color,
           backgroundColor: style.contains(MD$Style.monospace)
               ? Colors.black12
               : textStyle.backgroundColor,

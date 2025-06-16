@@ -88,9 +88,7 @@ extension type const MD$Style(int value) implements int {
   /// Useful for debugging or displaying the styles applied to the text.
   ///
   /// For example:
-  /// ```dart
   /// print(span.style.styles.join('|'));
-  /// ```
   Set<String> get styles => value == 0
       ? const <String>{}
       : <String>{
@@ -596,6 +594,3 @@ class MD$Spacer extends MD$Block {
   }) =>
       spacer(this);
 }
-
-// TODO(plugfox): Add html block support.
-// Mike Matiunin <plugfox@gmail.com>, 12 June 2025
