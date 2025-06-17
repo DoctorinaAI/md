@@ -52,7 +52,8 @@ class MarkdownRenderObject extends RenderBox {
   }
 
   @override
-  Size computeDryLayout(BoxConstraints constraints) => constraints.biggest;
+  Size computeDryLayout(BoxConstraints constraints) =>
+      constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
 
   @override
   void performLayout() {
@@ -64,7 +65,7 @@ class MarkdownRenderObject extends RenderBox {
   @override
   // ignore: unnecessary_overrides
   void performResize() {
-    super.performResize();
+    size = computeDryLayout(constraints);
   }
 
   @override
@@ -151,7 +152,9 @@ class MarkdownPainter {
   })  : _markdown = markdown,
         _theme = theme,
         _isEmpty = markdown.isEmpty,
-        _size = Size.zero;
+        _size = Size.zero {
+    _rebuild();
+  }
 
   /// Is the markdown entity empty?
   bool get isEmpty => _isEmpty;
@@ -167,22 +170,16 @@ class MarkdownPainter {
   Size get size => _size;
   Size _size;
 
+  /// Indicates if the layout needs to be recalculated.
+  bool _needsLayout = true;
+
   List<BlockPainter> _blockPainters = const <BlockPainter>[];
 
-  /// Update the painter with new values.
-  /// If the values are the same,
-  /// no update is required and the method returns false.
-  bool update({
-    required Markdown markdown,
-    required MarkdownThemeData theme,
-  }) {
-    if (identical(_markdown, markdown) && identical(_theme, theme))
-      return false;
-    _lastSize = null;
-    _lastPicture = null;
-    _markdown = markdown;
-    _theme = theme;
-    _isEmpty = markdown.isEmpty;
+  /// Rebuilds the block painters from the markdown blocks.
+  /// This method is called whenever the markdown or theme changes.
+  void _rebuild() {
+    _needsLayout = true; // Mark that layout needs to be recalculated.
+    _size = Size.zero; // Reset size before rebuilding.
     _blockPainters = _markdown.blocks
         .map<BlockPainter>(
           (b) => b.map<BlockPainter>(
@@ -222,6 +219,23 @@ class MarkdownPainter {
           ),
         )
         .toList(growable: false);
+  }
+
+  /// Update the painter with new values.
+  /// If the values are the same,
+  /// no update is required and the method returns false.
+  bool update({
+    required Markdown markdown,
+    required MarkdownThemeData theme,
+  }) {
+    if (identical(_markdown, markdown) && identical(_theme, theme))
+      return false;
+    _lastSize = null;
+    _lastPicture = null;
+    _markdown = markdown;
+    _theme = theme;
+    _isEmpty = markdown.isEmpty;
+    _rebuild();
     return true; // Indicate that the painter was updated.
   }
 
@@ -229,6 +243,7 @@ class MarkdownPainter {
   Size layout({required double maxWidth}) {
     if (_isEmpty) {
       _size = Size.zero;
+      _needsLayout = false; // No need to layout if the markdown is empty.
       return _size; // If the markdown is empty, return zero size.
     }
     var width = .0, height = .0;
@@ -237,19 +252,35 @@ class MarkdownPainter {
       width = math.max(width, size.width);
       height += size.height;
     }
+    _needsLayout = false; // No need to layout if the markdown is empty.
     return _size = Size(width, height);
   }
 
   /// The last size and picture used for painting.
+  /// This is used to avoid unnecessary recreation of the canvas picture.
+  /// If the size is the same as the last painted size,
   Size? _lastSize;
 
   /// The last picture used for painting,
   /// to avoid unnecessary recreation of the canvas picture.
+  /// If the size is the same as the last painted size,
+  /// we can reuse the last picture.
   Picture? _lastPicture;
 
   /// The markdown content to paint.
   void paint(Canvas canvas, Size size) {
-    if (_isEmpty) return; // If the markdown is empty, do not paint anything.
+    assert(
+      !_needsLayout,
+      'MarkdownPainter.paint() called without layout.',
+    );
+    assert(
+      size.isFinite,
+      'MarkdownPainter.paint() called with non-finite size: $size',
+    );
+
+    // Do not paint if the markdown is empty,
+    // or if the size is empty or infinite.
+    if (_isEmpty || size.isEmpty || size.isInfinite) return;
 
     if (_lastSize == size && _lastPicture != null) {
       // If the size is the same as the last painted size,
