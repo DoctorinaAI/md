@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:meta/meta.dart';
@@ -274,7 +275,7 @@ class MarkdownPainter {
     var offset = .0;
     BlockPainter? result;
     for (var painter in painters) {
-      if (dy > offset + painter.size.height) break;
+      if (dy < offset) break;
       result = painter;
       offset += painter.size.height; // Update the offset for the next block.
     }
@@ -292,15 +293,13 @@ class MarkdownPainter {
     _getPainterByHeight(_blockPainters, pos.dy)?.handleEvent(event);
 
     // Handle taps for the links with urls.
-    switch (event) {
+    /* switch (event) {
       case PointerDownEvent(down: true):
       // Handle pointer down events.
-      // TODO(plugfox): Implement me
-      // Mike Matiunin <plugfox@gmail.com>, 17 June 2025
       default:
         // Handle other pointer events if needed.
         break;
-    }
+    } */
   }
 
   /// The last size and picture used for painting.
@@ -477,7 +476,17 @@ class BlockPainter$Paragraph implements BlockPainter {
 
   @override
   void handleEvent(PointerEvent event) {
-    // TODO: implement handleEvent
+    if (event is! PointerDownEvent) return;
+    final pos = painter.getPositionForOffset(event.localPosition);
+    //final int index = pos.offset;
+    final span = painter.text?.getSpanForPosition(pos);
+    //final plainText = span?.toPlainText();
+    //print('Tapped on paragraph span: $plainText at offset: ${pos.offset}');
+    if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
+      onTap?.call();
+      // TODO(plugfox): Implement me
+      // Mike Matiunin <plugfox@gmail.com>, 17 June 2025
+    }
   }
 
   @override
