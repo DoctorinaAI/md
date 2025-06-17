@@ -506,7 +506,7 @@ abstract interface class BlockPainter {
   /// Available only after [layout].
   abstract final Size size;
 
-  /// Handle pointer events for the block.
+  /// Handle tap pointer events for the block.
   void handleTap(PointerDownEvent event);
 
   /// Measure the block size with the given width.
