@@ -211,7 +211,10 @@ sealed class MD$Block {
 final class MD$Paragraph extends MD$Block {
   /// Creates a new instance of [MD$Paragraph].
   /// {@macro markdown_block}
-  const MD$Paragraph({required this.text, required this.spans});
+  const MD$Paragraph({
+    required this.text,
+    required this.spans,
+  });
 
   @override
   String get type => 'paragraph';
@@ -244,8 +247,11 @@ final class MD$Paragraph extends MD$Block {
 final class MD$Heading extends MD$Block {
   /// Creates a new instance of [MD$Heading].
   /// {@macro markdown_block}
-  const MD$Heading(
-      {required this.text, required this.level, required this.spans});
+  const MD$Heading({
+    required this.text,
+    required this.level,
+    required this.spans,
+  });
 
   @override
   String get type => 'heading';
@@ -321,16 +327,19 @@ final class MD$Quote extends MD$Block {
 final class MD$Code extends MD$Block {
   /// Creates a new instance of [MD$Code].
   /// {@macro markdown_block}
-  const MD$Code({required this.text, required this.language});
+  const MD$Code({
+    required this.language,
+    required this.text,
+  });
 
   @override
   String get type => 'code';
 
-  @override
-  final String text;
-
   /// The programming language of the code block.
   final String? language;
+
+  @override
+  final String text;
 
   @override
   T map<T>({
@@ -492,7 +501,10 @@ final class MD$TableRow {
   /// The [text] is the content of the row,
   /// and [cells] are the inline text spans within the row.
   /// {@macro table_row}
-  const MD$TableRow({required this.text, required this.cells});
+  const MD$TableRow({
+    required this.text,
+    required this.cells,
+  });
 
   /// The text content of the row.
   final String text;
@@ -512,8 +524,11 @@ final class MD$TableRow {
 final class MD$Table extends MD$Block {
   /// Creates a new instance of [MD$Table].
   /// {@macro markdown_block}
-  const MD$Table(
-      {required this.text, required this.header, required this.rows});
+  const MD$Table({
+    required this.text,
+    required this.header,
+    required this.rows,
+  });
 
   @override
   String get type => 'table';

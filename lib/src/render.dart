@@ -212,8 +212,9 @@ class MarkdownPainter {
             divider: (d) => BlockPainter$Divider(
               theme: _theme,
             ),
-            table: (t) => BlockPainter$Spacer(
-              count: 1,
+            table: (t) => BlockPainter$Table(
+              header: t.header,
+              rows: t.rows,
               theme: _theme,
             ),
             spacer: (s) => BlockPainter$Spacer(
@@ -782,5 +783,137 @@ class BlockPainter$Code implements BlockPainter {
       canvas,
       Offset(padding, offset + padding),
     );
+  }
+}
+
+/// A class for painting a table block in markdown.
+@internal
+class BlockPainter$Table implements BlockPainter {
+  BlockPainter$Table({
+    required this.header,
+    required this.rows,
+    required this.theme,
+  })  : columns = header.cells.length,
+        painter = TextPainter(
+          textAlign: TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        );
+
+  /// Padding for the table cells.
+  static const double padding = 4.0;
+
+  /// The theme for the markdown table.
+  final MarkdownThemeData theme;
+
+  /// Text painter for rendering the table content.
+  final TextPainter painter;
+
+  /// The number of columns in the table.
+  final int columns;
+
+  /// The header row of the table.
+  final MD$TableRow header;
+
+  /// The rows of the table.
+  final List<MD$TableRow> rows;
+
+  @override
+  Size get size => _size;
+  Size _size = Size.zero;
+
+  @override
+  Size layout(double width) {
+    if (columns < 1) return _size = Size.zero;
+    return _size = Size(
+      width, // The width of the table is the same as the available width.
+      (header.cells.length + rows.length) *
+          ((theme.textStyle.fontSize ?? 14.0) + padding * 2),
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size, double offset) {
+    // If the width is less than required do not paint anything.
+    if (size.width < _size.width || columns < 1) return;
+
+    // Draw the header row.
+    final columnWidth = size.width / columns;
+    final cellMaxWidth = columnWidth - padding * 2;
+    final rowHeight = (theme.textStyle.fontSize ?? 14.0) + padding * 2;
+    canvas.drawRRect(
+      RRect.fromLTRBR(
+        0, // Left
+        offset, // Top
+        size.width, // Right
+        offset + _size.height, // Bottom
+        const Radius.circular(padding), // Radius for rounded corners
+      ),
+      Paint()
+        ..color = const Color.fromARGB(255, 235, 235, 235)
+        ..style = PaintingStyle.fill
+        ..isAntiAlias = false,
+    );
+
+    for (var i = 0; i < columns; i++) {
+      final cell = header.cells[i];
+      painter
+        ..text = TextSpan(
+          text: cell.map((span) => span.text).join(),
+          style: theme.textStyle.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        )
+        ..layout(
+          minWidth: 0,
+          maxWidth: cellMaxWidth,
+        );
+      painter.paint(
+        canvas,
+        Offset(
+          i * columnWidth + padding,
+          offset + rowHeight - padding - painter.height / 2,
+        ),
+      );
+    }
+
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      for (var j = 0; j < columns; j++) {
+        if (j >= row.cells.length) continue; // Skip if the cell is missing.
+        final cell = row.cells[j];
+        painter
+          ..text = TextSpan(
+            text: cell.map((span) => span.text).join(),
+            style: theme.textStyle,
+          )
+          ..layout(
+            minWidth: 0,
+            maxWidth: cellMaxWidth,
+          );
+        painter.paint(
+          canvas,
+          Offset(
+            j * columnWidth + padding,
+            offset + rowHeight * (i + 2) - painter.height / 2,
+          ),
+        );
+      }
+    }
+
+    /* canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, offset, size.width, _size.height),
+        const Radius.circular(padding),
+      ),
+      Paint()
+        ..color = const Color.fromARGB(255, 235, 235, 235)
+        ..isAntiAlias = false
+        ..style = PaintingStyle.fill,
+    );
+    painter.paint(
+      canvas,
+      Offset(padding, offset + padding),
+    ); */
   }
 }
