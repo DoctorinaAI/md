@@ -346,6 +346,9 @@ class MarkdownPainter {
   );
 } */
 
+/// Helper function to create a [TextSpan] from markdown spans.
+/// This function filters the spans based on the theme's span filter,
+/// and applies the appropriate text style to each span.
 TextSpan _paragraphFromMarkdownSpans({
   required Iterable<MD$Span> spans,
   required MarkdownThemeData theme,
@@ -358,12 +361,12 @@ TextSpan _paragraphFromMarkdownSpans({
     style: textStyle ?? theme.textStyle,
     children: textStyle != null
         ? filtered
-            .map((span) => TextSpan(
+            .map<InlineSpan>((span) => TextSpan(
                 text: span.text,
                 style: theme.textStyleFor(span.style).merge(style)))
             .toList(growable: false)
         : filtered
-            .map((span) => TextSpan(
+            .map<InlineSpan>((span) => TextSpan(
                 text: span.text, style: theme.textStyleFor(span.style)))
             .toList(growable: false),
   );
@@ -371,9 +374,7 @@ TextSpan _paragraphFromMarkdownSpans({
 
 /// A class for painting blocks in markdown.
 @internal
-sealed class BlockPainter {
-  const BlockPainter();
-
+abstract interface class BlockPainter {
   /// The current size of the block.
   /// Available only after [layout].
   abstract final Size size;
@@ -390,7 +391,7 @@ sealed class BlockPainter {
 
 /// A class for painting a paragraph block in markdown.
 @internal
-class BlockPainter$Paragraph extends BlockPainter {
+class BlockPainter$Paragraph implements BlockPainter {
   BlockPainter$Paragraph({
     required List<MD$Span> spans,
     required this.theme,
@@ -432,7 +433,7 @@ class BlockPainter$Paragraph extends BlockPainter {
 
 /// A class for painting a paragraph block in markdown.
 @internal
-class BlockPainter$Heading extends BlockPainter {
+class BlockPainter$Heading implements BlockPainter {
   BlockPainter$Heading({
     required int level,
     required List<MD$Span> spans,
@@ -484,7 +485,7 @@ class BlockPainter$Heading extends BlockPainter {
 
 /// A class for painting a quote block in markdown.
 @internal
-class BlockPainter$Quote extends BlockPainter {
+class BlockPainter$Quote implements BlockPainter {
   BlockPainter$Quote({
     required List<MD$Span> spans,
     required this.indent,
@@ -548,7 +549,7 @@ class BlockPainter$Quote extends BlockPainter {
 
 /// A class for painting a list block in markdown.
 @internal
-class BlockPainter$List extends BlockPainter {
+class BlockPainter$List implements BlockPainter {
   BlockPainter$List({
     required List<MD$ListItem> items,
     required this.theme,
@@ -641,7 +642,7 @@ class BlockPainter$List extends BlockPainter {
 
 /// A class for painting a spacer block in markdown.
 @internal
-class BlockPainter$Spacer extends BlockPainter {
+class BlockPainter$Spacer implements BlockPainter {
   BlockPainter$Spacer({
     required this.count,
     required this.theme,
@@ -673,7 +674,7 @@ class BlockPainter$Spacer extends BlockPainter {
 
 /// A class for painting a spacer block in markdown.
 @internal
-class BlockPainter$Divider extends BlockPainter {
+class BlockPainter$Divider implements BlockPainter {
   BlockPainter$Divider({
     required this.theme,
   }) : _paint = Paint()
