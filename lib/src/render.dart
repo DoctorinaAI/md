@@ -90,7 +90,9 @@ class MarkdownRenderObject extends RenderBox {
   }
 
   @override
-  void handleEvent(PointerEvent event, BoxHitTestEntry entry) {}
+  void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
+    _painter.handleEvent(event);
+  }
 
   @override
   // ignore: unnecessary_overrides
@@ -225,6 +227,8 @@ class MarkdownPainter {
           ),
         )
         .toList(growable: false);
+    // TODO(plugfox): Rebuild link spans and their positions.
+    // Mike Matiunin <plugfox@gmail.com>, 17 June 2025
   }
 
   /// Update the painter with new values.
@@ -260,6 +264,43 @@ class MarkdownPainter {
     }
     _needsLayout = false; // No need to layout if the markdown is empty.
     return _size = Size(width, height);
+  }
+
+  /// Get the painter from the array by the vertical local position (dy).
+  static BlockPainter? _getPainterByHeight(
+    Iterable<BlockPainter> painters,
+    double dy,
+  ) {
+    var offset = .0;
+    BlockPainter? result;
+    for (var painter in painters) {
+      if (dy > offset + painter.size.height) break;
+      result = painter;
+      offset += painter.size.height; // Update the offset for the next block.
+    }
+    return result;
+  }
+
+  void handleEvent(PointerEvent event) {
+    if (_blockPainters.isEmpty) return;
+    // event.buttons, event.kind, event.position
+    // event.localPosition, event.delta, event.down
+
+    final pos = event.localPosition;
+
+    // We can use the position to determine which block was hit.
+    _getPainterByHeight(_blockPainters, pos.dy)?.handleEvent(event);
+
+    // Handle taps for the links with urls.
+    switch (event) {
+      case PointerDownEvent(down: true):
+      // Handle pointer down events.
+      // TODO(plugfox): Implement me
+      // Mike Matiunin <plugfox@gmail.com>, 17 June 2025
+      default:
+        // Handle other pointer events if needed.
+        break;
+    }
   }
 
   /// The last size and picture used for painting.
@@ -364,13 +405,28 @@ TextSpan _paragraphFromMarkdownSpans({
     style: textStyle ?? theme.textStyle,
     children: textStyle != null
         ? filtered
-            .map<InlineSpan>((span) => TextSpan(
+            .map<InlineSpan>(
+              (span) => TextSpan(
                 text: span.text,
-                style: theme.textStyleFor(span.style).merge(style)))
+                style: theme.textStyleFor(span.style).merge(style),
+                /* recognizer: TapGestureRecognizer()
+                  ..onTap = () {
+                    print('Tapped on span: ${span.text}');
+                  }, */
+              ),
+            )
             .toList(growable: false)
         : filtered
-            .map<InlineSpan>((span) => TextSpan(
-                text: span.text, style: theme.textStyleFor(span.style)))
+            .map<InlineSpan>(
+              (span) => TextSpan(
+                text: span.text,
+                style: theme.textStyleFor(span.style),
+                /* recognizer: TapGestureRecognizer()
+                  ..onTap = () {
+                    print('Tapped on span: ${span.text}');
+                  }, */
+              ),
+            )
             .toList(growable: false),
   );
 }
@@ -381,6 +437,9 @@ abstract interface class BlockPainter {
   /// The current size of the block.
   /// Available only after [layout].
   abstract final Size size;
+
+  /// Handle pointer events for the block.
+  void handleEvent(PointerEvent event);
 
   /// Measure the block size with the given width.
   Size layout(double width);
@@ -415,6 +474,11 @@ class BlockPainter$Paragraph implements BlockPainter {
   @override
   Size get size => _size;
   Size _size = Size.zero;
+
+  @override
+  void handleEvent(PointerEvent event) {
+    // TODO: implement handleEvent
+  }
 
   @override
   Size layout(double width) {
@@ -471,6 +535,11 @@ class BlockPainter$Heading implements BlockPainter {
   Size _size = Size.zero;
 
   @override
+  void handleEvent(PointerEvent event) {
+    // TODO: implement handleEvent
+  }
+
+  @override
   Size layout(double width) {
     painter.layout(
       minWidth: 0,
@@ -525,6 +594,11 @@ class BlockPainter$Quote implements BlockPainter {
   @override
   Size get size => _size;
   Size _size = Size.zero;
+
+  @override
+  void handleEvent(PointerEvent event) {
+    // TODO: implement handleEvent
+  }
 
   @override
   Size layout(double width) {
@@ -695,6 +769,11 @@ class BlockPainter$List implements BlockPainter {
   Size _size = Size.zero;
 
   @override
+  void handleEvent(PointerEvent event) {
+    // TODO: implement handleEvent
+  }
+
+  @override
   Size layout(double width) {
     painter.layout(
       minWidth: 0,
@@ -734,6 +813,11 @@ class BlockPainter$Spacer implements BlockPainter {
   Size _size = Size.zero;
 
   @override
+  void handleEvent(PointerEvent event) {
+    // TODO: implement handleEvent
+  }
+
+  @override
   Size layout(double width) {
     final height = theme.textStyle.fontSize ?? 14.0;
     return _size = Size(0, height * count);
@@ -766,6 +850,11 @@ class BlockPainter$Divider implements BlockPainter {
   @override
   Size get size => _size;
   Size _size = Size.zero;
+
+  @override
+  void handleEvent(PointerEvent event) {
+    // TODO: implement handleEvent
+  }
 
   @override
   Size layout(double width) {
@@ -814,6 +903,11 @@ class BlockPainter$Code implements BlockPainter {
   @override
   Size get size => _size;
   Size _size = Size.zero;
+
+  @override
+  void handleEvent(PointerEvent event) {
+    // TODO: implement handleEvent
+  }
 
   @override
   Size layout(double width) {
@@ -888,6 +982,11 @@ class BlockPainter$Table implements BlockPainter {
   @override
   Size get size => _size;
   Size _size = Size.zero;
+
+  @override
+  void handleEvent(PointerEvent event) {
+    // TODO: implement handleEvent
+  }
 
   @override
   Size layout(double width) {
