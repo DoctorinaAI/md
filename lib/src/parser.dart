@@ -342,6 +342,13 @@ List<MD$Span> _parseInlineSpans(String text) {
       if (urlEnd == -1) break;
 
       // Create a link or image span
+      final parts = text.substring(urlIdx + 1, urlEnd).split(' ');
+      final src = parts.firstOrNull ?? '';
+      var alt = parts.length > 1 ? parts.skip(1).join(' ') : null;
+      if (alt != null && alt.startsWith('"') && alt.endsWith('"')) {
+        // Remove quotes from alt text
+        alt = alt.substring(1, alt.length - 1);
+      }
       links.add(
         MD$Span(
           start: img ? i - 1 : i, // include the '!' for images
@@ -352,7 +359,9 @@ List<MD$Span> _parseInlineSpans(String text) {
               : MD$Style.link, // link style
           extra: <String, Object?>{
             'type': img ? 'image' : 'link',
-            'url': text.substring(urlIdx + 1, urlEnd),
+            if (img) 'src': src else 'href': src,
+            'url': src,
+            if (alt != null) 'alt': alt,
           },
         ),
       );

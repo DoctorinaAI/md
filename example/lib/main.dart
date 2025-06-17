@@ -17,13 +17,31 @@ class App extends StatelessWidget {
   /// {@macro app}
   const App({super.key});
 
+  /// Light theme for the app.
+  static final ThemeData theme = ThemeData.light();
+
   @override
   Widget build(BuildContext context) => MaterialApp(
         title: 'Markdown',
         themeMode: ThemeMode.light,
-        theme: ThemeData.light(),
-        darkTheme: ThemeData.dark(),
+        theme: theme,
+        darkTheme: theme,
         home: const HomeScreen(),
+        builder: (context, child) => MarkdownTheme(
+          data: MarkdownThemeData(
+            textStyle: const TextStyle(
+              fontSize: 16.0,
+              color: Colors.black87,
+            ),
+            textDirection: TextDirection.ltr,
+            textScaler: TextScaler.noScaling,
+            // Exclude images from the markdown rendering,
+            // so they are not rendered in the output.
+            // Because image spans are not supported yet.
+            spanFilter: (span) => !span.style.contains(MD$Style.image),
+          ),
+          child: child!,
+        ),
       );
 }
 
@@ -242,12 +260,6 @@ _`You` **can** __combine__ ~~them~~_
 3. Item 3
     1. Item 3a
     2. Item 3b
-
----
-
-## Images
-
-![This is an alt text.](/image/sample.webp "This is a sample image.")
 
 ---
 

@@ -43,6 +43,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.quoteStyle = const TextStyle(
       fontSize: 14.0,
     ),
+    this.blockFilter,
+    this.spanFilter,
   }) : _textStyles = HashMap<int, TextStyle>();
 
   @override
@@ -77,6 +79,21 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// Default text style for quote blocks.
   final TextStyle quoteStyle;
+
+  /// A filter function to determine whether a block should be rendered.
+  /// If the function returns `true`, the block will be rendered.
+  ///
+  /// For example, you can use this to filter out blocks that are not
+  /// relevant to the current context, such as code blocks or tables.
+  final bool Function(MD$Block block)? blockFilter;
+
+  /// A filter function to determine whether a span should be rendered.
+  /// If the function returns `true`, the span will be rendered.
+  ///
+  /// For example, you can use this to filter out spans that are not
+  /// relevant to the current context, such as links or images.
+  /// This can be useful for customizing the rendering of Markdown spans.
+  final bool Function(MD$Span span)? spanFilter;
 
   final HashMap<int, TextStyle> _textStyles;
 
@@ -115,11 +132,29 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     TextDirection? textDirection,
     TextScaler? textScaler,
     TextStyle? textStyle,
+    TextStyle? h1Style,
+    TextStyle? h2Style,
+    TextStyle? h3Style,
+    TextStyle? h4Style,
+    TextStyle? h5Style,
+    TextStyle? h6Style,
+    TextStyle? quoteStyle,
+    bool Function(MD$Block block)? blockFilter,
+    bool Function(MD$Span span)? spanFilter,
   }) =>
       MarkdownThemeData(
         textDirection: textDirection ?? this.textDirection,
         textScaler: textScaler ?? this.textScaler,
         textStyle: textStyle ?? this.textStyle,
+        h1Style: h1Style ?? this.h1Style,
+        h2Style: h2Style ?? this.h2Style,
+        h3Style: h3Style ?? this.h3Style,
+        h4Style: h4Style ?? this.h4Style,
+        h5Style: h5Style ?? this.h5Style,
+        h6Style: h6Style ?? this.h6Style,
+        quoteStyle: quoteStyle ?? this.quoteStyle,
+        blockFilter: blockFilter ?? this.blockFilter,
+        spanFilter: spanFilter ?? this.spanFilter,
       );
 
   @override

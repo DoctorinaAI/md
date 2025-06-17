@@ -180,7 +180,10 @@ class MarkdownPainter {
   void _rebuild() {
     _needsLayout = true; // Mark that layout needs to be recalculated.
     _size = Size.zero; // Reset size before rebuilding.
-    _blockPainters = _markdown.blocks
+    final filter = _theme.blockFilter;
+    final filtered =
+        filter != null ? _markdown.blocks.where(filter) : _markdown.blocks;
+    _blockPainters = filtered
         .map<BlockPainter>(
           (b) => b.map<BlockPainter>(
             paragraph: (p) => BlockPainter$Paragraph(
@@ -312,21 +315,54 @@ class MarkdownPainter {
   }
 }
 
+/* InlineSpan _imageFromMarkdownSpan({
+  required MD$Span span,
+  required MarkdownThemeData theme,
+}) {
+  final url = span.extra?['url'];
+  if (url is! String || url.isEmpty) return const TextSpan();
+  ImageProvider? provider;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    provider = NetworkImage(url);
+  } else if (url.startsWith('asset://')) {
+    provider = AssetImage(Uri.parse(url).toFilePath());
+  } else if (kIsWeb) {
+    provider = NetworkImage(url);
+  } else {
+    return const TextSpan();
+  }
+  return WidgetSpan(
+    alignment: PlaceholderAlignment.middle,
+    child: SizedBox.square(
+      dimension: 48, // Fixed size for the image.
+      child: Image(
+        image: provider,
+        width: 48,
+        height: 48,
+        filterQuality: FilterQuality.medium,
+        fit: BoxFit.scaleDown,
+      ),
+    ),
+  );
+} */
+
 TextSpan _paragraphFromMarkdownSpans({
   required Iterable<MD$Span> spans,
   required MarkdownThemeData theme,
   TextStyle? textStyle,
 }) {
   final style = textStyle ?? theme.textStyle;
+  final spanFilter = theme.spanFilter;
+  final filtered = spanFilter != null ? spans.where(spanFilter) : spans;
   return TextSpan(
     style: textStyle ?? theme.textStyle,
     children: textStyle != null
-        ? spans
+        ? filtered
             .map((span) => TextSpan(
                 text: span.text,
                 style: theme.textStyleFor(span.style).merge(style)))
             .toList(growable: false)
-        : spans
+        : filtered
             .map((span) => TextSpan(
                 text: span.text, style: theme.textStyleFor(span.style)))
             .toList(growable: false),
@@ -517,17 +553,6 @@ class BlockPainter$List extends BlockPainter {
     required List<MD$ListItem> items,
     required this.theme,
   }) : painter = TextPainter(
-          /* text: _paragraphFromMarkdownSpans(
-            spans: items.isEmpty
-                ? const []
-                : [
-                    ...items.first.spans,
-                    TextSpan('\n'),
-                    for (var i = 1; i < items.length; i++) ...items[i].spans,
-                  ],
-            theme: theme,
-            textStyle: theme.quoteStyle,
-          ), */
           textAlign: TextAlign.start,
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
@@ -553,8 +578,12 @@ class BlockPainter$List extends BlockPainter {
     required List<MD$ListItem> items,
     required MarkdownThemeData theme,
   }) {
+    final filter = theme.spanFilter ?? (span) => true;
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
+      final filtered = item.spans.where(filter).toList(growable: false);
+      // Skip empty spans
+      if (filtered.isEmpty) continue;
       if (spans.isNotEmpty) spans.add(const TextSpan(text: '\n'));
       spans
         ..add(
@@ -569,7 +598,7 @@ class BlockPainter$List extends BlockPainter {
           ),
         )
         ..addAll(
-          item.spans.map<TextSpan>(
+          filtered.map<TextSpan>(
             (span) => TextSpan(
               text: span.text,
               style: theme.textStyleFor(span.style),
@@ -634,6 +663,7 @@ class BlockPainter$Spacer extends BlockPainter {
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
+    // Do not paint anything
     /* canvas.drawRect(
       Rect.fromLTWH(0, offset, size.width, _size.height),
       Paint()..color = theme.textStyle.color ?? const Color(0x00000000),

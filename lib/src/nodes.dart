@@ -164,6 +164,7 @@ sealed class MD$Block {
   abstract final String text;
 
   /// Pattern for matching the block type.
+  /// This is used to identify the block type in the Markdown tree.
   T map<T>({
     required T Function(MD$Paragraph p) paragraph,
     required T Function(MD$Heading h) heading,
@@ -174,6 +175,30 @@ sealed class MD$Block {
     required T Function(MD$Table t) table,
     required T Function(MD$Spacer s) spacer,
   });
+
+  /// Maps the block to a specific type based on its type.
+  /// This is useful for handling different block types in a type-safe manner.
+  T maybeMap<T>({
+    T Function(MD$Paragraph p)? paragraph,
+    T Function(MD$Heading h)? heading,
+    T Function(MD$Quote q)? quote,
+    T Function(MD$Code c)? code,
+    T Function(MD$List l)? list,
+    T Function(MD$Divider d)? divider,
+    T Function(MD$Table t)? table,
+    T Function(MD$Spacer s)? spacer,
+    required T Function(MD$Block b) orElse,
+  }) =>
+      map(
+        paragraph: paragraph ?? orElse,
+        heading: heading ?? orElse,
+        quote: quote ?? orElse,
+        code: code ?? orElse,
+        list: list ?? orElse,
+        divider: divider ?? orElse,
+        table: table ?? orElse,
+        spacer: spacer ?? orElse,
+      );
 
   @override
   String toString() => text;
