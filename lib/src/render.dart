@@ -200,8 +200,9 @@ class MarkdownPainter {
               indent: q.indent,
               theme: _theme,
             ),
-            code: (c) => BlockPainter$Spacer(
-              count: 1,
+            code: (c) => BlockPainter$Code(
+              language: c.language,
+              text: c.text,
               theme: _theme,
             ),
             list: (l) => BlockPainter$List(
@@ -424,6 +425,8 @@ class BlockPainter$Paragraph implements BlockPainter {
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
+    // If the width is less than required do not paint anything.
+    if (size.width < _size.width) return;
     painter.paint(
       canvas,
       Offset(0, offset),
@@ -476,6 +479,8 @@ class BlockPainter$Heading implements BlockPainter {
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
+    // If the width is less than required do not paint anything.
+    if (size.width < _size.width) return;
     painter.paint(
       canvas,
       Offset(0, offset),
@@ -521,19 +526,21 @@ class BlockPainter$Quote implements BlockPainter {
 
   @override
   Size layout(double width) {
+    // Adjust width for indentation.
     painter.layout(
       minWidth: 0,
-      // Adjust width for indentation.
-      maxWidth: math.max(width - lineIndent + indent * lineIndent, 0),
+      maxWidth: math.max(width - lineIndent - indent * lineIndent, 0),
     );
     return _size = Size(
-      painter.size.width + indent * 8, // Add indentation to the width.
+      painter.size.width + lineIndent + indent * lineIndent,
       painter.size.height,
     );
   }
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
+    // If the width is less than required do not paint anything.
+    if (size.width < _size.width) return;
     for (var i = 1; i <= indent; i++)
       canvas.drawLine(
         Offset(i * lineIndent - lineIndent / 2, offset),
@@ -633,6 +640,8 @@ class BlockPainter$List implements BlockPainter {
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
+    // If the width is less than required do not paint anything.
+    if (size.width < _size.width) return;
     painter.paint(
       canvas,
       Offset(indent, offset),
@@ -704,6 +713,74 @@ class BlockPainter$Divider implements BlockPainter {
       Offset(0, center),
       Offset(size.width, center),
       _paint,
+    );
+  }
+}
+
+/// A class for painting a code block in markdown.
+@internal
+class BlockPainter$Code implements BlockPainter {
+  BlockPainter$Code({
+    required String text,
+    required String? language,
+    required this.theme,
+  }) : painter = TextPainter(
+          text: TextSpan(
+            text: text,
+            style: theme.textStyle.copyWith(
+              fontFamily: 'monospace',
+              fontSize: theme.textStyle.fontSize ?? 14.0,
+            ),
+          ),
+          textAlign: TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        );
+
+  static const double padding = 8.0; // Padding for code blocks.
+
+  final MarkdownThemeData theme;
+
+  final TextPainter painter;
+
+  @override
+  Size get size => _size;
+  Size _size = Size.zero;
+
+  @override
+  Size layout(double width) {
+    if (width <= padding * 2) {
+      // If the width is less than or equal to padding, return zero size.
+      _size = Size.zero;
+      return _size;
+    }
+    painter.layout(
+      minWidth: 0,
+      maxWidth: width - padding * 2,
+    );
+    return _size = Size(
+      painter.size.width + padding * 2, // Add padding to the width.
+      painter.size.height + padding * 2, // Add padding to the height.
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size, double offset) {
+    // If the width is less than required do not paint anything.
+    if (size.width < _size.width) return;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, offset, size.width, _size.height),
+        const Radius.circular(padding),
+      ),
+      Paint()
+        ..color = const Color.fromARGB(255, 235, 235, 235)
+        ..isAntiAlias = false
+        ..style = PaintingStyle.fill,
+    );
+    painter.paint(
+      canvas,
+      Offset(padding, offset + padding),
     );
   }
 }

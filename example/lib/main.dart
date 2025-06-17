@@ -298,5 +298,5 @@ alert(message);
 
 ## Inline code
 
-This web site is using `markedjs/marked`.
+This example is using `package:md/md.dart`.
 ''';
