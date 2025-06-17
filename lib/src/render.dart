@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:meta/meta.dart';
 
@@ -513,7 +514,7 @@ class BlockPainter$Quote implements BlockPainter {
 
   final int indent; // Indentation for quote blocks.
 
-  static const double lineIndent = 8.0; // Indentation for quote blocks.
+  static const double lineIndent = 10.0; // Indentation for quote blocks.
 
   static final Paint linePaint = Paint()
     ..color = const Color(0x7F7F7F7F) // Gray color for the line.
@@ -542,15 +543,81 @@ class BlockPainter$Quote implements BlockPainter {
   void paint(Canvas canvas, Size size, double offset) {
     // If the width is less than required do not paint anything.
     if (size.width < _size.width) return;
-    for (var i = 1; i <= indent; i++)
-      canvas.drawLine(
-        Offset(i * lineIndent - lineIndent / 2, offset),
-        Offset(i * lineIndent - lineIndent / 2, offset + _size.height),
-        linePaint,
-      );
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, offset, size.width, _size.height),
+        const Radius.circular(4.0), // Rounded corners for the quote block.
+      ),
+      Paint()
+        ..color = const Color.fromARGB(255, 235, 235, 235)
+        ..isAntiAlias = false
+        ..style = PaintingStyle.fill,
+    );
+
+    {
+      // --- Icons.format_quote_outlined --- //
+      try {
+        const quoteCodePoint = 0xf0a9;
+        const quoteFamily = 'MaterialIcons';
+        final textStyle = TextStyle(
+          fontFamily: quoteFamily,
+          fontSize: theme.textStyle.fontSize ?? 14.0,
+          color: const Color(0xFF7F7F7F), // Gray color for the quote icon.
+        );
+        final painter = TextPainter(
+          text: TextSpan(
+            text: String.fromCharCode(quoteCodePoint),
+            style: textStyle,
+          ),
+          textAlign: TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        )..layout();
+        canvas
+          ..save()
+          ..translate(
+            _size.width + painter.width,
+            offset + _size.height,
+          )
+          ..rotate(math.pi);
+        painter.paint(
+          canvas,
+          Offset(
+            _size.width,
+            _size.height - painter.height,
+          ),
+        );
+        canvas.restore();
+        painter.paint(
+          canvas,
+          Offset(
+            _size.width - painter.width - 2.0,
+            offset + _size.height - painter.height,
+          ),
+        );
+      } on Object {
+        for (var i = 1; i <= indent; i++)
+          canvas.drawLine(
+            Offset(
+              i * lineIndent - lineIndent / 2,
+              offset + 12,
+            ),
+            Offset(
+              i * lineIndent - lineIndent / 2,
+              offset + _size.height - 12,
+            ),
+            linePaint,
+          );
+      }
+    }
+
     painter.paint(
       canvas,
-      Offset(lineIndent + indent * lineIndent, offset),
+      Offset(
+        lineIndent + indent * lineIndent,
+        offset,
+      ),
     );
   }
 }
