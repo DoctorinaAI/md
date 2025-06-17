@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -177,6 +178,7 @@ class MarkdownPainter {
   /// Indicates if the layout needs to be recalculated.
   bool _needsLayout = true;
 
+  Float32List _blockOffsets = Float32List(0);
   List<BlockPainter> _blockPainters = const <BlockPainter>[];
 
   /// Rebuilds the block painters from the markdown blocks.
@@ -228,8 +230,7 @@ class MarkdownPainter {
           ),
         )
         .toList(growable: false);
-    // TODO(plugfox): Rebuild link spans and their positions.
-    // Mike Matiunin <plugfox@gmail.com>, 17 June 2025
+    _blockOffsets = Float32List(_blockPainters.length);
   }
 
   /// Update the painter with new values.
@@ -258,8 +259,17 @@ class MarkdownPainter {
       return _size; // If the markdown is empty, return zero size.
     }
     var width = .0, height = .0;
-    for (var p in _blockPainters) {
-      final size = p.layout(maxWidth);
+    final blocks = _blockPainters;
+    if (_blockOffsets.length != blocks.length) {
+      // Resize the block sizes array
+      // if it does not match the number of painters.
+      _blockOffsets = Float32List(blocks.length);
+    }
+    final offsets = _blockOffsets;
+    for (var i = 0; i < blocks.length; i++) {
+      offsets[i] = height;
+      final block = blocks[i];
+      final size = block.layout(maxWidth);
       width = math.max(width, size.width);
       height += size.height;
     }
@@ -268,7 +278,7 @@ class MarkdownPainter {
   }
 
   /// Get the painter from the array by the vertical local position (dy).
-  static BlockPainter? _getPainterByHeight(
+  /* static BlockPainter? _getPainterByHeight(
     Iterable<BlockPainter> painters,
     double dy,
   ) {
@@ -280,17 +290,76 @@ class MarkdownPainter {
       offset += painter.size.height; // Update the offset for the next block.
     }
     return result;
-  }
+  } */
 
   void handleEvent(PointerEvent event) {
     if (_blockPainters.isEmpty) return;
     // event.buttons, event.kind, event.position
     // event.localPosition, event.delta, event.down
 
+    // Only handle pointer down events for now.
+    // You can extend this to handle other pointer events if needed.
+    if (event is! PointerDownEvent) return;
+
     final pos = event.localPosition;
+    {
+      // Binary search to find the block painter by the vertical position.
+      final dy = pos.dy;
+      var min = 0;
+      var max = _blockPainters.length;
+      var idx = 0;
+      while (min < max) {
+        final mid = min + ((max - min) >> 1);
+        final offset = _blockOffsets[mid];
+        //final comp = offset.compareTo(dy);
+        var comp = 0;
+        if (offset > dy) {
+          // The offset is greater than the position.
+          comp = 1;
+        } else {
+          idx = mid; // Remember the index of the block painter.
+          // The offset is less than or equal to the position.
+          comp = offset < dy ? -1 : 0;
+        }
+        if (comp == 0) {
+          break; // Found the exact match.
+        } else if (comp < 0) {
+          min = mid + 1;
+        } else {
+          max = mid;
+        }
+      }
+      final blockTapEvent = PointerDownEvent(
+        // Adjust the position by the block offset.
+        position: Offset(
+          pos.dx,
+          pos.dy - _blockOffsets[idx],
+        ),
+        viewId: event.viewId,
+        timeStamp: event.timeStamp,
+        pointer: event.pointer,
+        kind: event.kind,
+        device: event.device,
+        buttons: event.buttons,
+        obscured: event.obscured,
+        pressure: event.pressure,
+        pressureMin: event.pressureMin,
+        pressureMax: event.pressureMax,
+        distanceMax: event.distanceMax,
+        size: event.size,
+        radiusMajor: event.radiusMajor,
+        radiusMinor: event.radiusMinor,
+        radiusMin: event.radiusMin,
+        radiusMax: event.radiusMax,
+        orientation: event.orientation,
+        tilt: event.tilt,
+        embedderId: event.embedderId,
+      );
+      _blockPainters[idx].handleTap(blockTapEvent);
+    }
 
     // We can use the position to determine which block was hit.
-    _getPainterByHeight(_blockPainters, pos.dy)?.handleEvent(event);
+    //_getPainterByHeight(_blockPainters, pos.dy)?.handleEvent(event);
 
     // Handle taps for the links with urls.
     /* switch (event) {
@@ -438,7 +507,7 @@ abstract interface class BlockPainter {
   abstract final Size size;
 
   /// Handle pointer events for the block.
-  void handleEvent(PointerEvent event);
+  void handleTap(PointerDownEvent event);
 
   /// Measure the block size with the given width.
   Size layout(double width);
@@ -475,13 +544,12 @@ class BlockPainter$Paragraph implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleEvent(PointerEvent event) {
-    if (event is! PointerDownEvent) return;
+  void handleTap(PointerDownEvent event) {
     final pos = painter.getPositionForOffset(event.localPosition);
     //final int index = pos.offset;
     final span = painter.text?.getSpanForPosition(pos);
     //final plainText = span?.toPlainText();
-    //print('Tapped on paragraph span: $plainText at offset: ${pos.offset}');
+    //print('[${pos.offset}] $plainText');
     if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
       onTap?.call();
       // TODO(plugfox): Implement me
@@ -544,7 +612,7 @@ class BlockPainter$Heading implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleEvent(PointerEvent event) {
+  void handleTap(PointerDownEvent event) {
     // TODO: implement handleEvent
   }
 
@@ -605,7 +673,7 @@ class BlockPainter$Quote implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleEvent(PointerEvent event) {
+  void handleTap(PointerDownEvent event) {
     // TODO: implement handleEvent
   }
 
@@ -778,7 +846,7 @@ class BlockPainter$List implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleEvent(PointerEvent event) {
+  void handleTap(PointerDownEvent event) {
     // TODO: implement handleEvent
   }
 
@@ -822,7 +890,7 @@ class BlockPainter$Spacer implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleEvent(PointerEvent event) {
+  void handleTap(PointerDownEvent event) {
     // TODO: implement handleEvent
   }
 
@@ -861,7 +929,7 @@ class BlockPainter$Divider implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleEvent(PointerEvent event) {
+  void handleTap(PointerDownEvent event) {
     // TODO: implement handleEvent
   }
 
@@ -914,7 +982,7 @@ class BlockPainter$Code implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleEvent(PointerEvent event) {
+  void handleTap(PointerDownEvent event) {
     // TODO: implement handleEvent
   }
 
@@ -993,7 +1061,7 @@ class BlockPainter$Table implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleEvent(PointerEvent event) {
+  void handleTap(PointerDownEvent event) {
     // TODO: implement handleEvent
   }
 

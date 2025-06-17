@@ -242,6 +242,16 @@ _`You` **can** __combine__ ~~them~~_
 
 ---
 
+## Paragraphs
+
+  **Lorem ipsum** dolor sit amet, consectetur adipiscing elit.
+Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Ut enim ad minim veniam, quis ~~nostrud exercitation~~ ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in _reprehenderit in voluptate velit esse_ cillum dolore eu fugiat nulla pariatur.
+**Excepteur sint occaecat cupidatat non proident**, sunt in culpa qui __officia deserunt mollit__ anim id `est laborum`.
+
+---
+
 ## Lists
 
 ### Unordered
