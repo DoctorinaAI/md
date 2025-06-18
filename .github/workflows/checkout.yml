@@ -90,7 +90,7 @@ jobs:
         id: check-format
         timeout-minutes: 1
         run: |
-          find lib test -name "*.dart" ! -name "*.*.dart" -print0 | xargs -0 dart format --set-exit-if-changed --line-length 120 -o none
+          find lib test -name "*.dart" ! -name "*.*.dart" -print0 | xargs -0 dart format --set-exit-if-changed --line-length 80 -o none
 
       - name: 📈 Check analyzer
         id: check-analyzer
