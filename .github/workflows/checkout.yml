@@ -1,0 +1,105 @@
+name: Checkout
+
+on:
+  workflow_dispatch:
+    inputs:
+      flutter-version:
+        description: "Flutter SDK version to use"
+        default: "stable"
+        required: false
+  push:
+    branches:
+      - "main"
+      - "master"
+    paths:
+      - ".github/**.yaml"
+      - ".github/**.yml"
+      - "bin/**.dart"
+      - "lib/**.dart"
+      - "test/**.dart"
+      - "example/**.dart"
+      - "example/**.html"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+  pull_request:
+    branches:
+      - "main"
+      - "master"
+      - "dev"
+      - "develop"
+      - "feature/**"
+      - "bugfix/**"
+      - "hotfix/**"
+      - "support/**"
+    paths:
+      - ".github/**.yaml"
+      - ".github/**.yml"
+      - "bin/**.dart"
+      - "lib/**.dart"
+      - "test/**.dart"
+      - "example/**.dart"
+      - "example/**.html"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checkout:
+    name: "Checkout"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./
+    container:
+      image: ghcr.io/plugfox/flutter:${{ github.event.inputs.flutter-version || 'stable' }}
+    env:
+      pub-cache: pub
+      PUB_CACHE: /github/home/.pub-cache
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.setup.outputs.version }}
+    concurrency:
+      group: checkout-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/
+
+      - name: 🚂 Setup dependencies
+        id: setup
+        timeout-minutes: 5
+        uses: ./.github/actions/setup
+        with:
+          pub-cache: packages
+
+      - name: 🚦 Check code format
+        id: check-format
+        timeout-minutes: 1
+        run: |
+          find lib test -name "*.dart" ! -name "*.*.dart" -print0 | xargs -0 dart format --set-exit-if-changed --line-length 120 -o none
+
+      - name: 📈 Check analyzer
+        id: check-analyzer
+        timeout-minutes: 1
+        run: |
+          dart analyze --fatal-infos --fatal-warnings lib/ test/
+
+      - name: 🧪 Run unit tests
+        id: run-unit-tests
+        timeout-minutes: 5
+        run: |
+          flutter test --coverage --concurrency=40 test/unit_test.dart

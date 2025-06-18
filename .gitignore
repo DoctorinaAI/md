@@ -1,5 +1,6 @@
 credentials.json
-build
-.dart_tool
+build/
+coverage/
+.dart_tool/
 pubspec.lock
 *.exe

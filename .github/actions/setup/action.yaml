@@ -1,0 +1,74 @@
+# This action should be used within a docker container ghcr.io/plugfox/flutter
+
+name: "Setup Flutter Environment (docker)"
+description: Sets up the Flutter environment using the docker container.
+
+inputs:
+  pub-cache:
+    description: "The name of the pub cache variable"
+    required: false
+    default: packages
+
+outputs:
+  version:
+    description: "The version of the package"
+    value: ${{ steps.version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: 📦 Checkout the repo
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        sparse-checkout-cone-mode: false
+        sparse-checkout: |
+          lib/
+          test/
+          analysis_options.yaml
+          pubspec.yaml
+          README.md
+          CHANGELOG.md
+
+    - name: 👀 Verify versions
+      id: versions
+      shell: bash
+      run: |
+        test -f pubspec.yaml && test -f CHANGELOG.md
+        version_pubspec=$(grep '^version:' pubspec.yaml | awk '{print $2}' | sed 's/[^[:print:]]//g')
+        echo "Version from pubspec.yaml: '$version_pubspec'"
+        echo "$version_pubspec" > /tmp/version_pubspec
+        grep -q "# $version_pubspec" CHANGELOG.md || (echo "Version not found in CHANGELOG.md" >&2; exit 1)
+        echo "VERSION=$version_pubspec" >> $GITHUB_ENV
+        echo "version=$version_pubspec" >> $GITHUB_OUTPUT
+
+    - name: 📤 Restore Pub modules
+      id: cache-pub-restore
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          /home/runner/.pub-cache
+        key: ${{ runner.os }}-pub-${{ inputs.pub-cache }}-${{ hashFiles('pubspec.lock') }}
+
+    - name: 👷 Install Dependencies
+      shell: bash
+      run: |
+        export PATH="$PATH:/home/runner/.pub-cache/bin"
+        export PUB_CACHE="/home/runner/.pub-cache"
+        echo "PUB_CACHE=/var/cache/pub" >> $GITHUB_ENV
+        if [ -d /var/cache/pub ]; then
+            mkdir -p /home/runner/.pub-cache
+            cp -r /var/cache/pub/. /home/runner/.pub-cache/
+            ls -al /home/runner/.pub-cache
+        fi
+        flutter config --disable-analytics --no-cli-animations
+        flutter pub get
+
+    - name: 📥 Save Pub modules
+      id: cache-pub-save
+      if: steps.cache-pub-restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          /home/runner/.pub-cache
+        key: ${{ steps.cache-pub-restore.outputs.cache-primary-key }}
