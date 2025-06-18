@@ -532,7 +532,7 @@ List<MD$Span> _parseInlineSpans(String text) {
           }
         default:
           // Here we would handle any other inline markers,
-          // such as custom markers or cyrillic or any other symbols.
+          // such as custom markers or any other special symbols.
           continue; // Skip unknown markers
       }
 
