@@ -260,7 +260,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
 }
 
 /// Type of special inline markers
-final Uint8List _kind = Uint8List(128)
+final Uint8List _kind = Uint8List(2048)
   ..[42] = 1 // * - italic and bold (single and double)
   ..[61] = 1 // = - highlight (double)
   ..[95] = 1 // _ - underline (double)
@@ -533,10 +533,6 @@ List<MD$Span> _parseInlineSpans(String text) {
         default:
           // Here we would handle any other inline markers,
           // such as custom markers or cyrillic or any other symbols.
-          /* assert(
-            false,
-            'Unknown inline marker: $ch at position $i in "$text"',
-          ); */
           continue; // Skip unknown markers
       }
 

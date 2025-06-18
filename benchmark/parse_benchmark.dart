@@ -75,37 +75,37 @@ class Google$Benchmark extends BenchmarkBase {
 }
 
 const _testSample = r'''
-# Markdown Parser Test
+# Тест Markdown-парсера
 
-This is a **bold** paragraph with _italic_, __underline__, ~~strikethrough~~, `monospace`, and a [link](https://example.com).
+Это **жирный** абзац с *курсивом*, **подчёркнутым**, ~~зачёркнутым~~, `моноширинным` и [ссылкой](https://example.com).
 
-This is a highlighted ==text== in a single line.
+Это выделенный ==текст== в одной строке.
 
 ---
 
-## Multi-line Paragraph
+## Многострочный абзац
 
 Lorem ipsum dolor sit amet,
 consectetur adipiscing elit.
 Sed do eiusmod **tempor** incididunt
-_ut labore_ et dolore `magna aliqua`.
+*ut labore* et dolore `magna aliqua`.
 
 ---
 
-### Blockquote
+### Цитата
 
-> This is a simple blockquote.
+> Это простая цитата.
 >
-> It can have **multiple lines**,
-> and even nested formatting like `code` or [links](https://example.com).
+> Она может содержать **несколько строк**,
+> и даже вложенное форматирование, как `код` или [ссылки](https://example.com).
 >
-> > Nested blockquote level 2.
+> > Вложенная цитата второго уровня.
 
 ---
 
-### Code Blocks
+### Блоки кода
 
-Here is a fenced code block:
+Вот пример ограждённого блока кода:
 
 ```javascript
 function helloWorld() {
@@ -113,60 +113,61 @@ function helloWorld() {
 }
 ```
 
-Inline code also works like this: `let x = 42;`
+Встроенный код тоже работает вот так: `let x = 42;`
 
 ---
 
-### Lists
+### Списки
 
-#### Unordered
+#### Неупорядоченный
 
-- First item
-- Second item with *italic*
-  - Subitem with **bold**
-    - Third level ~~strikethrough~~
-- Fourth item
+* Первый элемент
+* Второй элемент с *курсивом*
 
-#### Ordered
+  * Подэлемент с **жирным**
 
-1. First step
-2. Second step
-   1. Substep 2.1
-   2. Substep 2.2
-3. Final step
+    * Третий уровень ~~зачёркнутый~~
+* Четвёртый элемент
 
----
+#### Упорядоченный
 
-### Horizontal Rule
+1. Первый шаг
+2. Второй шаг
 
----
-
-### Table
-
-| Name     | Age | Role         |
-|----------|-----|--------------|
-| Alice    | 25  | Developer    |
-| **Bob**  | 30  | _Designer_   |
-| Charlie  | 35  | ~~Manager~~  |
+   1. Подшаг 2.1
+   2. Подшаг 2.2
+3. Финальный шаг
 
 ---
 
-### Empty Lines Below
-
-
-
-These lines above are intentionally empty.
+### Горизонтальная линия
 
 ---
 
-### Images
+### Таблица
+
+| Имя     | Возраст | Роль         |
+| ------- | ------- | ------------ |
+| Alice   | 25      | Разработчик  |
+| **Bob** | 30      | *Дизайнер*   |
+| Charlie | 35      | ~~Менеджер~~ |
+
+---
+
+### Пустые строки ниже
+
+Эти строки выше оставлены намеренно пустыми.
+
+---
+
+### Изображения
 
 ![Alt text](https://example.com/image.png)
 `![Code style alt](https://example.com/image2.png)`
 
-You can also use **bold image captions**.
+Можно также использовать **жирные подписи к изображениям**.
 
 ---
 
-That’s all for the _test_ document.
+На этом всё для *тестового* документа.
 ''';
