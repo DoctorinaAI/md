@@ -455,7 +455,7 @@ List<MD$Span> _parseInlineSpans(String text) {
 
       // Check if the next character is the same kind
       // This is used to determine if it's a single or double marker.
-      final isDouble = i + 1 < length && codes[i + 1] == ch;
+      late final isDouble = i + 1 < length && codes[i + 1] == ch;
 
       // Find the style for this marker
       switch (ch) {
@@ -531,10 +531,12 @@ List<MD$Span> _parseInlineSpans(String text) {
             continue;
           }
         default:
-          assert(
+          // Here we would handle any other inline markers,
+          // such as custom markers or cyrillic or any other symbols.
+          /* assert(
             false,
             'Unknown inline marker: $ch at position $i in "$text"',
-          );
+          ); */
           continue; // Skip unknown markers
       }
 

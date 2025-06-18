@@ -32,6 +32,36 @@ void main() => group('Parse', () {
         );
       });
 
+      test('Should returns normally for cyrillic', () {
+        expect(
+          () => markdownDecoder.convert(_testCyrillicSample).blocks,
+          returnsNormally,
+        );
+        expect(
+          markdownDecoder.convert(_testCyrillicSample),
+          isA<Markdown>()
+              .having(
+                (md) => md.blocks,
+                'blocks',
+                allOf(
+                  isList,
+                  isNotEmpty,
+                  hasLength(greaterThan(0)),
+                  everyElement(isA<MD$Block>()),
+                ),
+              )
+              .having(
+                (md) => md.text,
+                'text',
+                allOf(
+                  isA<String>(),
+                  isNotEmpty,
+                  contains('Тест Markdown-парсера'),
+                ),
+              ),
+        );
+      });
+
       test('Should contain three blocks', () {
         const text = '# Header\n'
             '---\n'
@@ -370,4 +400,102 @@ You can also use **bold image captions**.
 ---
 
 That’s all for the _test_ document.
+''';
+
+const String _testCyrillicSample = r'''
+# Тест Markdown-парсера
+
+Это **жирный** абзац с *курсивом*, **подчёркнутым**, ~~зачёркнутым~~, `моноширинным` и [ссылкой](https://example.com).
+
+Это выделенный ==текст== в одной строке.
+
+---
+
+## Многострочный абзац
+
+Lorem ipsum dolor sit amet,
+consectetur adipiscing elit.
+Sed do eiusmod **tempor** incididunt
+*ut labore* et dolore `magna aliqua`.
+
+---
+
+### Цитата
+
+> Это простая цитата.
+>
+> Она может содержать **несколько строк**,
+> и даже вложенное форматирование, как `код` или [ссылки](https://example.com).
+>
+> > Вложенная цитата второго уровня.
+
+---
+
+### Блоки кода
+
+Вот пример ограждённого блока кода:
+
+```javascript
+function helloWorld() {
+  console.log("Hello, world!");
+}
+```
+
+Встроенный код тоже работает вот так: `let x = 42;`
+
+---
+
+### Списки
+
+#### Неупорядоченный
+
+* Первый элемент
+* Второй элемент с *курсивом*
+
+  * Подэлемент с **жирным**
+
+    * Третий уровень ~~зачёркнутый~~
+* Четвёртый элемент
+
+#### Упорядоченный
+
+1. Первый шаг
+2. Второй шаг
+
+   1. Подшаг 2.1
+   2. Подшаг 2.2
+3. Финальный шаг
+
+---
+
+### Горизонтальная линия
+
+---
+
+### Таблица
+
+| Имя     | Возраст | Роль         |
+| ------- | ------- | ------------ |
+| Alice   | 25      | Разработчик  |
+| **Bob** | 30      | *Дизайнер*   |
+| Charlie | 35      | ~~Менеджер~~ |
+
+---
+
+### Пустые строки ниже
+
+Эти строки выше оставлены намеренно пустыми.
+
+---
+
+### Изображения
+
+![Alt text](https://example.com/image.png)
+`![Code style alt](https://example.com/image2.png)`
+
+Можно также использовать **жирные подписи к изображениям**.
+
+---
+
+На этом всё для *тестового* документа.
 ''';
