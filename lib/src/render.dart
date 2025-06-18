@@ -181,6 +181,48 @@ class MarkdownPainter {
   Float32List _blockOffsets = Float32List(0);
   List<BlockPainter> _blockPainters = const <BlockPainter>[];
 
+  static BlockPainter _defaultBlockBuilder(
+    MD$Block block,
+    MarkdownThemeData theme,
+  ) =>
+      block.map<BlockPainter>(
+        paragraph: (p) => BlockPainter$Paragraph(
+          spans: p.spans,
+          theme: theme,
+        ),
+        heading: (h) => BlockPainter$Heading(
+          level: h.level,
+          spans: h.spans,
+          theme: theme,
+        ),
+        quote: (q) => BlockPainter$Quote(
+          spans: q.spans,
+          indent: q.indent,
+          theme: theme,
+        ),
+        code: (c) => BlockPainter$Code(
+          language: c.language,
+          text: c.text,
+          theme: theme,
+        ),
+        list: (l) => BlockPainter$List(
+          items: l.items,
+          theme: theme,
+        ),
+        divider: (d) => BlockPainter$Divider(
+          theme: theme,
+        ),
+        table: (t) => BlockPainter$Table(
+          header: t.header,
+          rows: t.rows,
+          theme: theme,
+        ),
+        spacer: (s) => BlockPainter$Spacer(
+          count: s.count,
+          theme: theme,
+        ),
+      );
+
   /// Rebuilds the block painters from the markdown blocks.
   /// This method is called whenever the markdown or theme changes.
   void _rebuild() {
@@ -189,45 +231,11 @@ class MarkdownPainter {
     final filter = _theme.blockFilter;
     final filtered =
         filter != null ? _markdown.blocks.where(filter) : _markdown.blocks;
+    final builder = _theme.builder ?? _defaultBlockBuilder;
     _blockPainters = filtered
         .map<BlockPainter>(
-          (b) => b.map<BlockPainter>(
-            paragraph: (p) => BlockPainter$Paragraph(
-              spans: p.spans,
-              theme: _theme,
-            ),
-            heading: (h) => BlockPainter$Heading(
-              level: h.level,
-              spans: h.spans,
-              theme: _theme,
-            ),
-            quote: (q) => BlockPainter$Quote(
-              spans: q.spans,
-              indent: q.indent,
-              theme: _theme,
-            ),
-            code: (c) => BlockPainter$Code(
-              language: c.language,
-              text: c.text,
-              theme: _theme,
-            ),
-            list: (l) => BlockPainter$List(
-              items: l.items,
-              theme: _theme,
-            ),
-            divider: (d) => BlockPainter$Divider(
-              theme: _theme,
-            ),
-            table: (t) => BlockPainter$Table(
-              header: t.header,
-              rows: t.rows,
-              theme: _theme,
-            ),
-            spacer: (s) => BlockPainter$Spacer(
-              count: s.count,
-              theme: _theme,
-            ),
-          ),
+          (block) =>
+              builder(block, _theme) ?? _defaultBlockBuilder(block, _theme),
         )
         .toList(growable: false);
     _blockOffsets = Float32List(_blockPainters.length);
@@ -510,7 +518,7 @@ TextSpan _paragraphFromMarkdownSpans({
 }
 
 /// A class for painting blocks in markdown.
-@internal
+/// You can implement this interface to create custom block painters.
 abstract interface class BlockPainter {
   /// The current size of the block.
   /// Available only after [layout].

@@ -45,6 +45,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     ),
     this.blockFilter,
     this.spanFilter,
+    this.builder,
     this.onLinkTap,
   }) : _textStyles = HashMap<int, TextStyle>();
 
@@ -95,6 +96,16 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// relevant to the current context, such as links or images.
   /// This can be useful for customizing the rendering of Markdown spans.
   final bool Function(MD$Span span)? spanFilter;
+
+  /// A custom block painter builder function.
+  /// It receives a [MD$Block] and returns a [BlockPainter].
+  /// If it returns `null`, the default painter will be used.
+  /// This allows you to customize the rendering of specific blocks,
+  /// such as code blocks, tables, or quote blocks.
+  final BlockPainter? Function(
+    MD$Block block,
+    MarkdownThemeData theme,
+  )? builder;
 
   /// A callback function that is called when a link is tapped.
   /// It receives the link title and URL as parameters.
