@@ -164,8 +164,10 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   @override
   ThemeExtension<MarkdownThemeData> lerp(
-          covariant ThemeExtension<MarkdownThemeData>? other, double t) =>
-      MarkdownThemeData();
+    covariant ThemeExtension<MarkdownThemeData>? other,
+    double t,
+  ) =>
+      other ?? this;
 
   @override
   String toString() => 'MarkdownThemeData{}';
