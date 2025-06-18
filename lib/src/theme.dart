@@ -45,6 +45,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     ),
     this.blockFilter,
     this.spanFilter,
+    this.onLinkTap,
   }) : _textStyles = HashMap<int, TextStyle>();
 
   @override
@@ -94,6 +95,10 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// relevant to the current context, such as links or images.
   /// This can be useful for customizing the rendering of Markdown spans.
   final bool Function(MD$Span span)? spanFilter;
+
+  /// A callback function that is called when a link is tapped.
+  /// It receives the link title and URL as parameters.
+  final void Function(String title, String url)? onLinkTap;
 
   final HashMap<int, TextStyle> _textStyles;
 

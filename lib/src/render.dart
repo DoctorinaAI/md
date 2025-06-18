@@ -458,6 +458,21 @@ class MarkdownPainter {
   );
 } */
 
+/// Builds a tap recognizer for the given markdown span.
+TapGestureRecognizer? _buildTapRecognizer(
+  MD$Span span,
+  void Function(String title, String url)? onTap,
+) {
+  if (onTap == null) return null;
+  if (span.extra case <String, Object?>{'url': String url}) {
+    return TapGestureRecognizer()
+      ..onTap = () {
+        onTap(span.extra?['alt']?.toString() ?? span.text, url);
+      };
+  }
+  return null;
+}
+
 /// Helper function to create a [TextSpan] from markdown spans.
 /// This function filters the spans based on the theme's span filter,
 /// and applies the appropriate text style to each span.
@@ -469,33 +484,28 @@ TextSpan _paragraphFromMarkdownSpans({
   final style = textStyle ?? theme.textStyle;
   final spanFilter = theme.spanFilter;
   final filtered = spanFilter != null ? spans.where(spanFilter) : spans;
+  final mapper = textStyle != null
+      ? (MD$Span span) {
+          return TextSpan(
+            text: span.text,
+            style: theme.textStyleFor(span.style).merge(style),
+            recognizer: span.style.contains(MD$Style.link)
+                ? _buildTapRecognizer(span, theme.onLinkTap)
+                : null,
+          );
+        }
+      : (MD$Span span) {
+          return TextSpan(
+            text: span.text,
+            style: theme.textStyleFor(span.style),
+            recognizer: span.style.contains(MD$Style.link)
+                ? _buildTapRecognizer(span, theme.onLinkTap)
+                : null,
+          );
+        };
   return TextSpan(
     style: textStyle ?? theme.textStyle,
-    children: textStyle != null
-        ? filtered
-            .map<InlineSpan>(
-              (span) => TextSpan(
-                text: span.text,
-                style: theme.textStyleFor(span.style).merge(style),
-                /* recognizer: TapGestureRecognizer()
-                  ..onTap = () {
-                    print('Tapped on span: ${span.text}');
-                  }, */
-              ),
-            )
-            .toList(growable: false)
-        : filtered
-            .map<InlineSpan>(
-              (span) => TextSpan(
-                text: span.text,
-                style: theme.textStyleFor(span.style),
-                /* recognizer: TapGestureRecognizer()
-                  ..onTap = () {
-                    print('Tapped on span: ${span.text}');
-                  }, */
-              ),
-            )
-            .toList(growable: false),
+    children: filtered.map<InlineSpan>(mapper).toList(growable: false),
   );
 }
 
@@ -519,9 +529,29 @@ abstract interface class BlockPainter {
   void paint(Canvas canvas, Size size, double offset);
 }
 
+@internal
+mixin ParagraphGestureHandler {
+  /// Handle tap events with a [TextPainter].
+  @protected
+  void handleTapWithTextPainter(PointerDownEvent event, TextPainter painter) {
+    final pos = painter.getPositionForOffset(event.localPosition);
+    //final int index = pos.offset;
+    final span = painter.text?.getSpanForPosition(pos);
+    //final plainText = span?.toPlainText();
+    //print('[${pos.offset}] $plainText');
+    if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
+      onTap?.call();
+      // TODO(plugfox): Implement me
+      // Mike Matiunin <plugfox@gmail.com>, 17 June 2025
+    }
+  }
+}
+
 /// A class for painting a paragraph block in markdown.
 @internal
-class BlockPainter$Paragraph implements BlockPainter {
+class BlockPainter$Paragraph
+    with ParagraphGestureHandler
+    implements BlockPainter {
   BlockPainter$Paragraph({
     required List<MD$Span> spans,
     required this.theme,
@@ -544,18 +574,8 @@ class BlockPainter$Paragraph implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {
-    final pos = painter.getPositionForOffset(event.localPosition);
-    //final int index = pos.offset;
-    final span = painter.text?.getSpanForPosition(pos);
-    //final plainText = span?.toPlainText();
-    //print('[${pos.offset}] $plainText');
-    if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
-      onTap?.call();
-      // TODO(plugfox): Implement me
-      // Mike Matiunin <plugfox@gmail.com>, 17 June 2025
-    }
-  }
+  void handleTap(PointerDownEvent event) =>
+      handleTapWithTextPainter(event, painter);
 
   @override
   Size layout(double width) {
@@ -579,7 +599,9 @@ class BlockPainter$Paragraph implements BlockPainter {
 
 /// A class for painting a paragraph block in markdown.
 @internal
-class BlockPainter$Heading implements BlockPainter {
+class BlockPainter$Heading
+    with ParagraphGestureHandler
+    implements BlockPainter {
   BlockPainter$Heading({
     required int level,
     required List<MD$Span> spans,
@@ -612,9 +634,8 @@ class BlockPainter$Heading implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {
-    // TODO: implement handleEvent
-  }
+  void handleTap(PointerDownEvent event) =>
+      handleTapWithTextPainter(event, painter);
 
   @override
   Size layout(double width) {
@@ -638,7 +659,7 @@ class BlockPainter$Heading implements BlockPainter {
 
 /// A class for painting a quote block in markdown.
 @internal
-class BlockPainter$Quote implements BlockPainter {
+class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
   BlockPainter$Quote({
     required List<MD$Span> spans,
     required this.indent,
@@ -673,9 +694,8 @@ class BlockPainter$Quote implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {
-    // TODO: implement handleEvent
-  }
+  void handleTap(PointerDownEvent event) =>
+      handleTapWithTextPainter(event, painter);
 
   @override
   Size layout(double width) {
@@ -775,7 +795,7 @@ class BlockPainter$Quote implements BlockPainter {
 
 /// A class for painting a list block in markdown.
 @internal
-class BlockPainter$List implements BlockPainter {
+class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
   BlockPainter$List({
     required List<MD$ListItem> items,
     required this.theme,
@@ -846,9 +866,8 @@ class BlockPainter$List implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {
-    // TODO: implement handleEvent
-  }
+  void handleTap(PointerDownEvent event) =>
+      handleTapWithTextPainter(event, painter);
 
   @override
   Size layout(double width) {
@@ -890,9 +909,7 @@ class BlockPainter$Spacer implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {
-    // TODO: implement handleEvent
-  }
+  void handleTap(PointerDownEvent event) {/* Do nothing */}
 
   @override
   Size layout(double width) {
@@ -929,9 +946,7 @@ class BlockPainter$Divider implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {
-    // TODO: implement handleEvent
-  }
+  void handleTap(PointerDownEvent event) {/* Do nothing */}
 
   @override
   Size layout(double width) {
@@ -982,9 +997,7 @@ class BlockPainter$Code implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {
-    // TODO: implement handleEvent
-  }
+  void handleTap(PointerDownEvent event) {/* Do nothing */}
 
   @override
   Size layout(double width) {
@@ -1061,9 +1074,7 @@ class BlockPainter$Table implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {
-    // TODO: implement handleEvent
-  }
+  void handleTap(PointerDownEvent event) {/* Do nothing */}
 
   @override
   Size layout(double width) {
@@ -1143,20 +1154,5 @@ class BlockPainter$Table implements BlockPainter {
         );
       }
     }
-
-    /* canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, offset, size.width, _size.height),
-        const Radius.circular(padding),
-      ),
-      Paint()
-        ..color = const Color.fromARGB(255, 235, 235, 235)
-        ..isAntiAlias = false
-        ..style = PaintingStyle.fill,
-    );
-    painter.paint(
-      canvas,
-      Offset(padding, offset + padding),
-    ); */
   }
 }

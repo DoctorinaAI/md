@@ -39,6 +39,16 @@ class App extends StatelessWidget {
             // so they are not rendered in the output.
             // Because image spans are not supported yet.
             spanFilter: (span) => !span.style.contains(MD$Style.image),
+            onLinkTap: (title, url) {
+              ScaffoldMessenger.maybeOf(context)
+                ?..clearSnackBars()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text('Link "$title" tapped: $url'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+            },
           ),
           child: child!,
         ),
