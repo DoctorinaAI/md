@@ -451,7 +451,7 @@ List<MD$Span> _parseInlineSpans(String text) {
       }
 
       // If the character is not a special inline marker, continue
-      if (_kind[ch] == 0) continue;
+      if (_kind.length > ch && _kind[ch] == 0) continue;
 
       // Check if the next character is the same kind
       // This is used to determine if it's a single or double marker.
