@@ -763,7 +763,7 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
         painter.paint(
           canvas,
           Offset(
-            _size.width - painter.width - 2.0,
+            size.width - painter.width - 2.0,
             offset + _size.height - painter.height,
           ),
         );
