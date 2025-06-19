@@ -134,15 +134,11 @@ class MarkdownRenderObject extends RenderBox {
     // ignore: unused_local_variable
     final canvas = context.canvas
       ..save()
-      ..translate(offset.dx, offset.dy)
-      ..clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
+      ..translate(offset.dx, offset.dy);
+    //..clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
 
     _painter.paint(canvas, size);
 
-    // Implement the painting logic here.
-    // This is where you would use the painter to draw the markdown content.
-    // For example:
-    // painter.paint(context, offset, size);
     canvas.restore();
   }
 }
@@ -618,15 +614,7 @@ class BlockPainter$Heading
           text: _paragraphFromMarkdownSpans(
             spans: spans,
             theme: theme,
-            textStyle: switch (level) {
-              1 => theme.h1Style,
-              2 => theme.h2Style,
-              3 => theme.h3Style,
-              4 => theme.h4Style,
-              5 => theme.h5Style,
-              6 => theme.h6Style,
-              _ => theme.textStyle,
-            },
+            textStyle: theme.headingStyleFor(level),
           ),
           textAlign: TextAlign.start,
           textDirection: theme.textDirection,
@@ -676,7 +664,7 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
           text: _paragraphFromMarkdownSpans(
             spans: spans,
             theme: theme,
-            textStyle: theme.quoteStyle,
+            textStyle: theme.quoteStyle ?? theme.textStyle,
           ),
           textAlign: TextAlign.start,
           textDirection: theme.textDirection,
@@ -741,10 +729,11 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
         const quoteFamily = 'MaterialIcons';
         final textStyle = TextStyle(
           fontFamily: quoteFamily,
-          fontSize: theme.textStyle.fontSize ?? 14.0,
+          fontSize:
+              theme.quoteStyle?.fontSize ?? theme.textStyle.fontSize ?? 14.0,
           color: const Color(0xFF7F7F7F), // Gray color for the quote icon.
         );
-        final painter = TextPainter(
+        final quotePainter = TextPainter(
           text: TextSpan(
             text: String.fromCharCode(quoteCodePoint),
             style: textStyle,
@@ -756,23 +745,23 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
         canvas
           ..save()
           ..translate(
-            _size.width + painter.width,
+            _size.width + quotePainter.width,
             offset + _size.height,
           )
           ..rotate(math.pi);
-        painter.paint(
+        quotePainter.paint(
           canvas,
           Offset(
             _size.width,
-            _size.height - painter.height,
+            _size.height - quotePainter.height,
           ),
         );
         canvas.restore();
-        painter.paint(
+        quotePainter.paint(
           canvas,
           Offset(
-            size.width - painter.width - 2.0,
-            offset + _size.height - painter.height,
+            size.width - quotePainter.width - 2.0,
+            offset + _size.height - quotePainter.height,
           ),
         );
       } on Object {

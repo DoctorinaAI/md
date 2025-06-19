@@ -8,7 +8,7 @@ description: >
   Markdown library written in Dart.
   It can parse and display Markdown.
 
-version: 0.0.1
+version: 0.0.2
 
 homepage: https://github.com/DoctorinaAI/md
 repository: https://github.com/DoctorinaAI/md

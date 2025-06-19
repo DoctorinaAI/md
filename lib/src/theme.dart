@@ -11,38 +11,16 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// Creates a [MarkdownThemeData] instance.
   /// {@macro markdown_theme_data}
   MarkdownThemeData({
+    required this.textStyle,
     this.textDirection = TextDirection.ltr,
     this.textScaler = TextScaler.noScaling,
-    this.textStyle = const TextStyle(fontSize: 14.0),
-    this.h1Style = const TextStyle(
-      fontSize: 24.0,
-      fontWeight: FontWeight.bold,
-      decoration: TextDecoration.underline,
-      decorationStyle: TextDecorationStyle.solid,
-    ),
-    this.h2Style = const TextStyle(
-      fontSize: 22.0,
-      fontWeight: FontWeight.bold,
-    ),
-    this.h3Style = const TextStyle(
-      fontSize: 20.0,
-      fontWeight: FontWeight.bold,
-    ),
-    this.h4Style = const TextStyle(
-      fontSize: 18.0,
-      fontWeight: FontWeight.bold,
-    ),
-    this.h5Style = const TextStyle(
-      fontSize: 16.0,
-      fontWeight: FontWeight.bold,
-    ),
-    this.h6Style = const TextStyle(
-      fontSize: 14.0,
-      fontWeight: FontWeight.bold,
-    ),
-    this.quoteStyle = const TextStyle(
-      fontSize: 14.0,
-    ),
+    this.h1Style,
+    this.h2Style,
+    this.h3Style,
+    this.h4Style,
+    this.h5Style,
+    this.h6Style,
+    this.quoteStyle,
     this.blockFilter,
     this.spanFilter,
     this.builder,
@@ -62,25 +40,25 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   final TextStyle textStyle;
 
   /// Default text style for headings h1.
-  final TextStyle h1Style;
+  final TextStyle? h1Style;
 
   /// Default text style for headings h2.
-  final TextStyle h2Style;
+  final TextStyle? h2Style;
 
   /// Default text style for headings h3.
-  final TextStyle h3Style;
+  final TextStyle? h3Style;
 
   /// Default text style for headings h4.
-  final TextStyle h4Style;
+  final TextStyle? h4Style;
 
   /// Default text style for headings h5.
-  final TextStyle h5Style;
+  final TextStyle? h5Style;
 
   /// Default text style for headings h6.
-  final TextStyle h6Style;
+  final TextStyle? h6Style;
 
   /// Default text style for quote blocks.
-  final TextStyle quoteStyle;
+  final TextStyle? quoteStyle;
 
   /// A filter function to determine whether a block should be rendered.
   /// If the function returns `true`, the block will be rendered.
@@ -111,35 +89,81 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// It receives the link title and URL as parameters.
   final void Function(String title, String url)? onLinkTap;
 
+  final List<TextStyle?> _headingStyles = List<TextStyle?>.filled(8, null);
+
+  /// Returns a [TextStyle] for the given heading level.
+  /// The level should be between 1 and 6, inclusive.
+  TextStyle headingStyleFor(int level) =>
+      _headingStyles[level] ??= switch (level.clamp(1, 7)) {
+        1 => h1Style ??
+            textStyle.copyWith(
+              fontSize: (textStyle.fontSize ?? 14.0) + 10.0,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.underline,
+              decorationStyle: TextDecorationStyle.solid,
+            ),
+        2 => h2Style ??
+            textStyle.copyWith(
+              fontSize: (textStyle.fontSize ?? 14.0) + 8.0,
+              fontWeight: FontWeight.bold,
+            ),
+        3 => h3Style ??
+            textStyle.copyWith(
+              fontSize: (textStyle.fontSize ?? 14.0) + 6.0,
+              fontWeight: FontWeight.bold,
+            ),
+        4 => h4Style ??
+            textStyle.copyWith(
+              fontSize: (textStyle.fontSize ?? 14.0) + 4.0,
+              fontWeight: FontWeight.bold,
+            ),
+        5 => h5Style ??
+            textStyle.copyWith(
+              fontSize: (textStyle.fontSize ?? 14.0) + 2.0,
+              fontWeight: FontWeight.bold,
+            ),
+        6 => h6Style ??
+            textStyle.copyWith(
+              fontSize: (textStyle.fontSize ?? 14.0) + 0.0,
+              fontWeight: FontWeight.bold,
+            ),
+        _ => textStyle,
+      };
+
   final HashMap<int, TextStyle> _textStyles;
 
   /// Returns a [TextStyle] for the given [MD$Style].
   TextStyle textStyleFor(MD$Style style) => _textStyles.putIfAbsent(
         style.hashCode,
-        () => TextStyle(
-          fontWeight:
-              style.contains(MD$Style.bold) || style.contains(MD$Style.link)
-                  ? FontWeight.bold
-                  : FontWeight.normal,
-          fontStyle: style.contains(MD$Style.italic)
-              ? FontStyle.italic
-              : FontStyle.normal,
-          decoration: style.contains(MD$Style.underline)
-              ? TextDecoration.underline
-              : style.contains(MD$Style.strikethrough)
-                  ? TextDecoration.lineThrough
-                  : TextDecoration.none,
-          fontFamily: style.contains(MD$Style.monospace)
-              ? 'monospace'
-              : textStyle.fontFamily,
-          color: style.contains(MD$Style.link)
-              ? Colors.purple
-              : style.contains(MD$Style.highlight)
-                  ? Colors.yellow
-                  : textStyle.color,
-          backgroundColor: style.contains(MD$Style.monospace)
-              ? Colors.black12
-              : textStyle.backgroundColor,
+        () => textStyle.copyWith(
+          fontWeight: switch (style) {
+            var s when s.contains(MD$Style.bold) => FontWeight.bold,
+            var s when s.contains(MD$Style.link) => FontWeight.bold,
+            var s when s.contains(MD$Style.highlight) => FontWeight.bold,
+            _ => null,
+          },
+          fontStyle: style.contains(MD$Style.italic) ? FontStyle.italic : null,
+          decoration: switch (style) {
+            var s when s.contains(MD$Style.underline) =>
+              TextDecoration.underline,
+            var s when s.contains(MD$Style.strikethrough) =>
+              TextDecoration.lineThrough,
+            _ => null,
+          },
+          fontFamily: style.contains(MD$Style.monospace) ? 'monospace' : null,
+          color: switch (style) {
+            var s when s.contains(MD$Style.link) => Colors.indigo,
+            var s when s.contains(MD$Style.highlight) => Colors.black,
+            var s when s.contains(MD$Style.monospace) => Colors.black,
+            _ => null,
+          },
+          backgroundColor: switch (style) {
+            var s when s.contains(MD$Style.highlight) =>
+              Colors.deepOrange.withValues(alpha: 0.25),
+            var s when s.contains(MD$Style.monospace) =>
+              Colors.grey.withValues(alpha: 0.25),
+            _ => null,
+          },
         ),
       );
 

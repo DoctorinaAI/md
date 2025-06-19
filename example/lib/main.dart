@@ -29,10 +29,7 @@ class App extends StatelessWidget {
         home: const HomeScreen(),
         builder: (context, child) => MarkdownTheme(
           data: MarkdownThemeData(
-            textStyle: const TextStyle(
-              fontSize: 16.0,
-              color: Colors.black87,
-            ),
+            textStyle: const TextStyle(fontSize: 14.0, color: Colors.black),
             textDirection: TextDirection.ltr,
             textScaler: TextScaler.noScaling,
             // Exclude images from the markdown rendering,
@@ -79,7 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _outputController.value = Markdown.fromString(_inputController.text);
+    final initialMarkdown = Markdown.fromString(_inputController.text);
+    _outputController.value = initialMarkdown;
     _inputController.addListener(_onInputChanged);
   }
 
@@ -247,6 +245,8 @@ __This will be underline__
 `This is inline code`
 
 ~~This text will be strikethrough~~
+
+==This text will be highlighted==
 
 _`You` **can** __combine__ ~~them~~_
 
