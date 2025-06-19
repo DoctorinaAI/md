@@ -25,7 +25,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.spanFilter,
     this.builder,
     this.onLinkTap,
-  }) : _textStyles = HashMap<int, TextStyle>();
+  })  : _headingStyles = List<TextStyle?>.filled(8, null),
+        _textStyles = HashMap<int, TextStyle>();
 
   @override
   Object get type => MarkdownThemeData;
@@ -89,7 +90,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// It receives the link title and URL as parameters.
   final void Function(String title, String url)? onLinkTap;
 
-  final List<TextStyle?> _headingStyles = List<TextStyle?>.filled(8, null);
+  final List<TextStyle?> _headingStyles;
 
   /// Returns a [TextStyle] for the given heading level.
   /// The level should be between 1 and 6, inclusive.
