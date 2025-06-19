@@ -55,11 +55,17 @@ final class Markdown {
       if (i > 0) buffer.writeln();
       switch (block) {
         case MD$Paragraph(:List<MD$Span> spans):
-          for (final span in spans) buffer.write(span.text);
+          for (final span in spans) {
+            buffer.write(span.text);
+          }
         case MD$Heading(:List<MD$Span> spans):
-          for (final span in spans) buffer.write(span.text);
+          for (final span in spans) {
+            buffer.write(span.text);
+          }
         case MD$Quote(:List<MD$Span> spans):
-          for (final span in spans) buffer.write(span.text);
+          for (final span in spans) {
+            buffer.write(span.text);
+          }
         case MD$Code(:String text):
           buffer.write(text);
         case MD$List(:List<MD$ListItem> items):
@@ -75,7 +81,9 @@ final class Markdown {
             for (var k = 0; k < row.cells.length; k++) {
               //if (k > 0) buffer.write(' | ');
               final spans = row.cells[k];
-              for (final span in spans) buffer.write(span.text);
+              for (final span in spans) {
+                buffer.write(span.text);
+              }
             }
           }
         case MD$Divider():
