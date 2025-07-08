@@ -1,3 +1,7 @@
+## 0.0.4
+
+- **CHANGED**: Improved link tap handling.
+
 ## 0.0.3
 
 - **FIXED**: Links inside lists now work correctly.

@@ -303,7 +303,7 @@ class MarkdownPainter {
 
     // Only handle pointer down events for now.
     // You can extend this to handle other pointer events if needed.
-    if (event is! PointerDownEvent) return;
+    if (event is! PointerDownEvent && event is! PointerUpEvent) return;
 
     final pos = event.localPosition;
     {
@@ -333,33 +333,64 @@ class MarkdownPainter {
           max = mid;
         }
       }
-      final blockTapEvent = PointerDownEvent(
-        // Adjust the position by the block offset.
-        position: Offset(
-          pos.dx,
-          pos.dy - _blockOffsets[idx],
-        ),
-        viewId: event.viewId,
-        timeStamp: event.timeStamp,
-        pointer: event.pointer,
-        kind: event.kind,
-        device: event.device,
-        buttons: event.buttons,
-        obscured: event.obscured,
-        pressure: event.pressure,
-        pressureMin: event.pressureMin,
-        pressureMax: event.pressureMax,
-        distanceMax: event.distanceMax,
-        size: event.size,
-        radiusMajor: event.radiusMajor,
-        radiusMinor: event.radiusMinor,
-        radiusMin: event.radiusMin,
-        radiusMax: event.radiusMax,
-        orientation: event.orientation,
-        tilt: event.tilt,
-        embedderId: event.embedderId,
-      );
-      _blockPainters[idx].handleTap(blockTapEvent);
+      switch (event) {
+        case PointerDownEvent():
+          final blockTapEvent = PointerDownEvent(
+            // Adjust the position by the block offset.
+            position: Offset(
+              pos.dx,
+              pos.dy - _blockOffsets[idx],
+            ),
+            viewId: event.viewId,
+            timeStamp: event.timeStamp,
+            pointer: event.pointer,
+            kind: event.kind,
+            device: event.device,
+            buttons: event.buttons,
+            obscured: event.obscured,
+            pressure: event.pressure,
+            pressureMin: event.pressureMin,
+            pressureMax: event.pressureMax,
+            distanceMax: event.distanceMax,
+            size: event.size,
+            radiusMajor: event.radiusMajor,
+            radiusMinor: event.radiusMinor,
+            radiusMin: event.radiusMin,
+            radiusMax: event.radiusMax,
+            orientation: event.orientation,
+            tilt: event.tilt,
+            embedderId: event.embedderId,
+          );
+          _blockPainters[idx].handleTapDown(blockTapEvent);
+        case PointerUpEvent():
+          final blockTapEvent = PointerUpEvent(
+            // Adjust the position by the block offset.
+            position: Offset(
+              pos.dx,
+              pos.dy - _blockOffsets[idx],
+            ),
+            viewId: event.viewId,
+            timeStamp: event.timeStamp,
+            pointer: event.pointer,
+            kind: event.kind,
+            device: event.device,
+            buttons: event.buttons,
+            obscured: event.obscured,
+            pressure: event.pressure,
+            pressureMin: event.pressureMin,
+            pressureMax: event.pressureMax,
+            distanceMax: event.distanceMax,
+            size: event.size,
+            radiusMajor: event.radiusMajor,
+            radiusMinor: event.radiusMinor,
+            radiusMin: event.radiusMin,
+            radiusMax: event.radiusMax,
+            orientation: event.orientation,
+            tilt: event.tilt,
+            embedderId: event.embedderId,
+          );
+          _blockPainters[idx].handleTapUp(blockTapEvent);
+      }
     }
 
     // We can use the position to determine which block was hit.
@@ -520,8 +551,11 @@ abstract interface class BlockPainter {
   /// Available only after [layout].
   abstract final Size size;
 
-  /// Handle tap pointer events for the block.
-  void handleTap(PointerDownEvent event);
+  /// Handle tap pointer down events for the block.
+  void handleTapDown(PointerDownEvent event);
+
+  /// Handle tap pointer up events for the block.
+  void handleTapUp(PointerUpEvent event);
 
   /// Measure the block size with the given width.
   Size layout(double width);
@@ -537,17 +571,14 @@ abstract interface class BlockPainter {
 mixin ParagraphGestureHandler {
   /// Handle tap events with a [TextPainter].
   @protected
-  void handleTapWithTextPainter(PointerDownEvent event, TextPainter painter) {
+  InlineSpan? hitTestInlineSpanWithPointerEvent(
+      PointerEvent event, TextPainter painter) {
     final pos = painter.getPositionForOffset(event.localPosition);
     //final int index = pos.offset;
     final span = painter.text?.getSpanForPosition(pos);
     //final plainText = span?.toPlainText();
     //print('[${pos.offset}] $plainText');
-    if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
-      onTap?.call();
-      // TODO(plugfox): Implement me
-      // Mike Matiunin <plugfox@gmail.com>, 17 June 2025
-    }
+    return span;
   }
 }
 
@@ -577,9 +608,28 @@ class BlockPainter$Paragraph
   Size get size => _size;
   Size _size = Size.zero;
 
+  /// Last span hit by the tap down event.
+  TextSpan? _lastSpan;
+
   @override
-  void handleTap(PointerDownEvent event) =>
-      handleTapWithTextPainter(event, painter);
+  void handleTapDown(PointerDownEvent event) {
+    _lastSpan = null; // Reset the span on tap down.
+    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    if (span case TextSpan textSpan) _lastSpan = textSpan;
+  }
+
+  @override
+  void handleTapUp(PointerUpEvent event) {
+    if (_lastSpan == null) return; // No span was hit on tap down.
+    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    if (span != null && _lastSpan == span) {
+      // If the span is the same as the one hit on tap down,
+      // call the tap recognizer.
+      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
+        onTap?.call();
+    }
+    _lastSpan = null; // Clear the span after handling the tap.
+  }
 
   @override
   Size layout(double width) {
@@ -629,9 +679,28 @@ class BlockPainter$Heading
   Size get size => _size;
   Size _size = Size.zero;
 
+  /// Last span hit by the tap down event.
+  TextSpan? _lastSpan;
+
   @override
-  void handleTap(PointerDownEvent event) =>
-      handleTapWithTextPainter(event, painter);
+  void handleTapDown(PointerDownEvent event) {
+    _lastSpan = null; // Reset the span on tap down.
+    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    if (span case TextSpan textSpan) _lastSpan = textSpan;
+  }
+
+  @override
+  void handleTapUp(PointerUpEvent event) {
+    if (_lastSpan == null) return; // No span was hit on tap down.
+    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    if (span != null && _lastSpan == span) {
+      // If the span is the same as the one hit on tap down,
+      // call the tap recognizer.
+      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
+        onTap?.call();
+    }
+    _lastSpan = null; // Clear the span after handling the tap.
+  }
 
   @override
   Size layout(double width) {
@@ -689,9 +758,28 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
   Size get size => _size;
   Size _size = Size.zero;
 
+  /// Last span hit by the tap down event.
+  TextSpan? _lastSpan;
+
   @override
-  void handleTap(PointerDownEvent event) =>
-      handleTapWithTextPainter(event, painter);
+  void handleTapDown(PointerDownEvent event) {
+    _lastSpan = null; // Reset the span on tap down.
+    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    if (span case TextSpan textSpan) _lastSpan = textSpan;
+  }
+
+  @override
+  void handleTapUp(PointerUpEvent event) {
+    if (_lastSpan == null) return; // No span was hit on tap down.
+    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    if (span != null && _lastSpan == span) {
+      // If the span is the same as the one hit on tap down,
+      // call the tap recognizer.
+      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
+        onTap?.call();
+    }
+    _lastSpan = null; // Clear the span after handling the tap.
+  }
 
   @override
   Size layout(double width) {
@@ -865,9 +953,28 @@ class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
   Size get size => _size;
   Size _size = Size.zero;
 
+  /// Last span hit by the tap down event.
+  TextSpan? _lastSpan;
+
   @override
-  void handleTap(PointerDownEvent event) =>
-      handleTapWithTextPainter(event, painter);
+  void handleTapDown(PointerDownEvent event) {
+    _lastSpan = null; // Reset the span on tap down.
+    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    if (span case TextSpan textSpan) _lastSpan = textSpan;
+  }
+
+  @override
+  void handleTapUp(PointerUpEvent event) {
+    if (_lastSpan == null) return; // No span was hit on tap down.
+    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    if (span != null && _lastSpan == span) {
+      // If the span is the same as the one hit on tap down,
+      // call the tap recognizer.
+      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
+        onTap?.call();
+    }
+    _lastSpan = null; // Clear the span after handling the tap.
+  }
 
   @override
   Size layout(double width) {
@@ -909,7 +1016,10 @@ class BlockPainter$Spacer implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {/* Do nothing */}
+  void handleTapDown(PointerDownEvent _) {/* Do nothing */}
+
+  @override
+  void handleTapUp(PointerUpEvent _) {/* Do nothing */}
 
   @override
   Size layout(double width) {
@@ -946,7 +1056,10 @@ class BlockPainter$Divider implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {/* Do nothing */}
+  void handleTapDown(PointerDownEvent _) {/* Do nothing */}
+
+  @override
+  void handleTapUp(PointerUpEvent _) {/* Do nothing */}
 
   @override
   Size layout(double width) {
@@ -997,7 +1110,10 @@ class BlockPainter$Code implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {/* Do nothing */}
+  void handleTapDown(PointerDownEvent _) {/* Do nothing */}
+
+  @override
+  void handleTapUp(PointerUpEvent _) {/* Do nothing */}
 
   @override
   Size layout(double width) {
@@ -1074,7 +1190,10 @@ class BlockPainter$Table implements BlockPainter {
   Size _size = Size.zero;
 
   @override
-  void handleTap(PointerDownEvent event) {/* Do nothing */}
+  void handleTapDown(PointerDownEvent _) {/* Do nothing */}
+
+  @override
+  void handleTapUp(PointerUpEvent _) {/* Do nothing */}
 
   @override
   Size layout(double width) {
