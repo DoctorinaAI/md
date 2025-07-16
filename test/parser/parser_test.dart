@@ -117,6 +117,71 @@ void main() => group('Parse', () {
         );
       });
 
+      test('Urls', () {
+        var markdown = markdownDecoder.convert('[text](url)');
+        expect(
+          markdown.text,
+          allOf(
+            isNotEmpty,
+            equals('text'),
+          ),
+        );
+        expect(
+          markdown.blocks,
+          allOf(
+            isNotEmpty,
+            hasLength(equals(1)),
+            everyElement(isA<MD$Paragraph>()),
+          ),
+        );
+        expect(
+          markdown.blocks.single,
+          isA<MD$Paragraph>().having(
+            (p) => p.spans,
+            'spans',
+            allOf(
+              isNotEmpty,
+              hasLength(equals(1)),
+              everyElement(isA<MD$Span>()
+                  .having((s) => s.style, 'style', equals(MD$Style.link))
+                  .having((s) => s.extra, 'extra', containsPair('url', 'url'))),
+            ),
+          ),
+        );
+
+        // Should be with url: `url()`
+        markdown = markdownDecoder.convert('[text](url())');
+        expect(
+          markdown.text,
+          allOf(
+            isNotEmpty,
+            equals('text'),
+          ),
+        );
+        expect(
+          markdown.blocks,
+          allOf(
+            isNotEmpty,
+            hasLength(equals(1)),
+            everyElement(isA<MD$Paragraph>()),
+          ),
+        );
+        expect(
+          markdown.blocks.single,
+          isA<MD$Paragraph>().having(
+            (p) => p.spans,
+            'spans',
+            allOf(
+              isNotEmpty,
+              hasLength(equals(1)),
+              everyElement(isA<MD$Span>()
+                  .having((s) => s.style, 'style', equals(MD$Style.link))
+                  .having((s) => s.extra, 'extra', containsPair('url', 'url'))),
+            ),
+          ),
+        );
+      });
+
       test('Empty input', () {
         expect(markdownDecoder.convert('').blocks, isEmpty);
       });
