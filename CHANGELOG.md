@@ -1,3 +1,7 @@
+## 0.0.5
+
+- **FIXED**: Fixed parsing url such as `[text](https://domain.com/path(with)brackets)`.
+
 ## 0.0.4
 
 - **CHANGED**: Improved link tap handling.

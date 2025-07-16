@@ -326,15 +326,21 @@ List<MD$Span> _parseInlineSpans(String text) {
 
       // find closing ')'
       var urlEnd = -1;
-      for (var k = urlIdx + 1; k < codes.length; k++) {
+      for (var k = urlIdx + 1, opens = 0; k < codes.length; k++) {
         final ck = codes[k];
         if (ck == esc) {
           k++;
-          continue;
+          continue; // skip escaped char
         }
-        if (ck == url$end) {
-          urlEnd = k;
-          break;
+        if (ck == url$start) {
+          opens++; // count opening '('
+        } else if (ck == url$end) {
+          if (opens > 0) {
+            opens--; // count closing ')'
+          } else {
+            urlEnd = k; // found the closing ')'
+            break;
+          }
         }
       }
 

@@ -150,7 +150,7 @@ void main() => group('Parse', () {
         );
 
         // Should be with url: `url()`
-        markdown = markdownDecoder.convert('[text](url())');
+        markdown = markdownDecoder.convert('[text](url(with)brackets)');
         expect(
           markdown.text,
           allOf(
@@ -176,7 +176,8 @@ void main() => group('Parse', () {
               hasLength(equals(1)),
               everyElement(isA<MD$Span>()
                   .having((s) => s.style, 'style', equals(MD$Style.link))
-                  .having((s) => s.extra, 'extra', containsPair('url', 'url'))),
+                  .having((s) => s.extra, 'extra',
+                      containsPair('url', 'url(with)brackets'))),
             ),
           ),
         );
