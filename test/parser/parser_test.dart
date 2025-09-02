@@ -369,6 +369,39 @@ void main() => group('Parse', () {
           ),
         );
       });
+
+      group('Parse escaped characters', () {
+        const escapedCharacterTests = {
+          r'\\': r'\', // Backslash
+          r'\`': '`', // Backtick
+          r'\*': '*', // Asterisk
+          r'\_': '_', // Underscore
+          r'\{': '{', // Left curly brace
+          r'\}': '}', // Right curly brace
+          r'\[': '[', // Left square bracket
+          r'\]': ']', // Right square bracket
+          r'\(': '(', // Left parenthesis
+          r'\)': ')', // Right parenthesis
+          r'\#': '#', // Hash mark
+          r'\+': '+', // Plus sign
+          r'\-': '-', // Minus sign (hyphen)
+          r'\.': '.', // Period
+          r'\!': '!', // Exclamation mark
+        };
+
+        for (final entry in escapedCharacterTests.entries) {
+          test('should correctly unescape "${entry.key}"', () {
+            final markdown = markdownDecoder.convert(entry.key);
+            expect(markdown.text, entry.value);
+          });
+        }
+
+        test('should not escape non-special characters', () {
+          const input = r'\no esc\aped strin\g';
+          final markdown = markdownDecoder.convert(input);
+          expect(markdown.text, input);
+        });
+      });
     });
 
 const String _testSample = r'''
