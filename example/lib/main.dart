@@ -319,4 +319,11 @@ alert(message);
 ## Inline code
 
 This example is using `package:flutter_md/flutter_md.dart`.
+
+---
+
+## Special symbols
+
+> "Quotes" and 'single quotes' with 👉 <, >, &, ©, ®, ™, €, £, ¥, •, …, ±, §, ¶, †, ‡, ‰, µ, °
+
 ''';
