@@ -25,7 +25,6 @@
       "runTestsOnDevice": false,
       "args": [
         "--color",
-        "--compiler=kernel",
         "--timeout=30s",
         "--reporter=expanded",
         "--concurrency=12"

@@ -1,3 +1,5 @@
+//ignore_for_file: unnecessary_import
+
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -6,13 +8,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:meta/meta.dart';
+import 'package:meta/meta.dart' as meta show internal;
 
 import 'markdown.dart';
 import 'nodes.dart';
 import 'theme.dart';
 
-@internal
+@meta.internal
 class MarkdownRenderObject extends RenderBox {
   MarkdownRenderObject({
     required Markdown markdown,
@@ -105,7 +107,7 @@ class MarkdownRenderObject extends RenderBox {
 
   /// Updates the render object with a new values.
   /// This method should be called whenever the markdown or theme changes.
-  @internal
+  @meta.internal
   void update({
     required Markdown markdown,
     required MarkdownThemeData theme,
@@ -144,7 +146,7 @@ class MarkdownRenderObject extends RenderBox {
 }
 
 /// A painter for rendering markdown content via blocks and spans.
-@internal
+@meta.internal
 class MarkdownPainter {
   /// Creates a [MarkdownPainter] instance.
   MarkdownPainter({
@@ -567,7 +569,7 @@ abstract interface class BlockPainter {
   void paint(Canvas canvas, Size size, double offset);
 }
 
-@internal
+@meta.internal
 mixin ParagraphGestureHandler {
   /// Handle tap events with a [TextPainter].
   @protected
@@ -583,7 +585,7 @@ mixin ParagraphGestureHandler {
 }
 
 /// A class for painting a paragraph block in markdown.
-@internal
+@meta.internal
 class BlockPainter$Paragraph
     with ParagraphGestureHandler
     implements BlockPainter {
@@ -652,7 +654,7 @@ class BlockPainter$Paragraph
 }
 
 /// A class for painting a paragraph block in markdown.
-@internal
+@meta.internal
 class BlockPainter$Heading
     with ParagraphGestureHandler
     implements BlockPainter {
@@ -723,7 +725,7 @@ class BlockPainter$Heading
 }
 
 /// A class for painting a quote block in markdown.
-@internal
+@meta.internal
 class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
   BlockPainter$Quote({
     required List<MD$Span> spans,
@@ -879,7 +881,7 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
 }
 
 /// A class for painting a list block in markdown.
-@internal
+@meta.internal
 class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
   BlockPainter$List({
     required List<MD$ListItem> items,
@@ -1000,7 +1002,7 @@ class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
 }
 
 /// A class for painting a spacer block in markdown.
-@internal
+@meta.internal
 class BlockPainter$Spacer implements BlockPainter {
   BlockPainter$Spacer({
     required this.count,
@@ -1038,7 +1040,7 @@ class BlockPainter$Spacer implements BlockPainter {
 }
 
 /// A class for painting a spacer block in markdown.
-@internal
+@meta.internal
 class BlockPainter$Divider implements BlockPainter {
   BlockPainter$Divider({
     required this.theme,
@@ -1080,7 +1082,7 @@ class BlockPainter$Divider implements BlockPainter {
 }
 
 /// A class for painting a code block in markdown.
-@internal
+@meta.internal
 class BlockPainter$Code implements BlockPainter {
   BlockPainter$Code({
     required String text,
@@ -1154,7 +1156,7 @@ class BlockPainter$Code implements BlockPainter {
 }
 
 /// A class for painting a table block in markdown.
-@internal
+@meta.internal
 class BlockPainter$Table implements BlockPainter {
   BlockPainter$Table({
     required this.header,
