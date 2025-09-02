@@ -1,3 +1,7 @@
+## 0.0.6
+
+- **FIXED**: Fixed escaping of special characters. [#6] 
+
 ## 0.0.5
 
 - **FIXED**: Fixed parsing url such as `[text](https://domain.com/path(with)brackets)`.

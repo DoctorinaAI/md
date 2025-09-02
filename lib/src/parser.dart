@@ -268,6 +268,24 @@ final Uint8List _kind = Uint8List(2048)
   ..[124] = 1 // | - spoiler (double)
   ..[126] = 1; // ~ - strikethrough (double)
 
+///  Markdown provides backslash escapes for the following characters:
+final Uint8List _escapedChars = Uint8List(126)
+  ..[33] = 1 // ! Exclamation mark
+  ..[35] = 1 // # Hash mark
+  ..[40] = 1 // ( Left parenthesis
+  ..[41] = 1 // ) Right parenthesis
+  ..[42] = 1 // * Asterisk
+  ..[43] = 1 // + Plus sign
+  ..[45] = 1 // - Minus sign (hyphen)
+  ..[46] = 1 // . Period
+  ..[91] = 1 // [ Left square bracket
+  ..[92] = 1 // \ Backslash
+  ..[93] = 1 // ] Right square bracket
+  ..[95] = 1 // _ Underscore
+  ..[96] = 1 // ` Backtick
+  ..[123] = 1 // { Left curly brace
+  ..[125] = 1; // } Right curly brace
+
 List<MD$Span> _parseInlineSpans(String text) {
   if (text.isEmpty) return const <MD$Span>[];
 
@@ -399,7 +417,7 @@ List<MD$Span> _parseInlineSpans(String text) {
         final spanLength = end - start - excluded.length;
         if (spanLength > 0) {
           // If the span has any valid text
-          final bytes = Uint8List(spanLength);
+          final bytes = Uint16List(spanLength);
           var j = 0; // Index for the new bytes array
           for (var i = start; i < end; i++) {
             if (excluded.contains(i)) continue; // Skip excluded indices
@@ -435,13 +453,17 @@ List<MD$Span> _parseInlineSpans(String text) {
 
     for (var i = 0; i < length; i++) {
       final ch = codes[i];
-
       // Check for escaped characters
       if (ch == esc /* \ */ && i != length - 1) {
-        hasExcluded = true; // We have an escaped character
-        excluded.add(i); // Exclude this character as it is escaped
-        i++; // skip next char
-        continue;
+        final nextChar = codes[i + 1];
+        // Check if the next character is an escaped character
+        if (_escapedChars.length > nextChar && _escapedChars[nextChar] == 1) {
+          hasExcluded = true; // We have an escaped character
+          excluded.add(i); // Exclude this character as it is escaped
+          i++; // skip next char
+
+          continue;
+        }
       }
 
       // If this character is part of a link or image, skip it
