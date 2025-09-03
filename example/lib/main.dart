@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_md/flutter_md.dart';
 
 void main() => runZonedGuarded<void>(
-      () => runApp(const App()),
+      () => runApp(ThemeModel(
+          notifier: ValueNotifier<ThemeMode>(ThemeMode.dark),
+          child: const App())),
       (e, s) => print(e),
     );
 
@@ -17,21 +19,16 @@ class App extends StatelessWidget {
   /// {@macro app}
   const App({super.key});
 
-  /// Light theme for the app.
-  static final ThemeData theme = ThemeData.light();
-
   @override
   Widget build(BuildContext context) => MaterialApp(
         title: 'Markdown',
-        themeMode: ThemeMode.light,
-        theme: theme,
-        darkTheme: theme,
+        themeMode: ThemeModel.of(context).value,
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
         home: const HomeScreen(),
         builder: (context, child) => MarkdownTheme(
-          data: MarkdownThemeData(
-            textStyle: const TextStyle(fontSize: 14.0, color: Colors.black),
-            textDirection: TextDirection.ltr,
-            textScaler: TextScaler.noScaling,
+          data: MarkdownThemeData.mergeTheme(
+            Theme.of(context),
             // Exclude images from the markdown rendering,
             // so they are not rendered in the output.
             // Because image spans are not supported yet.
@@ -50,6 +47,42 @@ class App extends StatelessWidget {
           child: child!,
         ),
       );
+}
+
+/// {@template theme_model}
+/// A widget that provides the [ThemeMode] to its descendants.
+/// {@endtemplate}
+class ThemeModel extends InheritedNotifier<ValueNotifier<ThemeMode>> {
+  /// {@macro theme_model}
+  const ThemeModel({super.key, super.notifier, required super.child});
+
+  /// The state from the closest instance of this class
+  /// that encloses the given context, if any.
+  /// e.g. `Theme.maybeOf(context)`.
+  static ValueNotifier<ThemeMode>? maybeOf(BuildContext context,
+          {bool listen = true}) =>
+      listen
+          ? context.dependOnInheritedWidgetOfExactType<ThemeModel>()?.notifier
+          : context.getInheritedWidgetOfExactType<ThemeModel>()?.notifier;
+
+  static Never _notFoundInheritedWidgetOfExactType() => throw ArgumentError(
+        'Out of scope, not found inherited widget '
+            'a ThemeModel of the exact type',
+        'out_of_scope',
+      );
+
+  /// The state from the closest instance of this class
+  /// that encloses the given context.
+  /// e.g. `Theme.of(context)`
+  static ValueNotifier<ThemeMode> of(BuildContext context,
+          {bool listen = true}) =>
+      maybeOf(context, listen: listen) ?? _notFoundInheritedWidgetOfExactType();
+
+  @override
+  bool updateShouldNotify(
+      covariant InheritedNotifier<ValueNotifier<ThemeMode>> oldWidget) {
+    return !identical(notifier, oldWidget.notifier);
+  }
 }
 
 /// {@template home_screen}
@@ -104,9 +137,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          centerTitle: true,
-          title: const Text('Markdown'),
-        ),
+            centerTitle: true,
+            title: const Text('Markdown'),
+            actions: <Widget>[
+              // theme switch widget
+              Switch.adaptive(
+                  value: ThemeModel.of(context).value == ThemeMode.dark,
+                  onChanged: (value) {
+                    ThemeModel.of(context).value =
+                        value ? ThemeMode.dark : ThemeMode.light;
+                  }),
+            ]),
         body: SafeArea(
           child: CustomMultiChildLayout(
             delegate: _layoutDelegate,

@@ -21,12 +21,63 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.h5Style,
     this.h6Style,
     this.quoteStyle,
+    this.linkColor = Colors.indigo,
+    this.surfaceColor = const Color.fromARGB(255, 235, 235, 235),
+    this.highlightBackgroundColor = const Color(0x40FF5722),
+    this.monospaceBackgroundColor = const Color(0x409E9E9E),
     this.blockFilter,
     this.spanFilter,
     this.builder,
     this.onLinkTap,
   })  : _headingStyles = List<TextStyle?>.filled(8, null),
         _textStyles = HashMap<int, TextStyle>();
+
+  /// Creates a [MarkdownThemeData] from the given [ThemeData].
+  factory MarkdownThemeData.mergeTheme(
+    ThemeData theme, {
+    TextStyle? textStyle,
+    TextDirection? textDirection,
+    TextScaler? textScaler,
+    TextStyle? h1Style,
+    TextStyle? h2Style,
+    TextStyle? h3Style,
+    TextStyle? h4Style,
+    TextStyle? h5Style,
+    TextStyle? h6Style,
+    TextStyle? quoteStyle,
+    Color? linkColor,
+    Color? surfaceColor,
+    Color? highlightBackgroundColor,
+    Color? monospaceBackgroundColor,
+    bool Function(MD$Block block)? blockFilter,
+    bool Function(MD$Span span)? spanFilter,
+    BlockPainter? Function(MD$Block block, MarkdownThemeData theme)? builder,
+    void Function(String title, String url)? onLinkTap,
+  }) {
+    return MarkdownThemeData(
+      textStyle: textStyle ??
+          theme.textTheme.bodyMedium ??
+          const TextStyle(color: Colors.black, fontSize: kDefaultFontSize),
+      textDirection: textDirection ?? TextDirection.ltr,
+      textScaler: textScaler ?? TextScaler.noScaling,
+      h1Style: h1Style ?? theme.textTheme.headlineLarge,
+      h2Style: h2Style ?? theme.textTheme.headlineMedium,
+      h3Style: h3Style ?? theme.textTheme.headlineSmall,
+      h4Style: h4Style ?? theme.textTheme.titleLarge,
+      h5Style: h5Style ?? theme.textTheme.titleMedium,
+      h6Style: h6Style ?? theme.textTheme.titleSmall,
+      linkColor: linkColor ?? theme.colorScheme.primary,
+      surfaceColor: surfaceColor ?? theme.colorScheme.surfaceContainerHigh,
+      highlightBackgroundColor:
+          highlightBackgroundColor ?? theme.colorScheme.errorContainer,
+      monospaceBackgroundColor:
+          monospaceBackgroundColor ?? theme.colorScheme.surfaceContainerHigh,
+      blockFilter: blockFilter,
+      spanFilter: spanFilter,
+      builder: builder,
+      onLinkTap: onLinkTap,
+    );
+  }
 
   @override
   Object get type => MarkdownThemeData;
@@ -60,6 +111,18 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// Default text style for quote blocks.
   final TextStyle? quoteStyle;
+
+  /// The color to use for link text.
+  final Color? linkColor;
+
+  /// The color to use for the background of the quote, block, table and etc.
+  final Color? surfaceColor;
+
+  /// The color to use for the background of highlighted text.
+  final Color? highlightBackgroundColor;
+
+  /// The color to use for the background of monospace text.
+  final Color? monospaceBackgroundColor;
 
   /// A filter function to determine whether a block should be rendered.
   /// If the function returns `true`, the block will be rendered.
@@ -98,34 +161,34 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       _headingStyles[level] ??= switch (level.clamp(1, 7)) {
         1 => h1Style ??
             textStyle.copyWith(
-              fontSize: (textStyle.fontSize ?? 14.0) + 10.0,
+              fontSize: (textStyle.fontSize ?? kDefaultFontSize) + 10.0,
               fontWeight: FontWeight.bold,
               decoration: TextDecoration.underline,
               decorationStyle: TextDecorationStyle.solid,
             ),
         2 => h2Style ??
             textStyle.copyWith(
-              fontSize: (textStyle.fontSize ?? 14.0) + 8.0,
+              fontSize: (textStyle.fontSize ?? kDefaultFontSize) + 8.0,
               fontWeight: FontWeight.bold,
             ),
         3 => h3Style ??
             textStyle.copyWith(
-              fontSize: (textStyle.fontSize ?? 14.0) + 6.0,
+              fontSize: (textStyle.fontSize ?? kDefaultFontSize) + 6.0,
               fontWeight: FontWeight.bold,
             ),
         4 => h4Style ??
             textStyle.copyWith(
-              fontSize: (textStyle.fontSize ?? 14.0) + 4.0,
+              fontSize: (textStyle.fontSize ?? kDefaultFontSize) + 4.0,
               fontWeight: FontWeight.bold,
             ),
         5 => h5Style ??
             textStyle.copyWith(
-              fontSize: (textStyle.fontSize ?? 14.0) + 2.0,
+              fontSize: (textStyle.fontSize ?? kDefaultFontSize) + 2.0,
               fontWeight: FontWeight.bold,
             ),
         6 => h6Style ??
             textStyle.copyWith(
-              fontSize: (textStyle.fontSize ?? 14.0) + 0.0,
+              fontSize: (textStyle.fontSize ?? kDefaultFontSize) + 0.0,
               fontWeight: FontWeight.bold,
             ),
         _ => textStyle,
@@ -153,16 +216,14 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
           },
           fontFamily: style.contains(MD$Style.monospace) ? 'monospace' : null,
           color: switch (style) {
-            var s when s.contains(MD$Style.link) => Colors.indigo,
-            var s when s.contains(MD$Style.highlight) => Colors.black,
-            var s when s.contains(MD$Style.monospace) => Colors.black,
+            var s when s.contains(MD$Style.link) => linkColor,
             _ => null,
           },
           backgroundColor: switch (style) {
             var s when s.contains(MD$Style.highlight) =>
-              Colors.deepOrange.withValues(alpha: 0.25),
+              highlightBackgroundColor,
             var s when s.contains(MD$Style.monospace) =>
-              Colors.grey.withValues(alpha: 0.25),
+              monospaceBackgroundColor,
             _ => null,
           },
         ),
@@ -180,6 +241,10 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     TextStyle? h5Style,
     TextStyle? h6Style,
     TextStyle? quoteStyle,
+    Color? linkColor,
+    Color? surfaceColor,
+    Color? highlightBackgroundColor,
+    Color? monospaceBackgroundColor,
     bool Function(MD$Block block)? blockFilter,
     bool Function(MD$Span span)? spanFilter,
   }) =>
@@ -194,16 +259,48 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
         h5Style: h5Style ?? this.h5Style,
         h6Style: h6Style ?? this.h6Style,
         quoteStyle: quoteStyle ?? this.quoteStyle,
+        linkColor: linkColor ?? this.linkColor,
+        surfaceColor: surfaceColor ?? this.surfaceColor,
+        highlightBackgroundColor:
+            highlightBackgroundColor ?? this.highlightBackgroundColor,
+        monospaceBackgroundColor:
+            monospaceBackgroundColor ?? this.monospaceBackgroundColor,
         blockFilter: blockFilter ?? this.blockFilter,
         spanFilter: spanFilter ?? this.spanFilter,
       );
 
   @override
   ThemeExtension<MarkdownThemeData> lerp(
-    covariant ThemeExtension<MarkdownThemeData>? other,
+    covariant MarkdownThemeData? other,
     double t,
-  ) =>
-      other ?? this;
+  ) {
+    if (identical(this, other)) return this;
+
+    return MarkdownThemeData(
+      textDirection:
+          t < 0.5 ? textDirection : other?.textDirection ?? TextDirection.ltr,
+      textScaler:
+          t < 0.5 ? textScaler : other?.textScaler ?? TextScaler.noScaling,
+      textStyle: TextStyle.lerp(textStyle, other?.textStyle, t)!,
+      h1Style: TextStyle.lerp(h1Style, other?.h1Style, t),
+      h2Style: TextStyle.lerp(h2Style, other?.h2Style, t),
+      h3Style: TextStyle.lerp(h3Style, other?.h3Style, t),
+      h4Style: TextStyle.lerp(h4Style, other?.h4Style, t),
+      h5Style: TextStyle.lerp(h5Style, other?.h5Style, t),
+      h6Style: TextStyle.lerp(h6Style, other?.h6Style, t),
+      quoteStyle: TextStyle.lerp(quoteStyle, other?.quoteStyle, t),
+      linkColor: Color.lerp(linkColor, other?.linkColor, t),
+      surfaceColor: Color.lerp(surfaceColor, other?.surfaceColor, t),
+      highlightBackgroundColor: Color.lerp(
+          highlightBackgroundColor, other?.highlightBackgroundColor, t),
+      monospaceBackgroundColor: Color.lerp(
+          monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
+      blockFilter: t < 0.5 ? blockFilter : other?.blockFilter,
+      spanFilter: t < 0.5 ? spanFilter : other?.spanFilter,
+      builder: t < 0.5 ? builder : other?.builder,
+      onLinkTap: t < 0.5 ? onLinkTap : other?.onLinkTap,
+    );
+  }
 
   @override
   String toString() => 'MarkdownThemeData{}';

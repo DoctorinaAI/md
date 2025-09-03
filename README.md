@@ -159,6 +159,9 @@ MarkdownTheme(
 )
 ```
 
+Or you can use the `MarkdownThemeData.mergeTheme(Theme.of(context))` factory to create a theme that inherits from the application's theme.
+This approach allows you to easily support both light and dark themes, and keeps your markdown styling consistent with the rest of your application.
+
 ### Custom Block Painters
 
 For advanced customization, you can provide custom block painters:
