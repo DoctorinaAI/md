@@ -25,6 +25,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.surfaceColor = const Color.fromARGB(255, 235, 235, 235),
     this.highlightBackgroundColor = const Color(0x40FF5722),
     this.monospaceBackgroundColor = const Color(0x409E9E9E),
+    this.dividerColor,
     this.blockFilter,
     this.spanFilter,
     this.builder,
@@ -49,6 +50,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
+    Color? dividerColor,
     bool Function(MD$Block block)? blockFilter,
     bool Function(MD$Span span)? spanFilter,
     BlockPainter? Function(MD$Block block, MarkdownThemeData theme)? builder,
@@ -66,12 +68,17 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       h4Style: h4Style ?? theme.textTheme.titleLarge,
       h5Style: h5Style ?? theme.textTheme.titleMedium,
       h6Style: h6Style ?? theme.textTheme.titleSmall,
+      quoteStyle: quoteStyle ??
+          theme.textTheme.bodyMedium?.copyWith(
+              color:
+                  theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.75)),
       linkColor: linkColor ?? theme.colorScheme.primary,
       surfaceColor: surfaceColor ?? theme.colorScheme.surfaceContainerHigh,
       highlightBackgroundColor:
           highlightBackgroundColor ?? theme.colorScheme.errorContainer,
       monospaceBackgroundColor:
           monospaceBackgroundColor ?? theme.colorScheme.surfaceContainerHigh,
+      dividerColor: dividerColor ?? theme.dividerColor.withValues(alpha: 0.12),
       blockFilter: blockFilter,
       spanFilter: spanFilter,
       builder: builder,
@@ -123,6 +130,9 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// The color to use for the background of monospace text.
   final Color? monospaceBackgroundColor;
+
+  /// The color to use for the divider.
+  final Color? dividerColor;
 
   /// A filter function to determine whether a block should be rendered.
   /// If the function returns `true`, the block will be rendered.
@@ -245,6 +255,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
+    Color? dividerColor,
     bool Function(MD$Block block)? blockFilter,
     bool Function(MD$Span span)? spanFilter,
   }) =>
@@ -265,6 +276,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
             highlightBackgroundColor ?? this.highlightBackgroundColor,
         monospaceBackgroundColor:
             monospaceBackgroundColor ?? this.monospaceBackgroundColor,
+        dividerColor: dividerColor ?? this.dividerColor,
         blockFilter: blockFilter ?? this.blockFilter,
         spanFilter: spanFilter ?? this.spanFilter,
       );
@@ -295,6 +307,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
           highlightBackgroundColor, other?.highlightBackgroundColor, t),
       monospaceBackgroundColor: Color.lerp(
           monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
+      dividerColor: Color.lerp(dividerColor, other?.dividerColor, t),
       blockFilter: t < 0.5 ? blockFilter : other?.blockFilter,
       spanFilter: t < 0.5 ? spanFilter : other?.spanFilter,
       builder: t < 0.5 ? builder : other?.builder,
