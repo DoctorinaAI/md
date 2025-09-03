@@ -760,7 +760,7 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
     required List<MD$Span> spans,
     required this.indent,
     required this.theme,
-  }) : painter = TextPainter(
+  })  : painter = TextPainter(
           text: _paragraphFromMarkdownSpans(
             spans: spans,
             theme: theme,
@@ -769,7 +769,13 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
           textAlign: TextAlign.start,
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
-        );
+        ),
+        linePaint = Paint()
+          ..color = theme.dividerColor ??
+              const Color(0x7F7F7F7F) // Gray color for the line.
+          ..isAntiAlias = false
+          ..strokeWidth = 4.0
+          ..style = PaintingStyle.fill;
 
   final MarkdownThemeData theme;
 
@@ -779,11 +785,7 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
 
   static const double lineIndent = 10.0; // Indentation for quote blocks.
 
-  static final Paint linePaint = Paint()
-    ..color = const Color(0x7F7F7F7F) // Gray color for the line.
-    ..isAntiAlias = false
-    ..strokeWidth = 4.0
-    ..style = PaintingStyle.fill;
+  final Paint linePaint;
 
   @override
   Size get size => _size;
@@ -830,75 +832,19 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
     // If the width is less than required do not paint anything.
     if (size.width < _size.width) return;
 
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, offset, size.width, _size.height),
-        const Radius.circular(4.0), // Rounded corners for the quote block.
-      ),
-      Paint()
-        ..color = theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235)
-        ..isAntiAlias = false
-        ..style = PaintingStyle.fill,
-    );
-
-    {
-      // --- Icons.format_quote_outlined --- //
-      try {
-        const quoteCodePoint = 0xf0a9;
-        const quoteFamily = 'MaterialIcons';
-        final textStyle = TextStyle(
-          fontFamily: quoteFamily,
-          fontSize: theme.quoteStyle?.fontSize ??
-              theme.textStyle.fontSize ??
-              kDefaultFontSize,
-          color: const Color(0xFF7F7F7F), // Gray color for the quote icon.
-        );
-        final quotePainter = TextPainter(
-          text: TextSpan(
-            text: String.fromCharCode(quoteCodePoint),
-            style: textStyle,
-          ),
-          textAlign: TextAlign.start,
-          textDirection: theme.textDirection,
-          textScaler: theme.textScaler,
-        )..layout();
-        canvas
-          ..save()
-          ..translate(
-            _size.width + quotePainter.width,
-            offset + _size.height,
-          )
-          ..rotate(math.pi);
-        quotePainter.paint(
-          canvas,
-          Offset(
-            _size.width,
-            _size.height - quotePainter.height,
-          ),
-        );
-        canvas.restore();
-        quotePainter.paint(
-          canvas,
-          Offset(
-            size.width - quotePainter.width - 2.0,
-            offset + _size.height - quotePainter.height,
-          ),
-        );
-      } on Object {
-        for (var i = 1; i <= indent; i++)
-          canvas.drawLine(
-            Offset(
-              i * lineIndent - lineIndent / 2,
-              offset + 12,
-            ),
-            Offset(
-              i * lineIndent - lineIndent / 2,
-              offset + _size.height - 12,
-            ),
-            linePaint,
-          );
-      }
-    }
+    // --- Draw vertical lines --- //
+    for (var i = 1; i <= indent; i++)
+      canvas.drawLine(
+        Offset(
+          i * lineIndent,
+          offset,
+        ),
+        Offset(
+          i * lineIndent,
+          offset + _size.height,
+        ),
+        linePaint,
+      );
 
     painter.paint(
       canvas,
