@@ -836,7 +836,7 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
         const Radius.circular(4.0), // Rounded corners for the quote block.
       ),
       Paint()
-        ..color = const Color.fromARGB(255, 235, 235, 235)
+        ..color = theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235)
         ..isAntiAlias = false
         ..style = PaintingStyle.fill,
     );
@@ -848,8 +848,9 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
         const quoteFamily = 'MaterialIcons';
         final textStyle = TextStyle(
           fontFamily: quoteFamily,
-          fontSize:
-              theme.quoteStyle?.fontSize ?? theme.textStyle.fontSize ?? 14.0,
+          fontSize: theme.quoteStyle?.fontSize ??
+              theme.textStyle.fontSize ??
+              kDefaultFontSize,
           color: const Color(0xFF7F7F7F), // Gray color for the quote icon.
         );
         final quotePainter = TextPainter(
@@ -1096,7 +1097,7 @@ class BlockPainter$Spacer implements BlockPainter {
 
   @override
   Size layout(double width) {
-    final height = theme.textStyle.fontSize ?? 14.0;
+    final height = theme.textStyle.fontSize ?? kDefaultFontSize;
     return _size = Size(0, height * count);
   }
 
@@ -1141,7 +1142,7 @@ class BlockPainter$Divider implements BlockPainter {
 
   @override
   Size layout(double width) {
-    final height = theme.textStyle.fontSize ?? 14.0;
+    final height = theme.textStyle.fontSize ?? kDefaultFontSize;
     return _size = Size(0, height);
   }
 
@@ -1174,7 +1175,7 @@ class BlockPainter$Code implements BlockPainter {
             text: text,
             style: theme.textStyle.copyWith(
               fontFamily: 'monospace',
-              fontSize: theme.textStyle.fontSize ?? 14.0,
+              fontSize: theme.textStyle.fontSize ?? kDefaultFontSize,
             ),
           ),
           textAlign: TextAlign.start,
@@ -1225,7 +1226,7 @@ class BlockPainter$Code implements BlockPainter {
         const Radius.circular(padding),
       ),
       Paint()
-        ..color = const Color.fromARGB(255, 235, 235, 235)
+        ..color = theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235)
         ..isAntiAlias = false
         ..style = PaintingStyle.fill,
     );
@@ -1289,7 +1290,7 @@ class BlockPainter$Table implements BlockPainter {
     return _size = Size(
       width, // The width of the table is the same as the available width.
       (header.cells.length + rows.length) *
-          ((theme.textStyle.fontSize ?? 14.0) + padding * 2),
+          ((theme.textStyle.fontSize ?? kDefaultFontSize) + padding * 2),
     );
   }
 
@@ -1301,7 +1302,8 @@ class BlockPainter$Table implements BlockPainter {
     // Draw the header row.
     final columnWidth = size.width / columns;
     final cellMaxWidth = columnWidth - padding * 2;
-    final rowHeight = (theme.textStyle.fontSize ?? 14.0) + padding * 2;
+    final rowHeight =
+        (theme.textStyle.fontSize ?? kDefaultFontSize) + padding * 2;
     canvas.drawRRect(
       RRect.fromLTRBR(
         0, // Left
@@ -1311,7 +1313,7 @@ class BlockPainter$Table implements BlockPainter {
         const Radius.circular(padding), // Radius for rounded corners
       ),
       Paint()
-        ..color = const Color.fromARGB(255, 235, 235, 235)
+        ..color = theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235)
         ..style = PaintingStyle.fill
         ..isAntiAlias = false,
     );
