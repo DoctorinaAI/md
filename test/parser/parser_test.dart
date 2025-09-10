@@ -370,6 +370,47 @@ void main() => group('Parse', () {
         );
       });
 
+      test('Inline code should treat inline code as literal', () {
+        // A map of markdown syntax to its expected literal representation
+        // inside a code block.
+        const List<String> syntaxes = [
+          '*italic*',
+          '_italic_',
+          '**bold**',
+          '__underline__',
+          '~~strike~~',
+          '==highlight==',
+          '||spoiler||',
+          r'\* \_ \`',
+          '!alt',
+          '* Item 1',
+          '# Header',
+          '---',
+          '1. Item **1**',
+          '[Markdown Live Preview](https://markdownlivepreview.com/)',
+          'package:flutter_md/flutter_md.dart'
+        ];
+
+        final text = syntaxes.map((syntax) => '`$syntax`').join();
+        final markdown = markdownDecoder.convert(text);
+
+        expect(markdown.blocks,
+            allOf(isNotEmpty, hasLength(1), everyElement(isA<MD$Paragraph>())));
+
+        final paragraph = markdown.blocks.first as MD$Paragraph;
+        final spans = paragraph.spans;
+
+        for (var i = 0; i < syntaxes.length; i++) {
+          final expectedText = syntaxes.elementAt(i);
+
+          final codeSpan = spans[i];
+          expect(codeSpan.text, expectedText);
+          expect(codeSpan.style, MD$Style.monospace,
+              reason:
+                  'Span for "$expectedText" should only have monospace style');
+        }
+      });
+
       group('Parse escaped characters', () {
         const escapedCharacterTests = {
           r'\\': r'\', // Backslash

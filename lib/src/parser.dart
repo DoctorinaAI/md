@@ -453,17 +453,19 @@ List<MD$Span> _parseInlineSpans(String text) {
 
     for (var i = 0; i < length; i++) {
       final ch = codes[i];
-      // Check for escaped characters
-      if (ch == esc /* \ */ && i != length - 1) {
-        final nextChar = codes[i + 1];
-        // Check if the next character is an escaped character
-        if (_escapedChars.length > nextChar && _escapedChars[nextChar] == 1) {
-          hasExcluded = true; // We have an escaped character
-          excluded.add(i); // Exclude this character as it is escaped
-          i++; // skip next char
 
-          continue;
+      // If we are inside a monospace block, we should only look
+      // for the closing backtick.
+      if (mask.contains(MD$Style.monospace)) {
+        if (ch == 96 /* ` */ && i > 0 && codes[i - 1] != esc /* ignore \` */) {
+          // Found closing backtick
+          maybePushSpan(i);
+          mask ^= MD$Style.monospace;
+          start = i + 1;
         }
+        // We continue to the next character, ignoring any other
+        // special markers.
+        continue;
       }
 
       // If this character is part of a link or image, skip it
@@ -476,6 +478,19 @@ List<MD$Span> _parseInlineSpans(String text) {
         i = span.end - 1; // -1 because the loop will increment i
         start = i + 1;
         continue;
+      }
+
+      // Check for escaped characters
+      if (ch == esc /* \ */ && i != length - 1) {
+        final nextChar = codes[i + 1];
+        // Check if the next character is an escaped character
+        if (_escapedChars.length > nextChar && _escapedChars[nextChar] == 1) {
+          hasExcluded = true; // We have an escaped character
+          excluded.add(i); // Exclude this character as it is escaped
+          i++; // skip next char
+
+          continue;
+        }
       }
 
       // If the character is not a special inline marker, continue

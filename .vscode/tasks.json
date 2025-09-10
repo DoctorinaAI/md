@@ -39,7 +39,7 @@
       },
       "type": "shell",
       "command": [
-        "dart format --fix -l 80 lib test"
+        "dart format -l 80 lib test"
       ],
       "dependsOn": [],
       "args": [],
