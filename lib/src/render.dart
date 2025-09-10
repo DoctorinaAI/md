@@ -129,6 +129,13 @@ class MarkdownRenderObject extends RenderBox {
 
   @override
   @protected
+  void dispose() {
+    super.dispose();
+    _painter.dispose();
+  }
+
+  @override
+  @protected
   void paint(PaintingContext context, Offset offset) {
     if (_painter.isEmpty)
       return; // If the markdown is empty, do not paint anything.
@@ -462,6 +469,15 @@ class MarkdownPainter {
     _lastSize = size;
     _lastPicture = picture;
   }
+
+  void dispose() {
+    _lastPicture?.dispose();
+    _lastPicture = null;
+    for (final painter in _blockPainters) {
+      painter.dispose();
+    }
+    _blockPainters = const <BlockPainter>[];
+  }
 }
 
 /* InlineSpan _imageFromMarkdownSpan({
@@ -567,6 +583,9 @@ abstract interface class BlockPainter {
   /// [size] the whole size of the markdown content
   /// [offset] is the vertical offset to paint the block at
   void paint(Canvas canvas, Size size, double offset);
+
+  /// Dispose all resources used by the painter.
+  void dispose();
 }
 
 @meta.internal
@@ -651,6 +670,11 @@ class BlockPainter$Paragraph
       Offset(0, offset),
     );
   }
+
+  @override
+  void dispose() {
+    painter.dispose();
+  }
 }
 
 /// A class for painting a paragraph block in markdown.
@@ -721,6 +745,11 @@ class BlockPainter$Heading
       canvas,
       Offset(0, offset),
     );
+  }
+
+  @override
+  void dispose() {
+    painter.dispose();
   }
 }
 
@@ -878,6 +907,34 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    painter.dispose();
+  }
+}
+
+/// A helper class to store layout information for a single list item.
+class _ListItemMetrics {
+  _ListItemMetrics({
+    required this.bulletPainter,
+    required this.contentPainter,
+    required this.offset,
+  });
+
+  final TextPainter bulletPainter;
+  final TextPainter contentPainter;
+  final Offset offset;
+
+  late final double height =
+      math.max(bulletPainter.height, contentPainter.height);
+  late final Size size =
+      Size(bulletPainter.width + contentPainter.width, height);
+
+  void dispose() {
+    bulletPainter.dispose();
+    contentPainter.dispose();
+  }
 }
 
 /// A class for painting a list block in markdown.
@@ -886,118 +943,132 @@ class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
   BlockPainter$List({
     required List<MD$ListItem> items,
     required this.theme,
-  }) : painter = TextPainter(
-          textAlign: TextAlign.start,
-          textDirection: theme.textDirection,
-          textScaler: theme.textScaler,
-        ) {
-    if (items.isEmpty) {
-      painter.text = const TextSpan();
-    } else {
-      final spans = <TextSpan>[];
-      drawListSpans(spans: spans, items: items, theme: theme);
-      painter.text = TextSpan(children: spans);
-    }
-  }
+  })  : _items = items,
+        _painters = <_ListItemMetrics>[];
 
   final MarkdownThemeData theme;
+  final List<MD$ListItem> _items;
+  final List<_ListItemMetrics> _painters;
 
-  final TextPainter painter;
+  // Indentation for the entire list block.
+  static const double _baseIndent = 8.0;
 
-  static const double indent = 8.0; // Indentation for list blocks.
-
-  /// Create a list of spans from the list items.
-  static void drawListSpans({
-    required List<TextSpan> spans,
-    required List<MD$ListItem> items,
-    required MarkdownThemeData theme,
-  }) {
-    final filter = theme.spanFilter ?? (span) => true;
-    for (var i = 0; i < items.length; i++) {
-      final item = items[i];
-      final filtered = item.spans.where(filter).toList(growable: false);
-      // Skip empty spans
-      if (filtered.isEmpty) continue;
-      if (spans.isNotEmpty) spans.add(const TextSpan(text: '\n'));
-      spans
-        ..add(
-          TextSpan(
-            text: '${' ' * item.indent}${switch (item.marker) {
-              '-' => '•',
-              '*' => '•',
-              '+' => '•',
-              _ => item.marker,
-            }} ',
-            style: theme.textStyle,
-          ),
-        )
-        ..addAll(
-          filtered.map<TextSpan>(
-            (span) => TextSpan(
-              text: span.text,
-              style: theme.textStyleFor(span.style),
-              recognizer: span.style.contains(MD$Style.link)
-                  ? _buildTapRecognizer(span, theme.onLinkTap)
-                  : null,
-            ),
-          ),
-        );
-      if (item.children.isEmpty) continue;
-      drawListSpans(
-        spans: spans,
-        items: item.children,
-        theme: theme,
-      ); // Recursively draw children if any.
-    }
-  }
+  // Indentation for each level of nesting.
+  static const double _levelIndent = 16.0;
 
   @override
   Size get size => _size;
   Size _size = Size.zero;
 
   /// Last span hit by the tap down event.
-  TextSpan? _lastSpan;
+  InlineSpan? _lastSpan;
+
+  InlineSpan? _getSpanForPosition(Offset localPosition) {
+    for (final metrics in _painters) {
+      final contentOffset =
+          metrics.offset + Offset(metrics.bulletPainter.width, 0);
+      final contentRect = contentOffset & metrics.contentPainter.size;
+      if (contentRect.contains(localPosition)) {
+        final painterPosition = localPosition - contentOffset;
+        final textPosition =
+            metrics.contentPainter.getPositionForOffset(painterPosition);
+        return metrics.contentPainter.text?.getSpanForPosition(textPosition);
+      }
+    }
+    return null;
+  }
 
   @override
   void handleTapDown(PointerDownEvent event) {
     _lastSpan = null; // Reset the span on tap down.
-    final span = hitTestInlineSpanWithPointerEvent(event, painter);
-    if (span case TextSpan textSpan) _lastSpan = textSpan;
+    _lastSpan = _getSpanForPosition(event.localPosition);
   }
 
   @override
   void handleTapUp(PointerUpEvent event) {
     if (_lastSpan == null) return; // No span was hit on tap down.
-    final span = hitTestInlineSpanWithPointerEvent(event, painter);
-    if (span != null && _lastSpan == span) {
-      // If the span is the same as the one hit on tap down,
-      // call the tap recognizer.
-      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
-        onTap?.call();
+    final newSpan = _getSpanForPosition(event.localPosition);
+    if (newSpan != null && _lastSpan == newSpan) {
+      if (newSpan
+          case TextSpan(recognizer: final TapGestureRecognizer recognizer)) {
+        recognizer.onTap?.call();
+      }
     }
+
     _lastSpan = null; // Clear the span after handling the tap.
   }
 
   @override
   Size layout(double width) {
-    painter.layout(
-      minWidth: 0,
-      maxWidth: math.max(width - indent, 0), // Adjust width for indentation.
-    );
-    return _size = Size(
-      painter.size.width + indent, // Add indentation to the width.
-      painter.size.height,
-    );
+    for (final painter in _painters) {
+      painter.dispose();
+    }
+    _painters.clear();
+
+    double currentHeight = 0;
+    double maxContentWidth = 0;
+
+    void layoutItems(List<MD$ListItem> items, int level) {
+      final indent = _baseIndent + level * _levelIndent;
+      for (final item in items) {
+        final bulletPainter = TextPainter(
+          text: TextSpan(
+              text: '${switch (item.marker) {
+                '-' => '•',
+                '*' => '•',
+                '+' => '•',
+                _ => item.marker,
+              }} ',
+              style: theme.textStyle),
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        )..layout();
+
+        final contentPainter = TextPainter(
+          text: _paragraphFromMarkdownSpans(spans: item.spans, theme: theme),
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        )..layout(maxWidth: math.max(0, width - indent - bulletPainter.width));
+
+        final metrics = _ListItemMetrics(
+          bulletPainter: bulletPainter,
+          contentPainter: contentPainter,
+          offset: Offset(indent, currentHeight),
+        );
+        _painters.add(metrics);
+
+        currentHeight += metrics.height;
+        maxContentWidth =
+            math.max(maxContentWidth, indent + metrics.size.width);
+
+        if (item.children.isNotEmpty) {
+          layoutItems(item.children, level + 1);
+        }
+      }
+    }
+
+    layoutItems(_items, 0);
+    return _size = Size(maxContentWidth, currentHeight);
   }
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
-    // If the width is less than required do not paint anything.
-    if (size.width < _size.width) return;
-    painter.paint(
-      canvas,
-      Offset(indent, offset),
-    );
+    for (final metrics in _painters) {
+      final bulletOffset = metrics.offset + Offset(0, offset);
+      metrics.bulletPainter.paint(canvas, bulletOffset);
+
+      final contentOffset =
+          bulletOffset + Offset(metrics.bulletPainter.width, 0);
+      metrics.contentPainter.paint(canvas, contentOffset);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final metrics in _painters) {
+      metrics.dispose();
+    }
+    _painters.clear();
   }
 }
 
@@ -1036,6 +1107,11 @@ class BlockPainter$Spacer implements BlockPainter {
       Rect.fromLTWH(0, offset, size.width, _size.height),
       Paint()..color = theme.textStyle.color ?? const Color(0x00000000),
     ); */
+  }
+
+  @override
+  void dispose() {
+    // Noting to dispose
   }
 }
 
@@ -1078,6 +1154,11 @@ class BlockPainter$Divider implements BlockPainter {
       Offset(size.width, center),
       _paint,
     );
+  }
+
+  @override
+  void dispose() {
+    // Noting to dispose
   }
 }
 
@@ -1152,6 +1233,11 @@ class BlockPainter$Code implements BlockPainter {
       canvas,
       Offset(padding, offset + padding),
     );
+  }
+
+  @override
+  void dispose() {
+    painter.dispose();
   }
 }
 
@@ -1275,5 +1361,10 @@ class BlockPainter$Table implements BlockPainter {
         );
       }
     }
+  }
+
+  @override
+  void dispose() {
+    painter.dispose();
   }
 }
