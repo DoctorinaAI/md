@@ -1,3 +1,10 @@
+## 0.0.7
+
+- **FIXED**: Preserved indentation on line breaks within list items [#4].
+- **FIXED**: Inline code no longer processes inner Markdown syntax [#10].
+- **CHANGED**: Improved theme support.
+- **ADDED**: Dark mode support in the example app.
+
 ## 0.0.6
 
 - **FIXED**: Fixed escaping of special characters. [#6] 
