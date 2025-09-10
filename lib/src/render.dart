@@ -1190,29 +1190,40 @@ class BlockPainter$Code implements BlockPainter {
 
 /// A class for painting a table block in markdown.
 @meta.internal
-class BlockPainter$Table implements BlockPainter {
+class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
   BlockPainter$Table({
     required this.header,
     required this.rows,
     required this.theme,
   })  : columns = header.cells.length,
-        painter = TextPainter(
-          textAlign: TextAlign.start,
-          textDirection: theme.textDirection,
-          textScaler: theme.textScaler,
-        );
+        _columnWidths = List<double>.filled(header.cells.length, 0.0),
+        _rowHeights = List<double>.filled(rows.length + 1, 0.0),
+        _borderPaint = Paint()
+          ..color = theme.dividerColor ?? const Color(0x1F000000)
+          ..style = PaintingStyle.stroke
+          ..isAntiAlias = false
+          ..strokeWidth = 1.0,
+        _rowBackgroundPaint = Paint()
+          ..style = PaintingStyle.fill
+          ..isAntiAlias = false
+          ..color =
+              theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235);
 
-  /// Padding for the table cells.
-  static const double padding = 4.0;
+  /// Padding for table cells.
+  static const double padding = 8.0;
 
   /// The theme for the markdown table.
   final MarkdownThemeData theme;
 
-  /// Text painter for rendering the table content.
-  final TextPainter painter;
-
   /// The number of columns in the table.
   final int columns;
+
+  final List<double> _columnWidths;
+  final List<double> _rowHeights;
+  final Paint _borderPaint;
+  final Paint _rowBackgroundPaint;
+
+  Float32List? _borderPoints;
 
   /// The header row of the table.
   final MD$TableRow header;
@@ -1224,95 +1235,295 @@ class BlockPainter$Table implements BlockPainter {
   Size get size => _size;
   Size _size = Size.zero;
 
-  @override
-  void handleTapDown(PointerDownEvent _) {/* Do nothing */}
+  List<List<TextPainter>> _cellPainters = const [];
+
+  /// Last span hit by the tap down event.
+  TextSpan? _lastSpan;
 
   @override
-  void handleTapUp(PointerUpEvent _) {/* Do nothing */}
+  void handleTapDown(PointerDownEvent event) {
+    _lastSpan = null; // Reset the span on tap down.
+    final span = _getSpanForOffset(event.localPosition);
+    if (span != null) {
+      _lastSpan = span;
+    }
+  }
+
+  @override
+  void handleTapUp(PointerUpEvent event) {
+    if (_lastSpan == null) return; // No span was hit on tap down.
+    final span = _getSpanForOffset(event.localPosition);
+    if (span != null && _lastSpan == span) {
+      // If the span is the same as the one hit on tap down,
+      // call the tap recognizer.
+      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
+        onTap?.call();
+    }
+    _lastSpan = null; // Clear the span after handling the tap.
+  }
+
+  TextSpan? _getSpanForOffset(Offset position) {
+    final rowHeights =
+        List.generate(_cellPainters.length, (r) => _rowHeights[r]);
+
+    double currentY = 0.0;
+
+    for (int r = 0; r < _cellPainters.length; r++) {
+      final rowHeight = rowHeights[r];
+      double currentX = 0.0;
+
+      if (position.dy >= currentY && position.dy < currentY + rowHeight) {
+        // In this row.
+        for (int c = 0; c < _cellPainters[r].length; c++) {
+          final painter = _cellPainters[r][c];
+          if (painter.text == null) {
+            currentX += _columnWidths[c];
+            continue;
+          }
+          final columnWidth = _columnWidths[c];
+
+          if (position.dx >= currentX && position.dx < currentX + columnWidth) {
+            // In this cell.
+            final verticalPadding = (rowHeight - painter.height) / 2;
+            final horizontalPadding =
+                (r == 0) ? (columnWidth - painter.width) / 2 : padding;
+
+            final painterOffset = Offset(
+                currentX + horizontalPadding, currentY + verticalPadding);
+            final localPosition = position - painterOffset;
+
+            // Check if inside the actual painted text area.
+            if (localPosition.dx < 0 ||
+                localPosition.dx > painter.width ||
+                localPosition.dy < 0 ||
+                localPosition.dy > painter.height) {
+              currentX += columnWidth;
+              continue;
+            }
+
+            final textPosition = painter.getPositionForOffset(localPosition);
+            final span = painter.text!.getSpanForPosition(textPosition);
+            if (span is TextSpan) {
+              return span;
+            }
+            return null; // Found cell, but no span.
+          }
+          currentX += columnWidth;
+        }
+      }
+      currentY += rowHeight;
+    }
+    return null;
+  }
 
   @override
   Size layout(double width) {
     if (columns < 1) return _size = Size.zero;
-    return _size = Size(
-      width, // The width of the table is the same as the available width.
-      (header.cells.length + rows.length) *
-          ((theme.textStyle.fontSize ?? kDefaultFontSize) + padding * 2),
-    );
+
+    // Dispose old painters
+    for (final row in _cellPainters) {
+      for (final painter in row) {
+        painter.dispose();
+      }
+    }
+
+    final allRows = [header, ...rows];
+    final naturalWidths = List<double>.filled(columns, 0.0);
+    final minWidths = List<double>.filled(columns, 0.0);
+
+    // Create painters for each row and column and calculate natural widths
+    _cellPainters = List.generate(allRows.length, (r) {
+      final row = allRows[r];
+      return List.generate(columns, (c) {
+        if (c >= row.cells.length) {
+          return TextPainter(textDirection: theme.textDirection);
+        }
+        final cell = row.cells[c];
+        final style = (r == 0)
+            ? theme.textStyle.copyWith(fontWeight: FontWeight.bold)
+            : null;
+        final textPainter = TextPainter(
+          text: _paragraphFromMarkdownSpans(
+              spans: cell, theme: theme, textStyle: style),
+          textAlign: (r == 0) ? TextAlign.center : TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        );
+
+        // Calculate natural width
+        textPainter.layout(maxWidth: double.infinity);
+        naturalWidths[c] =
+            math.max(naturalWidths[c], textPainter.width + padding * 2);
+
+        // Calculate min width (longest word)
+        final cellText = cell.map((s) => s.text).join();
+        final words = cellText.split(RegExp(r'\s+'));
+        if (words.isNotEmpty) {
+          final longestWord =
+              words.reduce((a, b) => a.length > b.length ? a : b);
+          final wordPainter = TextPainter(
+            text: TextSpan(text: longestWord, style: style),
+            textDirection: theme.textDirection,
+          )..layout();
+          minWidths[c] =
+              math.max(minWidths[c], wordPainter.width + padding * 2);
+          wordPainter.dispose();
+        }
+
+        return textPainter;
+      });
+    });
+
+    _columnWidths.setAll(0, _distributeWidths(naturalWidths, minWidths, width));
+
+    final totalWidth = _columnWidths.reduce((a, b) => a + b);
+
+    // Layout painters with final widths and calculate row heights
+
+    double totalHeight = 0.0;
+    for (int r = 0; r < allRows.length; r++) {
+      double rowHeight = 0.0;
+      for (int c = 0; c < columns; c++) {
+        final painter = _cellPainters[r][c];
+        if (painter.text == null) continue;
+        painter.layout(maxWidth: math.max(0.0, _columnWidths[c] - padding * 2));
+        rowHeight = math.max(
+          rowHeight,
+          painter.height,
+        );
+      }
+
+      _rowHeights[r] = rowHeight + padding * 2;
+      totalHeight += _rowHeights[r];
+    }
+
+    // Cache border points
+    final points = Float32List(((allRows.length - 1) + (columns - 1)) * 4);
+    var pointIndex = 0;
+    // Horizontal lines
+    double lineY = 0;
+    for (int r = 0; r < allRows.length - 1; r++) {
+      lineY += _rowHeights[r];
+      points[pointIndex++] = 0;
+      points[pointIndex++] = lineY;
+      points[pointIndex++] = totalWidth;
+      points[pointIndex++] = lineY;
+    }
+    // Vertical lines
+    double lineX = 0;
+    for (int c = 0; c < columns - 1; c++) {
+      lineX += _columnWidths[c];
+      points[pointIndex++] = lineX;
+      points[pointIndex++] = 0;
+      points[pointIndex++] = lineX;
+      points[pointIndex++] = totalHeight;
+    }
+    _borderPoints = points;
+
+    return _size = Size(totalWidth, totalHeight);
   }
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
     // If the width is less than required do not paint anything.
-    if (size.width < _size.width || columns < 1) return;
+    if (columns < 1) return;
 
-    // Draw the header row.
-    final columnWidth = size.width / columns;
-    final cellMaxWidth = columnWidth - padding * 2;
-    final rowHeight =
-        (theme.textStyle.fontSize ?? kDefaultFontSize) + padding * 2;
-    canvas.drawRRect(
-      RRect.fromLTRBR(
-        0, // Left
-        offset, // Top
-        size.width, // Right
-        offset + _size.height, // Bottom
-        const Radius.circular(padding), // Radius for rounded corners
-      ),
-      Paint()
-        ..color = theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235)
-        ..style = PaintingStyle.fill
-        ..isAntiAlias = false,
-    );
+    double currentY = offset;
+    final rowHeights =
+        List.generate(_cellPainters.length, (r) => _rowHeights[r]);
 
-    for (var i = 0; i < columns; i++) {
-      final cell = header.cells[i];
-      painter
-        ..text = TextSpan(
-          text: cell.map((span) => span.text).join(),
-          style: theme.textStyle.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        )
-        ..layout(
-          minWidth: 0,
-          maxWidth: cellMaxWidth,
+    for (int r = 0; r < _cellPainters.length; r++) {
+      double currentX = 0;
+
+      // Draw background for even data rows.
+      if (r % 2 == 0 && r != 0) {
+        canvas.drawRect(
+          Rect.fromLTWH(0, currentY, _size.width, rowHeights[r]),
+          _rowBackgroundPaint,
         );
-      painter.paint(
-        canvas,
-        Offset(
-          i * columnWidth + padding,
-          offset + rowHeight - padding - painter.height / 2,
-        ),
-      );
-    }
+      }
 
-    for (var i = 0; i < rows.length; i++) {
-      final row = rows[i];
-      for (var j = 0; j < columns; j++) {
-        if (j >= row.cells.length) continue; // Skip if the cell is missing.
-        final cell = row.cells[j];
-        painter
-          ..text = TextSpan(
-            text: cell.map((span) => span.text).join(),
-            style: theme.textStyle,
-          )
-          ..layout(
-            minWidth: 0,
-            maxWidth: cellMaxWidth,
-          );
+      for (int c = 0; c < columns; c++) {
+        final painter = _cellPainters[r][c];
+        if (painter.text == null) {
+          currentX += _cellPainters[r].length > c ? _columnWidths[c] : 0;
+          continue;
+        }
+
+        final verticalPadding = (rowHeights[r] - painter.height) / 2;
+        final horizontalPadding = (r == 0)
+            ? (_columnWidths[c] - painter.width) / 2 // Center for header rows
+            : padding; // Left align for data rows
+
         painter.paint(
           canvas,
           Offset(
-            j * columnWidth + padding,
-            offset + rowHeight * (i + 2) - painter.height / 2,
+            currentX + horizontalPadding,
+            currentY + verticalPadding,
           ),
         );
+        currentX += _columnWidths[c];
       }
+      currentY += rowHeights[r];
     }
+
+    // Draw inner borders
+    if (_borderPoints != null) {
+      canvas.save();
+      canvas.translate(0, offset);
+      canvas.drawRawPoints(PointMode.lines, _borderPoints!, _borderPaint);
+      canvas.restore();
+    }
+
+    // Draw outer borders
+    canvas.drawRect(
+      Rect.fromLTRB(
+        0,
+        offset,
+        _size.width,
+        offset + _size.height,
+      ),
+      _borderPaint,
+    );
   }
 
   @override
   void dispose() {
-    painter.dispose();
+    for (final row in _cellPainters) {
+      for (final painter in row) {
+        painter.dispose();
+      }
+    }
+    _cellPainters = const [];
+  }
+
+  /// Helper function to distribute widths among columns, respecting minimums.
+  /// If total minimum width exceeds availableWidth,
+  /// it returns the minimum widths as-is,
+  /// implying that the content will overflow and require scrolling.
+  List<double> _distributeWidths(
+      List<double> natural, List<double> min, double availableWidth) {
+    final totalNatural = natural.reduce((a, b) => a + b);
+    final totalMin = min.reduce((a, b) => a + b);
+
+    if (totalNatural <= availableWidth) {
+      return natural;
+    }
+
+    if (totalMin <= availableWidth) {
+      final remainingSpace = availableWidth - totalMin;
+      final extraSpacePerColumn = [
+        for (var i = 0; i < natural.length; i++) natural[i] - min[i]
+      ];
+      final totalExtraSpace = extraSpacePerColumn.reduce((a, b) => a + b);
+
+      if (totalExtraSpace <= 0.001) return min;
+
+      return [
+        for (var i = 0; i < natural.length; i++)
+          min[i] + remainingSpace * (extraSpacePerColumn[i] / totalExtraSpace)
+      ];
+    }
+    return min;
   }
 }
