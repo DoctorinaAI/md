@@ -1,3 +1,8 @@
+## 0.0.8
+
+- **CHANGED**: New table render
+- **FIXED**: Invalidate and relayout render object after system fonts changed.
+
 ## 0.0.7
 
 - **FIXED**: Preserved indentation on line breaks within list items [#4].
@@ -7,7 +12,7 @@
 
 ## 0.0.6
 
-- **FIXED**: Fixed escaping of special characters. [#6] 
+- **FIXED**: Fixed escaping of special characters. [#6]
 
 ## 0.0.5
 
