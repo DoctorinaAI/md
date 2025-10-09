@@ -98,11 +98,19 @@ class MarkdownRenderObject extends RenderBox {
     _painter.handleEvent(event);
   }
 
+  /// Handles system font changes by marking the render object as needing layout
+  void _handleSystemFontsChange() {
+    // Invalidate cached layouts in painter and all block painters
+    _painter.invalidateLayout();
+    // Request new layout and paint
+    markNeedsLayout();
+  }
+
   @override
   // ignore: unnecessary_overrides
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    // Ensure the painter is mounted when the render object is attached.
+    PaintingBinding.instance.systemFonts.addListener(_handleSystemFontsChange);
   }
 
   /// Updates the render object with a new values.
@@ -124,6 +132,8 @@ class MarkdownRenderObject extends RenderBox {
   @override
   @protected
   void detach() {
+    PaintingBinding.instance.systemFonts
+        .removeListener(_handleSystemFontsChange);
     super.detach();
   }
 
@@ -262,6 +272,20 @@ class MarkdownPainter {
     _isEmpty = markdown.isEmpty;
     _rebuild();
     return true; // Indicate that the painter was updated.
+  }
+
+  /// Invalidate cached layouts when system fonts change.
+  /// This forces TextPainters to recreate their layouts with new fonts.
+  void invalidateLayout() {
+    _needsLayout = true;
+    _lastSize = null;
+    _lastPicture = null;
+    // Dispose and rebuild all block painters to recreate TextPainters
+    // with the new system fonts
+    for (final painter in _blockPainters) {
+      painter.dispose();
+    }
+    _rebuild();
   }
 
   /// Layouts the markdown content with the given width.
