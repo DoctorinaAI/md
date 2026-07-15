@@ -22,6 +22,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.h6Style,
     this.quoteStyle,
     this.linkColor = Colors.indigo,
+    this.linkStyle,
     this.surfaceColor = const Color.fromARGB(255, 235, 235, 235),
     this.highlightBackgroundColor = const Color(0x40FF5722),
     this.monospaceBackgroundColor = const Color(0x409E9E9E),
@@ -47,6 +48,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     TextStyle? h6Style,
     TextStyle? quoteStyle,
     Color? linkColor,
+    TextStyle? linkStyle,
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
@@ -59,7 +61,10 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     return MarkdownThemeData(
       textStyle: textStyle ??
           theme.textTheme.bodyMedium ??
-          const TextStyle(color: Colors.black, fontSize: kDefaultFontSize),
+          const TextStyle(
+            color: Colors.black,
+            fontSize: kDefaultFontSize,
+          ),
       textDirection: textDirection ?? TextDirection.ltr,
       textScaler: textScaler ?? TextScaler.noScaling,
       h1Style: h1Style ?? theme.textTheme.headlineLarge,
@@ -70,14 +75,13 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       h6Style: h6Style ?? theme.textTheme.titleSmall,
       quoteStyle: quoteStyle ??
           theme.textTheme.bodyMedium?.copyWith(
-              color:
-                  theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.75)),
+            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.75),
+          ),
       linkColor: linkColor ?? theme.colorScheme.primary,
+      linkStyle: linkStyle,
       surfaceColor: surfaceColor ?? theme.colorScheme.surfaceContainerHigh,
-      highlightBackgroundColor:
-          highlightBackgroundColor ?? theme.colorScheme.errorContainer,
-      monospaceBackgroundColor:
-          monospaceBackgroundColor ?? theme.colorScheme.surfaceContainerHigh,
+      highlightBackgroundColor: highlightBackgroundColor ?? theme.colorScheme.errorContainer,
+      monospaceBackgroundColor: monospaceBackgroundColor ?? theme.colorScheme.surfaceContainerHigh,
       dividerColor: dividerColor ?? theme.dividerColor.withValues(alpha: 0.12),
       blockFilter: blockFilter,
       spanFilter: spanFilter,
@@ -85,7 +89,6 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       onLinkTap: onLinkTap,
     );
   }
-
   @override
   Object get type => MarkdownThemeData;
 
@@ -121,6 +124,9 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// The color to use for link text.
   final Color? linkColor;
+
+  /// The style to use for link text
+  final TextStyle? linkStyle;
 
   /// The color to use for the background of the quote, block, table and etc.
   final Color? surfaceColor;
@@ -167,8 +173,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// Returns a [TextStyle] for the given heading level.
   /// The level should be between 1 and 6, inclusive.
-  TextStyle headingStyleFor(int level) =>
-      _headingStyles[level] ??= switch (level.clamp(1, 7)) {
+  TextStyle headingStyleFor(int level) => _headingStyles[level] ??= switch (level.clamp(1, 7)) {
         1 => h1Style ??
             textStyle.copyWith(
               fontSize: (textStyle.fontSize ?? kDefaultFontSize) + 10.0,
@@ -209,36 +214,39 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// Returns a [TextStyle] for the given [MD$Style].
   TextStyle textStyleFor(MD$Style style) => _textStyles.putIfAbsent(
         style.hashCode,
-        () => textStyle.copyWith(
-          fontWeight: switch (style) {
-            var s when s.contains(MD$Style.bold) => FontWeight.bold,
-            var s when s.contains(MD$Style.link) => FontWeight.bold,
-            var s when s.contains(MD$Style.highlight) => FontWeight.bold,
-            _ => null,
-          },
-          fontStyle: style.contains(MD$Style.italic) ? FontStyle.italic : null,
-          decoration: switch (style) {
-            var s when s.contains(MD$Style.underline) =>
-              TextDecoration.underline,
-            var s when s.contains(MD$Style.strikethrough) =>
-              TextDecoration.lineThrough,
-            _ => null,
-          },
-          fontFamily: style.contains(MD$Style.monospace) ? 'monospace' : null,
-          color: switch (style) {
-            var s when s.contains(MD$Style.link) => linkColor,
-            _ => null,
-          },
-          backgroundColor: switch (style) {
-            var s when s.contains(MD$Style.highlight) =>
-              highlightBackgroundColor,
-            var s when s.contains(MD$Style.monospace) =>
-              monospaceBackgroundColor,
-            _ => null,
-          },
-        ),
-      );
+        () {
+          final styleText = textStyle.copyWith(
+            fontWeight: switch (style) {
+              var s when s.contains(MD$Style.bold) => FontWeight.bold,
+              var s when s.contains(MD$Style.link) => FontWeight.bold,
+              var s when s.contains(MD$Style.highlight) => FontWeight.bold,
+              _ => null,
+            },
+            fontStyle: style.contains(MD$Style.italic) ? FontStyle.italic : null,
+            decoration: switch (style) {
+              var s when s.contains(MD$Style.underline) => TextDecoration.underline,
+              var s when s.contains(MD$Style.strikethrough) => TextDecoration.lineThrough,
+              _ => null,
+            },
+            fontFamily: style.contains(MD$Style.monospace) ? 'monospace' : null,
+            color: switch (style) {
+              var s when s.contains(MD$Style.link) => linkColor,
+              _ => null,
+            },
+            backgroundColor: switch (style) {
+              var s when s.contains(MD$Style.highlight) => highlightBackgroundColor,
+              var s when s.contains(MD$Style.monospace) => monospaceBackgroundColor,
+              _ => null,
+            },
+          );
 
+          if (style.contains(MD$Style.link) && linkStyle != null) {
+            return styleText.merge(linkStyle);
+          }
+
+          return styleText;
+        },
+      );
   @override
   ThemeExtension<MarkdownThemeData> copyWith({
     TextDirection? textDirection,
@@ -252,6 +260,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     TextStyle? h6Style,
     TextStyle? quoteStyle,
     Color? linkColor,
+    TextStyle? linkStyle,
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
@@ -271,16 +280,16 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
         h6Style: h6Style ?? this.h6Style,
         quoteStyle: quoteStyle ?? this.quoteStyle,
         linkColor: linkColor ?? this.linkColor,
+        linkStyle: linkStyle ?? this.linkStyle,
         surfaceColor: surfaceColor ?? this.surfaceColor,
-        highlightBackgroundColor:
-            highlightBackgroundColor ?? this.highlightBackgroundColor,
-        monospaceBackgroundColor:
-            monospaceBackgroundColor ?? this.monospaceBackgroundColor,
+        highlightBackgroundColor: highlightBackgroundColor ?? this.highlightBackgroundColor,
+        monospaceBackgroundColor: monospaceBackgroundColor ?? this.monospaceBackgroundColor,
         dividerColor: dividerColor ?? this.dividerColor,
         blockFilter: blockFilter ?? this.blockFilter,
         spanFilter: spanFilter ?? this.spanFilter,
+        builder: builder,
+        onLinkTap: onLinkTap,
       );
-
   @override
   ThemeExtension<MarkdownThemeData> lerp(
     covariant MarkdownThemeData? other,
@@ -289,10 +298,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     if (identical(this, other)) return this;
 
     return MarkdownThemeData(
-      textDirection:
-          t < 0.5 ? textDirection : other?.textDirection ?? TextDirection.ltr,
-      textScaler:
-          t < 0.5 ? textScaler : other?.textScaler ?? TextScaler.noScaling,
+      textDirection: t < 0.5 ? textDirection : other?.textDirection ?? TextDirection.ltr,
+      textScaler: t < 0.5 ? textScaler : other?.textScaler ?? TextScaler.noScaling,
       textStyle: TextStyle.lerp(textStyle, other?.textStyle, t)!,
       h1Style: TextStyle.lerp(h1Style, other?.h1Style, t),
       h2Style: TextStyle.lerp(h2Style, other?.h2Style, t),
@@ -302,11 +309,10 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       h6Style: TextStyle.lerp(h6Style, other?.h6Style, t),
       quoteStyle: TextStyle.lerp(quoteStyle, other?.quoteStyle, t),
       linkColor: Color.lerp(linkColor, other?.linkColor, t),
+      linkStyle: TextStyle.lerp(linkStyle, other?.linkStyle, t),
       surfaceColor: Color.lerp(surfaceColor, other?.surfaceColor, t),
-      highlightBackgroundColor: Color.lerp(
-          highlightBackgroundColor, other?.highlightBackgroundColor, t),
-      monospaceBackgroundColor: Color.lerp(
-          monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
+      highlightBackgroundColor: Color.lerp(highlightBackgroundColor, other?.highlightBackgroundColor, t),
+      monospaceBackgroundColor: Color.lerp(monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
       dividerColor: Color.lerp(dividerColor, other?.dividerColor, t),
       blockFilter: t < 0.5 ? blockFilter : other?.blockFilter,
       spanFilter: t < 0.5 ? spanFilter : other?.spanFilter,
@@ -333,11 +339,9 @@ class MarkdownTheme extends InheritedWidget {
   /// The state from the closest instance of this class
   /// that encloses the given context, if any.
   /// e.g. `Theme.maybeOf(context)`.
-  static MarkdownThemeData? maybeOf(BuildContext context,
-          {bool listen = true}) =>
-      listen
-          ? context.dependOnInheritedWidgetOfExactType<MarkdownTheme>()?.data
-          : context.getInheritedWidgetOfExactType<MarkdownTheme>()?.data;
+  static MarkdownThemeData? maybeOf(BuildContext context, {bool listen = true}) => listen
+      ? context.dependOnInheritedWidgetOfExactType<MarkdownTheme>()?.data
+      : context.getInheritedWidgetOfExactType<MarkdownTheme>()?.data;
 
   static Never _notFoundInheritedWidgetOfExactType() => throw ArgumentError(
         'Out of scope, not found inherited widget '
@@ -355,6 +359,5 @@ class MarkdownTheme extends InheritedWidget {
   final MarkdownThemeData data;
 
   @override
-  bool updateShouldNotify(covariant MarkdownTheme oldWidget) =>
-      !identical(data, oldWidget.data);
+  bool updateShouldNotify(covariant MarkdownTheme oldWidget) => !identical(data, oldWidget.data);
 }
