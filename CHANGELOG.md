@@ -6,7 +6,8 @@
   and `MD$ListItem.isTask`, rendered with a checkbox.
 - **ADDED**: Table column alignment (`:---`, `:--:`, `---:`) captured on
   `MD$Table.alignments` and applied when rendering.
-- **ADDED**: `linkStyle` on `MarkdownThemeData` to customize link text styling.
+- **ADDED**: `linkStyle` on `MarkdownThemeData` to customize link text styling
+  (thanks @inamhusain, #22).
 - **ADDED**: Per-type alert accent colors via `MarkdownThemeData.alertColors`
   and `alertColorFor`.
 - **ADDED**: Opt-in `$...$` inline LaTeX math conversion to Unicode, **disabled
@@ -15,7 +16,8 @@
   (`\alpha`, `\rightarrow`, ...), superscripts/subscripts (`x^2`, `H_2O`,
   `x^{10}`), is code-span and code-block safe, and preserves currency (`$5`).
   The command table is configurable via `mathReplacements` (extend the
-  exported `kMarkdownMathCommands`).
+  exported `kMarkdownMathCommands`). Originally proposed in #21 by
+  @ibragimov05.
 - **FIXED**: `\$` is now a recognized backslash escape, producing a literal
   dollar sign (and opting a `$...$` run out of math conversion).
 - **CHANGED**: Thematic breaks now support `***` and `___` (and spaced variants
