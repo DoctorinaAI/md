@@ -92,6 +92,10 @@ void main() {
     test('superscript letter n', () {
       expect(_render(r'$2^n$'), '2ⁿ');
     });
+
+    test('unterminated brace group is left literal', () {
+      expect(_render(r'$x^{2$'), r'$x^{2$');
+    });
   });
 
   group('Code is protected', () {

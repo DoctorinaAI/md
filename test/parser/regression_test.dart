@@ -235,6 +235,37 @@ void main() {
     });
   });
 
+  group('Link & emphasis edge cases', () {
+    MD$Span linkOf(String input) =>
+        _spans(input).firstWhere((s) => s.extra != null);
+
+    test('unterminated angle-bracket url keeps the rest as url', () {
+      expect(linkOf('[t](<https://x.io)').extra?['url'], 'https://x.io');
+    });
+
+    test('escaped closing bracket inside a label', () {
+      final span = linkOf(r'[a\]b](https://x.io)');
+      expect(span.style.contains(MD$Style.link), isTrue);
+      expect(span.extra?['url'], 'https://x.io');
+    });
+
+    test('escaped closing paren inside a url', () {
+      expect(linkOf(r'[t](a\)b)').extra?['url'], r'a\)b');
+    });
+
+    test('double-marker closer preceded by a space is skipped', () {
+      // The first `**` (space before it) is not a valid closer; bold spans the
+      // whole run and closes at the final `**`.
+      final spans = _spans('**a ** b**');
+      expect(
+        spans,
+        contains(isA<MD$Span>()
+            .having((s) => s.text, 'text', 'a ** b')
+            .having((s) => s.style, 'style', MD$Style.bold)),
+      );
+    });
+  });
+
   group('Span offset invariants', () {
     // These guard the fast path and the selection-critical offset invariant:
     // spans must stay ordered, well-formed, and cover plain text exactly.
