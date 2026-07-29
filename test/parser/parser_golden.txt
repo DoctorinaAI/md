@@ -1,0 +1,380 @@
+@@@ prose-simple
+P
+  [0,44] style=0 "The quick brown fox jumps over the lazy dog."
+@@@ prose-multiline
+P
+  [0,54] style=0 "First line of a paragraph\nsecond line here\nthird line."
+@@@ prose-two-paragraphs
+P
+  [0,14] style=0 "Paragraph one."
+SPACER count=1
+P
+  [0,14] style=0 "Paragraph two."
+@@@ prose-operators
+P
+  [0,54] style=0 "5 * 6 = 30 and 3 < 4 and a_b_c and x > y stay literal."
+@@@ prose-unicode
+P
+  [0,45] style=0 "Привет мир 👋 and 日本語 text 🌍 mixed together."
+@@@ em-bold
+P
+  [0,8] style=0 "This is "
+  [10,14] style=2 "bold"
+  [16,22] style=0 " text."
+@@@ em-italic-star
+P
+  [0,8] style=0 "This is "
+  [9,15] style=1 "italic"
+  [16,22] style=0 " text."
+@@@ em-italic-underscore
+P
+  [0,8] style=0 "This is "
+  [9,15] style=1 "italic"
+  [16,22] style=0 " text."
+@@@ em-underline
+P
+  [0,8] style=0 "This is "
+  [10,19] style=4 "underline"
+  [21,27] style=0 " text."
+@@@ em-strike
+P
+  [0,8] style=0 "This is "
+  [10,16] style=8 "strike"
+  [18,24] style=0 " text."
+@@@ em-highlight
+P
+  [0,8] style=0 "This is "
+  [10,19] style=128 "highlight"
+  [21,27] style=0 " text."
+@@@ em-spoiler
+P
+  [0,8] style=0 "This is "
+  [10,17] style=256 "spoiler"
+  [19,25] style=0 " text."
+@@@ em-code
+P
+  [0,8] style=0 "This is "
+  [9,13] style=16 "code"
+  [14,20] style=0 " text."
+@@@ em-nested
+P
+  [2,7] style=2 "bold "
+  [8,18] style=3 "and italic"
+  [19,28] style=2 " together"
+@@@ em-adjacent
+P
+  [1,2] style=1 "a"
+  [4,5] style=3 "b"
+  [7,8] style=1 "c"
+@@@ em-unterminated-star
+P
+  [0,19] style=0 "**bold never closed"
+@@@ em-unterminated-single
+P
+  [0,19] style=0 "a * lonely asterisk"
+@@@ em-intraword-underscore
+P
+  [0,39] style=0 "snake_case and object_id remain literal"
+@@@ em-cyrillic-underscore
+P
+  [0,23] style=0 "переменная_значение_тут"
+@@@ em-mixed-line
+P
+  [2,3] style=2 "b"
+  [5,6] style=0 " "
+  [7,8] style=1 "i"
+  [9,10] style=0 " "
+  [12,13] style=4 "u"
+  [15,16] style=0 " "
+  [18,19] style=8 "s"
+  [21,22] style=0 " "
+  [23,24] style=16 "c"
+  [25,26] style=0 " "
+  [28,29] style=128 "h"
+  [31,32] style=0 " "
+  [34,36] style=256 "sp"
+@@@ em-unterminated-code
+P
+  [0,25] style=0 "a `code span never closed"
+@@@ em-double-backtick
+P
+  [0,24] style=0 "use ``double`` backticks"
+@@@ link-simple
+P
+  [0,27] style=32 "text" {href="https://example.com", type="link", url="https://example.com"}
+@@@ link-title
+P
+  [0,39] style=32 "text" {alt="the title", href="https://example.com", type="link", url="https://example.com"}
+@@@ link-single-quote-title
+P
+  [0,39] style=32 "text" {alt="the title", href="https://example.com", type="link", url="https://example.com"}
+@@@ link-angle
+P
+  [0,33] style=32 "text" {href="https://example.com/a b", type="link", url="https://example.com/a b"}
+@@@ link-in-text
+P
+  [0,4] style=0 "See "
+  [4,28] style=32 "the docs" {href="https://x.io", type="link", url="https://x.io"}
+  [28,38] style=0 " for more."
+@@@ link-emphasis
+P
+  [0,2] style=0 "A "
+  [4,29] style=34 "bold link" {href="https://x.io", type="link", url="https://x.io"}
+  [31,37] style=0 " here."
+@@@ image-simple
+P
+  [0,33] style=64 "alt" {src="https://example.com/i.png", type="image", url="https://example.com/i.png"}
+@@@ image-title
+P
+  [0,39] style=64 "alt" {alt="cap", src="https://example.com/i.png", type="image", url="https://example.com/i.png"}
+@@@ link-nested-parens
+P
+  [0,34] style=32 "t" {href="https://x.io/path(with)parens", type="link", url="https://x.io/path(with)parens"}
+@@@ link-two
+P
+  [0,6] style=32 "a" {href="b", type="link", url="b"}
+  [6,11] style=0 " and "
+  [11,17] style=32 "c" {href="d", type="link", url="d"}
+@@@ escape-emphasis
+P
+  [0,32] style=0 "*not italic* and _not underline_"
+@@@ escape-backtick
+P
+  [0,10] style=0 "`not code`"
+@@@ escape-brackets
+P
+  [0,18] style=0 "[not a link](nope)"
+@@@ escape-backslash-eol
+P
+  [0,19] style=0 "trailing backslash\\"
+@@@ escape-lone
+P
+  [0,1] style=0 "\\"
+@@@ math-alpha
+P
+  [0,21] style=0 "The angle α is small."
+@@@ math-currency
+P
+  [0,26] style=0 "It costs $5 and $10 today."
+@@@ math-in-code
+P
+  [1,9] style=16 "$\\alpha$"
+  [10,33] style=0 " stays literal in code."
+@@@ math-mixed
+P
+  [0,34] style=0 "π ≈ 3.14 but $plain$ is untouched."
+@@@ heading-h1
+H1
+  [0,11] style=0 "Heading one"
+@@@ heading-h6
+H6
+  [0,11] style=0 "Heading six"
+@@@ heading-closing
+H2
+  [0,7] style=0 "Heading"
+@@@ heading-no-space
+P
+  [0,25] style=0 "#hashtag is not a heading"
+@@@ heading-seven
+P
+  [0,23] style=0 "####### too many hashes"
+@@@ heading-empty
+H1
+@@@ quote-simple
+Q indent=1
+  [0,11] style=0 "quoted text"
+@@@ quote-multiline
+Q indent=1
+  [0,17] style=0 "line one\nline two"
+@@@ alert-note
+ALERT note
+  [0,18] style=0 "Take note of this."
+@@@ alert-tip
+ALERT tip
+  [0,14] style=0 "A helpful tip."
+@@@ alert-important
+ALERT important
+  [0,17] style=0 "Important detail."
+@@@ alert-warning
+ALERT warning
+  [0,15] style=0 "A warning here."
+@@@ alert-caution
+ALERT caution
+  [0,12] style=0 "Be cautious."
+@@@ alert-lowercase
+ALERT note
+  [0,17] style=0 "lowercase marker."
+@@@ alert-with-emphasis
+ALERT note
+  [0,10] style=0 "Body with "
+  [12,16] style=2 "bold"
+  [18,23] style=0 " and "
+  [24,28] style=16 "code"
+  [29,30] style=0 "."
+@@@ code-fenced
+CODE lang="dart" text="void main() {}"
+@@@ code-tilde
+CODE lang="" text="plain code"
+@@@ code-no-lang
+CODE lang="" text="no language"
+@@@ code-unterminated
+CODE lang="dart" text="void main() {}"
+@@@ list-unordered
+LIST
+  ITEM marker="-" indent=0 checked=null
+    [0,3] style=0 "one"
+  ITEM marker="-" indent=0 checked=null
+    [0,3] style=0 "two"
+  ITEM marker="-" indent=0 checked=null
+    [0,5] style=0 "three"
+@@@ list-ordered
+LIST
+  ITEM marker="1." indent=0 checked=null
+    [0,3] style=0 "one"
+  ITEM marker="2." indent=0 checked=null
+    [0,3] style=0 "two"
+  ITEM marker="3." indent=0 checked=null
+    [0,5] style=0 "three"
+@@@ list-nested
+LIST
+  ITEM marker="-" indent=0 checked=null
+    [0,1] style=0 "a"
+    ITEM marker="-" indent=2 checked=null
+      [0,1] style=0 "b"
+      ITEM marker="-" indent=4 checked=null
+        [0,1] style=0 "c"
+  ITEM marker="-" indent=0 checked=null
+    [0,1] style=0 "d"
+@@@ list-task
+LIST
+  ITEM marker="-" indent=0 checked=false
+    [0,4] style=0 "todo"
+  ITEM marker="-" indent=0 checked=true
+    [0,4] style=0 "done"
+  ITEM marker="-" indent=0 checked=true
+    [0,9] style=0 "also done"
+@@@ list-mixed-marker
+LIST
+  ITEM marker="*" indent=0 checked=null
+    [0,4] style=0 "star"
+  ITEM marker="+" indent=0 checked=null
+    [0,4] style=0 "plus"
+  ITEM marker="-" indent=0 checked=null
+    [0,4] style=0 "dash"
+@@@ list-with-inline
+LIST
+  ITEM marker="-" indent=0 checked=null
+    [0,10] style=0 "item with "
+    [12,16] style=2 "bold"
+    [18,23] style=0 " and "
+    [23,43] style=32 "link" {href="https://x.io", type="link", url="https://x.io"}
+@@@ table-basic
+TABLE aligns=[none,none]
+  header
+    cell0
+      [0,1] style=0 "a"
+    cell1
+      [0,1] style=0 "b"
+  row
+    cell0
+      [0,1] style=0 "1"
+    cell1
+      [0,1] style=0 "2"
+@@@ table-aligned
+TABLE aligns=[left,center,right]
+  header
+    cell0
+      [0,1] style=0 "L"
+    cell1
+      [0,1] style=0 "C"
+    cell2
+      [0,1] style=0 "R"
+  row
+    cell0
+      [0,1] style=0 "1"
+    cell1
+      [0,1] style=0 "2"
+    cell2
+      [0,1] style=0 "3"
+@@@ table-inline
+TABLE aligns=[none,none]
+  header
+    cell0
+      [0,1] style=0 "a"
+    cell1
+      [0,1] style=0 "b"
+  row
+    cell0
+      [2,3] style=2 "x"
+    cell1
+      [1,2] style=16 "y"
+@@@ table-malformed-ragged
+P
+  [0,29] style=0 "| a | b |\n| --- | --- |\n| 1 |"
+@@@ table-no-delimiter
+P
+  [0,19] style=0 "| a | b |\n| 1 | 2 |"
+@@@ hr-dash
+HR
+@@@ hr-star
+HR
+@@@ hr-underscore
+HR
+@@@ hr-spaced
+HR
+@@@ hr-between
+P
+  [0,5] style=0 "above"
+SPACER count=1
+HR
+SPACER count=1
+P
+  [0,5] style=0 "below"
+@@@ spacer-multi
+P
+  [0,1] style=0 "a"
+SPACER count=3
+P
+  [0,1] style=0 "b"
+@@@ doc-mixed
+H1
+  [0,5] style=0 "Title"
+SPACER count=1
+P
+  [0,2] style=0 "A "
+  [4,8] style=2 "para"
+  [10,16] style=0 " with "
+  [17,21] style=16 "code"
+  [22,23] style=0 "."
+SPACER count=1
+Q indent=1
+  [0,5] style=0 "quote"
+SPACER count=1
+LIST
+  ITEM marker="-" indent=0 checked=null
+    [0,1] style=0 "x"
+  ITEM marker="-" indent=0 checked=null
+    [0,1] style=0 "y"
+SPACER count=1
+TABLE aligns=[none,none]
+  header
+    cell0
+      [0,1] style=0 "a"
+    cell1
+      [0,1] style=0 "b"
+  row
+    cell0
+      [0,1] style=0 "1"
+    cell1
+      [0,1] style=0 "2"
+SPACER count=1
+HR
+SPACER count=1
+P
+  [0,5] style=0 "Done."
+@@@ empty
+
+@@@ whitespace-only
+SPACER count=1
+@@@ newlines-only
+SPACER count=3

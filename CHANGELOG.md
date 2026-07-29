@@ -25,6 +25,20 @@
 - **FIXED**: `MarkdownThemeData.copyWith` no longer drops `builder` and `onLinkTap`.
 - **BREAKING**: `MD$Block.map`/`maybeMap` gained an `alert` branch for the new
   `MD$Alert` block type.
+- **PERFORMANCE**: Rewrote the parser hot path — a single-span fast path for
+  plain text, first-code-unit guards that keep regexes off paragraph lines,
+  hand-rolled list-line and link-target parsing (removing per-line / per-link
+  `RegExp` allocation), lazy link-extraction gated on `[`, a range-copy escape
+  rebuild (no more per-character hash-set lookups), and a currency-safe inline
+  math bail. Roughly **40% faster** across representative workloads (links
+  −65%, lists −60%, currency-heavy text −77%). Output is byte-identical,
+  guarded by a golden snapshot test.
+- **TESTS**: Added a golden characterization snapshot, a corner-case regression
+  suite, and span-offset invariants; wired every test file into
+  `test/unit_test.dart` so CI runs the full suite (was running only a fraction).
+- **ADDED**: `benchmark/parser_benchmark.dart` (a multi-scenario
+  `benchmark_harness` suite) and `benchmark/compare.dart` (a low-noise
+  before/after comparison tool).
 
 ## 0.0.8
 

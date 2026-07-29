@@ -20,8 +20,16 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// {@macro markdown_decoder}
   const MarkdownDecoder();
 
-  /// A regular expression pattern to match empty lines.
-  static final RegExp _emptyPattern = RegExp(r'^(?:[ \t]*)$');
+  /// Whether [line] is blank (empty or only spaces/tabs). Replaces a regular
+  /// expression on the hot path of the block loop, since blank-line detection
+  /// runs for every line of the document.
+  static bool _isBlank(String line) {
+    for (var i = 0; i < line.length; i++) {
+      final c = line.codeUnitAt(i);
+      if (c != 0x20 && c != 0x09) return false;
+    }
+    return true;
+  }
 
   /// Leading (and trailing) `#` define atx-style headers.
   ///
@@ -35,11 +43,55 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// Matches an optional ATX closing sequence of `#` characters.
   static final RegExp _headingClosingPattern = RegExp(r'[ \t]+#+$');
 
-  /// A regular expression pattern to match ordered lists.
-  /// Matches lines that start with a number followed by a period
-  /// or parenthesis, or with a bullet point (`*`, `+`, or `-`).
-  static final RegExp _listPattern = RegExp(
-      r'^(?<indent>[ \t]{0,8})(?<marker>(\d{1,9})[\.)]|[*+-])(?<text>[ \t]+(.*))?$');
+  /// Parses a list-item [line] into its indent width, marker, and trailing
+  /// text, or returns `null` when the line is not a list item.
+  ///
+  /// This is a hand-rolled replacement for the named-group regular expression
+  /// `^([ \t]{0,8})((\d{1,9})[.)]|[*+-])([ \t]+.*)?$`, which previously ran for
+  /// every candidate line (once to open a list, then once per line to find its
+  /// end). The returned [text] still includes leading whitespace, matching the
+  /// old capture group; callers trim it as before.
+  static ({int indent, String marker, String text})? _parseListLine(
+      String line) {
+    final len = line.length;
+    // Leading indent: at most 8 spaces or tabs.
+    var i = 0;
+    while (i < len &&
+        i < 8 &&
+        (line.codeUnitAt(i) == 0x20 || line.codeUnitAt(i) == 0x09)) {
+      i++;
+    }
+    if (i >= len) return null;
+    final indent = i;
+    final c = line.codeUnitAt(i);
+    final String marker;
+    final int textStart;
+    if (c >= 0x30 && c <= 0x39) {
+      // Ordered marker: 1-9 digits followed by '.' or ')'.
+      var d = i;
+      while (d < len &&
+          d - i < 9 &&
+          line.codeUnitAt(d) >= 0x30 &&
+          line.codeUnitAt(d) <= 0x39) {
+        d++;
+      }
+      if (d >= len) return null;
+      final delim = line.codeUnitAt(d);
+      if (delim != 0x2E /* . */ && delim != 0x29 /* ) */) return null;
+      marker = line.substring(i, d + 1);
+      textStart = d + 1;
+    } else if (c == 0x2A /* * */ || c == 0x2B /* + */ || c == 0x2D /* - */) {
+      marker = line.substring(i, i + 1);
+      textStart = i + 1;
+    } else {
+      return null;
+    }
+    if (textStart >= len) return (indent: indent, marker: marker, text: '');
+    // The marker must be followed by whitespace (or the end of the line).
+    final nc = line.codeUnitAt(textStart);
+    if (nc != 0x20 && nc != 0x09) return null;
+    return (indent: indent, marker: marker, text: line.substring(textStart));
+  }
 
   /// A regular expression pattern to match thematic breaks (horizontal rules).
   ///
@@ -128,26 +180,32 @@ class MarkdownDecoder extends Converter<String, Markdown> {
     }
 
     for (var i = 0; i < length; i++) {
-      // Trim trailing whitespace for consistent parsing
       final line = lines[i];
 
-      // Here you would implement the logic to parse the line
-      // and create the appropriate MD$Block instances.
-      // This is a placeholder for demonstration purposes.
-      if (line.isEmpty || _emptyPattern.hasMatch(line)) {
-        /// Parse empty lines and combine them into a spacing block.
+      if (_isBlank(line)) {
+        // Parse empty lines and combine them into a spacing block.
         var j = i + 1;
-        for (; j < length && _emptyPattern.hasMatch(lines[j]); j++) continue;
+        for (; j < length && _isBlank(lines[j]); j++) continue;
         final count = j - i;
         pushBlock(MD$Spacer(count: count));
         if (i + count == length) break; // Last line is empty
         i = j - 1; // Skip the empty lines
         continue;
-      } else if (_thematicBreakPattern.hasMatch(line)) {
+      }
+
+      // The first code unit cheaply gates the block-type checks below, so a
+      // plain paragraph line runs no regular expressions at all.
+      final c0 = line.codeUnitAt(0);
+
+      if ((c0 == 0x20 /* space */ ||
+              c0 == 0x2D /* - */ ||
+              c0 == 0x2A /* * */ ||
+              c0 == 0x5F /* _ */) &&
+          _thematicBreakPattern.hasMatch(line)) {
         // Parse thematic breaks (horizontal rules): ---, ***, ___, - - -, etc.
         pushBlock(const MD$Divider());
         continue;
-      } else if (line.startsWith('#')) {
+      } else if (c0 == 0x23 /* # */) {
         // Parse ATX headings (1-6 `#` followed by a space or end of line).
         final match = _headingPattern.firstMatch(line);
         if (match == null) {
@@ -163,7 +221,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         pushBlock(MD$Heading(
             level: level, text: text, spans: _parseInlineSpans(text)));
         continue;
-      } else if (line.startsWith('>')) {
+      } else if (c0 == 0x3E /* > */) {
         // Parse quotes and GitHub-style alerts.
         final quoteLines = <String>[_stripQuoteMarker(line)];
         var j = i + 1;
@@ -212,29 +270,36 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         if (j == length - 1) break; // Last line is a code block
         i = j; // Skip to the end of the code block
         continue;
-      } else if (_listPattern.firstMatch(line) case RegExpMatch match
-          when match.namedGroup('indent')?.isEmpty == true) {
-        final marker = match.namedGroup('marker') ?? '*';
-        final firstTask = _parseTask(match.namedGroup('text')?.trim() ?? '');
+      } else if ((c0 >= 0x30 && c0 <= 0x39) /* 0-9 */ ||
+          c0 == 0x2A /* * */ ||
+          c0 == 0x2B /* + */ ||
+          c0 == 0x2D /* - */) {
+        final first = _parseListLine(line);
+        if (first == null || first.indent != 0) {
+          // A marker-like first character that is not actually a top-level
+          // list item (e.g. "-> arrow", "*emphasis*"); treat it as paragraph.
+          if (paragraph.isNotEmpty) paragraph.writeln();
+          paragraph.write(line);
+          continue;
+        }
+        final firstTask = _parseTask(first.text.trim());
         final list =
             <({int intent, String marker, String text, bool? checked})>[
           (
             intent: 0,
-            marker: marker,
+            marker: first.marker,
             text: firstTask.text,
             checked: firstTask.checked,
           )
         ];
         var j = i + 1;
         for (; j < length; j++) {
-          final line = lines[j];
-          final match = _listPattern.firstMatch(line);
-          final indent = match?.namedGroup('indent')?.length;
-          if (indent == null) break;
-          final task = _parseTask(match?.namedGroup('text')?.trim() ?? '');
+          final parsed = _parseListLine(lines[j]);
+          if (parsed == null) break;
+          final task = _parseTask(parsed.text.trim());
           list.add((
-            intent: indent,
-            marker: match?.namedGroup('marker') ?? '*',
+            intent: parsed.indent,
+            marker: parsed.marker,
             text: task.text,
             checked: task.checked,
           ));
@@ -295,7 +360,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         if (i + count == length) break; // Last line is a list item
         i = j - 1; // Skip the list items
         continue;
-      } else if (line.startsWith('|')) {
+      } else if (c0 == 0x7C /* | */) {
         // Parse tables
         MD$TableRow textToRow(String text) {
           final cells = text.split('|');
@@ -357,6 +422,20 @@ class MarkdownDecoder extends Converter<String, Markdown> {
     );
   }
 }
+
+/// Lookup table of code units that can start an inline construct: emphasis
+/// markers (`* _ ~ = | ` `` ` ``), a link/image label (`[`), or an escape
+/// (`\`). Used by [_parseInlineSpans] to take a fast path for plain text that
+/// contains none of them — by far the most common case for prose.
+final Uint8List _special = Uint8List(128)
+  ..[0x2A] = 1 // *
+  ..[0x5F] = 1 // _
+  ..[0x7E] = 1 // ~
+  ..[0x3D] = 1 // =
+  ..[0x7C] = 1 // |
+  ..[0x60] = 1 // `
+  ..[0x5B] = 1 // [
+  ..[0x5C] = 1; // \
 
 /// Type of special inline markers
 final Uint8List _kind = Uint8List(2048)
@@ -458,7 +537,10 @@ String? _convertMathContent(String content) {
 /// least one recognized LaTeX command are converted; everything else — such as
 /// currency (`$5`) — is preserved verbatim.
 String _applyInlineMath(String text) {
-  if (!text.contains(r'$')) return text;
+  // Both delimiters are required, and so is a backslash: every supported
+  // command begins with one, so text with `$` but no `\` (e.g. prices like
+  // `$5`) can never convert and skips the scan entirely.
+  if (!text.contains(r'$') || !text.contains(r'\')) return text;
 
   String convertSegment(String segment) =>
       segment.replaceAllMapped(_inlineMathPattern, (match) {
@@ -511,7 +593,16 @@ String _applyInlineMath(String text) {
       rest = '';
     }
   } else {
-    final space = rest.indexOf(RegExp(r'[ \t]'));
+    // Find the first whitespace separating the URL from an optional title.
+    // A manual scan avoids allocating and compiling a RegExp on every call.
+    var space = -1;
+    for (var k = 0; k < rest.length; k++) {
+      final ch = rest.codeUnitAt(k);
+      if (ch == 0x20 || ch == 0x09) {
+        space = k;
+        break;
+      }
+    }
     if (space == -1) {
       url = rest;
       rest = '';
@@ -611,13 +702,34 @@ List<MD$Span> _parseInlineSpans(String text) {
   final codes = text.codeUnits;
   final length = codes.length;
 
+  // Fast path: text without any inline markers, links, or escapes is a single
+  // unstyled span. Detect that with one early-terminating scan and skip both
+  // the link-extraction and emphasis passes (and their allocations).
+  var hasSpecial = false;
+  for (var i = 0; i < length; i++) {
+    final c = codes[i];
+    if (c < 128 && _special[c] != 0) {
+      hasSpecial = true;
+      break;
+    }
+  }
+  if (!hasSpecial) {
+    return <MD$Span>[
+      MD$Span(start: 0, end: length, text: text),
+    ];
+  }
+
   /// Escaped characters in Markdown
   const int esc = 0x5C; // '\'
 
-  // Phase 1: Extract links and images
-  final links = <MD$Span>[];
-  final skip = Uint16List(length); // Skip links during inline parsing
-  {
+  // Phase 1: Extract links and images.
+  //
+  // Only run when a label bracket is actually present, and allocate the
+  // `links`/`skip` structures lazily on the first match, so text with emphasis
+  // but no links (a common case) pays neither the scan nor the allocation.
+  List<MD$Span>? links;
+  Uint16List? skip;
+  if (text.contains('[')) {
     const img$symbol = 0x21, // '!' (33)
         label$start = 0x5B, // '[' (91)
         label$end = 0x5D, // ']' (93)
@@ -686,6 +798,8 @@ List<MD$Span> _parseInlineSpans(String text) {
       final target = _parseLinkTarget(text.substring(urlIdx + 1, urlEnd));
       final src = target.url;
       final alt = target.title;
+      links ??= <MD$Span>[];
+      skip ??= Uint16List(length);
       links.add(
         MD$Span(
           start: img ? i - 1 : i, // include the '!' for images
@@ -719,29 +833,37 @@ List<MD$Span> _parseInlineSpans(String text) {
   final spans = <MD$Span>[];
 
   var hasExcluded = false; // Flag to check if we have excluded characters
-  late final excluded = HashSet<int>(); // Set of excluded indices
+  // Backslash indices to drop from the current span, in ascending order. This
+  // is cleared after every pushed span, so it only ever holds the escapes of
+  // the span currently being built. Allocated lazily on the first escape.
+  late final excluded = <int>[];
   {
     // Add span to the list of spans
     void maybePushSpan(int end) {
       if (start >= end) return; // No valid span to push
       if (hasExcluded) {
-        // If we have excluded characters, we should create a new span
-        // from the bytes that are not excluded.
-        final spanLength = end - start - excluded.length;
+        // Rebuild the span text without the excluded backslash characters by
+        // copying the ranges between them. Because the indices are already
+        // sorted, this avoids both a hash-set lookup per character and an
+        // intermediate code-unit buffer.
+        final removed = excluded.length;
+        final spanLength = end - start - removed;
         if (spanLength > 0) {
-          // If the span has any valid text
-          final bytes = Uint16List(spanLength);
-          var j = 0; // Index for the new bytes array
-          for (var i = start; i < end; i++) {
-            if (excluded.contains(i)) continue; // Skip excluded indices
-            bytes[j++] = codes[i]; // Copy the character to the new array
+          final buffer = StringBuffer();
+          var segmentStart = start;
+          for (var e = 0; e < excluded.length; e++) {
+            final idx = excluded[e];
+            if (idx > segmentStart)
+              buffer.write(text.substring(segmentStart, idx));
+            segmentStart = idx + 1;
           }
-          final txt = String.fromCharCodes(bytes);
+          if (segmentStart < end)
+            buffer.write(text.substring(segmentStart, end));
           spans.add(
             MD$Span(
               start: start,
-              end: end - excluded.length,
-              text: txt,
+              end: end - removed,
+              text: buffer.toString(),
               style: mask,
             ),
           );
@@ -782,11 +904,11 @@ List<MD$Span> _parseInlineSpans(String text) {
       }
 
       // If this character is part of a link or image, skip it
-      if (skip[i] != 0) {
+      if (skip != null && skip[i] != 0) {
         // Finish the current span if it exists
         maybePushSpan(i);
 
-        final link = links[skip[i] - 1];
+        final link = links![skip[i] - 1];
         // Combine any active emphasis (bold/italic/...) with the link style.
         spans.add(mask.isEmpty
             ? link
