@@ -9,8 +9,15 @@
 - **ADDED**: `linkStyle` on `MarkdownThemeData` to customize link text styling.
 - **ADDED**: Per-type alert accent colors via `MarkdownThemeData.alertColors`
   and `alertColorFor`.
-- **ADDED**: Guarded `$...$` inline LaTeX math conversion to Unicode
-  (code-span and code-block safe; currency like `$5` is preserved).
+- **ADDED**: Opt-in `$...$` inline LaTeX math conversion to Unicode, **disabled
+  by default**. Enable with `MarkdownDecoder(inlineMath: true)` or
+  `Markdown.fromString(text, inlineMath: true)`. Supports LaTeX commands
+  (`\alpha`, `\rightarrow`, ...), superscripts/subscripts (`x^2`, `H_2O`,
+  `x^{10}`), is code-span and code-block safe, and preserves currency (`$5`).
+  The command table is configurable via `mathReplacements` (extend the
+  exported `kMarkdownMathCommands`).
+- **FIXED**: `\$` is now a recognized backslash escape, producing a literal
+  dollar sign (and opting a `$...$` run out of math conversion).
 - **CHANGED**: Thematic breaks now support `***` and `___` (and spaced variants
   like `- - -`), and no longer greedily consume text after `---`.
 - **CHANGED**: `~~~` fenced code blocks are now recognized in addition to ` ``` `.
@@ -28,11 +35,11 @@
 - **PERFORMANCE**: Rewrote the parser hot path — a single-span fast path for
   plain text, first-code-unit guards that keep regexes off paragraph lines,
   hand-rolled list-line and link-target parsing (removing per-line / per-link
-  `RegExp` allocation), lazy link-extraction gated on `[`, a range-copy escape
-  rebuild (no more per-character hash-set lookups), and a currency-safe inline
-  math bail. Roughly **40% faster** across representative workloads (links
-  −65%, lists −60%, currency-heavy text −77%). Output is byte-identical,
-  guarded by a golden snapshot test.
+  `RegExp` allocation), lazy link-extraction gated on `[`, and a range-copy
+  escape rebuild (no more per-character hash-set lookups). Together with math
+  now being opt-in, the default parse path is roughly **45% faster** across
+  representative workloads (links −68%, lists −61%, escapes −68%). Output is
+  byte-identical, guarded by a golden snapshot test.
 - **TESTS**: Added a golden characterization snapshot, a corner-case regression
   suite, and span-offset invariants; wired every test file into
   `test/unit_test.dart` so CI runs the full suite (was running only a fraction).

@@ -30,11 +30,34 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 - `Inline code`: `` `code` ``
 - ==Highlight==: `==text==`
 - ||Spoiler||: `||text||`
-- Inline math: `$\alpha$`, `$\pi \approx 3.14$` (common LaTeX commands → Unicode)
+- Inline math (**opt-in**): `$\alpha$`, `$\pi \approx 3.14$`, `$x^2$`, `$H_2O$`
+  (common LaTeX commands + super/subscripts → Unicode)
 
 Emphasis follows CommonMark-inspired flanking rules, so stray markers
 (`5 * 6 = 30`), intraword underscores (`snake_case`), and unterminated markers
 (`**oops`) are left as literal text instead of leaking styles.
+
+#### Inline math (opt-in)
+
+Inline `$...$` LaTeX math is **disabled by default** (so prices like `$5` and
+shell variables like `$HOME` are never altered). Enable it per parse or per
+decoder:
+
+```dart
+// Per parse:
+final md = Markdown.fromString(r'The angle $\alpha$ and $x^2 + y^2$.',
+    inlineMath: true);
+
+// Or a reusable decoder, optionally extending the command table:
+const decoder = MarkdownDecoder(
+  inlineMath: true,
+  mathReplacements: {...kMarkdownMathCommands, r'\R': 'ℝ'},
+);
+```
+
+It converts LaTeX commands (`\alpha`, `\rightarrow`, ...) and super/subscripts
+(`x^2`, `H_2O`, `x^{10}`), is code-span and code-block safe, and treats `\$` as
+a literal dollar. Write `\$\alpha\$` to keep a literal `$\alpha$`.
 
 ### Headers
 

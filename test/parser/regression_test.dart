@@ -218,30 +218,20 @@ void main() {
     });
   });
 
-  group('Inline math fast bail', () {
-    test('currency without a backslash is unchanged', () {
+  group('Inline math is off by default', () {
+    // With the default decoder, `$...$` is never converted (see math_test.dart
+    // for the opt-in behaviour).
+    test('greek command stays literal', () {
+      expect(_text(_spans(r'angle $\alpha$ small')), r'angle $\alpha$ small');
+    });
+
+    test('currency is unchanged', () {
       expect(_text(_spans(r'It costs $5 and $10 today.')),
           r'It costs $5 and $10 today.');
     });
 
-    test('a single greek command converts', () {
-      expect(_text(_spans(r'angle $\alpha$ small')), contains('α'));
-    });
-
-    test('multiple commands in one expression', () {
-      expect(_text(_spans(r'$\pi \approx 3.14$')), contains('π'));
-      expect(_text(_spans(r'$\pi \approx 3.14$')), contains('≈'));
-    });
-
-    test('math inside a code span is left literal', () {
-      final spans = _spans(r'`$\alpha$` stays');
-      final code =
-          spans.firstWhere((s) => s.style.contains(MD$Style.monospace));
-      expect(code.text, r'$\alpha$');
-    });
-
-    test('unknown command is preserved verbatim', () {
-      expect(_text(_spans(r'$\unknowncmd$ here')), r'$\unknowncmd$ here');
+    test(r'escaped dollar \$ becomes a literal dollar', () {
+      expect(_text(_spans(r'price \$5 today')), r'price $5 today');
     });
   });
 

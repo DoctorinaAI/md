@@ -152,7 +152,7 @@ P
   [0,1] style=0 "\\"
 @@@ math-alpha
 P
-  [0,21] style=0 "The angle α is small."
+  [0,28] style=0 "The angle $\\alpha$ is small."
 @@@ math-currency
 P
   [0,26] style=0 "It costs $5 and $10 today."
@@ -162,7 +162,7 @@ P
   [10,33] style=0 " stays literal in code."
 @@@ math-mixed
 P
-  [0,34] style=0 "π ≈ 3.14 but $plain$ is untouched."
+  [0,44] style=0 "$\\pi \\approx 3.14$ but $plain$ is untouched."
 @@@ heading-h1
 H1
   [0,11] style=0 "Heading one"

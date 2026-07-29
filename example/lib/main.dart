@@ -109,7 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    final initialMarkdown = Markdown.fromString(_inputController.text);
+    // `inlineMath` is opt-in (disabled by default); enabled here to showcase
+    // the `$...$` LaTeX conversion.
+    final initialMarkdown =
+        Markdown.fromString(_inputController.text, inlineMath: true);
     _outputController.value = initialMarkdown;
     _inputController.addListener(_onInputChanged);
   }
@@ -129,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (text == _outputController.value.markdown) {
       return; // No change, no need to update
     } else {
-      final markdown = Markdown.fromString(text);
+      final markdown = Markdown.fromString(text, inlineMath: true);
       _outputController.value = markdown;
     }
   }
@@ -401,9 +404,9 @@ This example is using `package:flutter_md/flutter_md.dart`.
 
 ---
 
-## Inline math
+## Inline math (opt-in)
 
-Greek letters and operators render inline: $\alpha$, $\beta$, $\pi \approx 3.14$, and $x \rightarrow \infty$.
+Enabled via `inlineMath: true`. Greek letters and operators: $\alpha$, $\beta$, $\pi \approx 3.14$, $x \rightarrow \infty$, plus superscripts and subscripts like $x^2$ and $H_2O$.
 
 ---
 
