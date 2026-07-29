@@ -363,6 +363,59 @@ This example is using `package:flutter_md/flutter_md.dart`.
 
 ---
 
+## Alerts
+
+> [!NOTE]
+> Highlights information that users should take into account.
+
+> [!TIP]
+> Optional information to help a user be more successful.
+
+> [!IMPORTANT]
+> Crucial information necessary for users to succeed.
+
+> [!WARNING]
+> Critical content demanding immediate user attention.
+
+> [!CAUTION]
+> Negative potential consequences of an action.
+
+---
+
+## Task lists
+
+- [x] Write the parser
+- [x] Add GitHub alerts
+- [ ] Ship selection support
+    - [x] Nested done
+    - [ ] Nested todo
+
+---
+
+## Aligned tables
+
+| Left   | Center | Right |
+| :----- | :----: | ----: |
+| a      | b      | c     |
+| longer | text   | here  |
+
+---
+
+## Inline math
+
+Greek letters and operators render inline: $\alpha$, $\beta$, $\pi \approx 3.14$, and $x \rightarrow \infty$.
+
+---
+
+## Thematic breaks
+
+Dashes, asterisks and underscores all produce a horizontal rule:
+
+***
+___
+
+---
+
 ## Special symbols
 
 > "Quotes" and 'single quotes' with 👉 <, >, &, ©, ®, ™, €, £, ¥, •, …, ±, §, ¶, †, ‡, ‰, µ, °

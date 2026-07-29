@@ -1,3 +1,31 @@
+## 0.0.9
+
+- **ADDED**: GitHub-style alert blocks (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`,
+  `> [!WARNING]`, `> [!CAUTION]`) via the new `MD$Alert` block and `MD$AlertType`.
+- **ADDED**: GitHub task-list items (`- [ ]` / `- [x]`) via `MD$ListItem.checked`
+  and `MD$ListItem.isTask`, rendered with a checkbox.
+- **ADDED**: Table column alignment (`:---`, `:--:`, `---:`) captured on
+  `MD$Table.alignments` and applied when rendering.
+- **ADDED**: `linkStyle` on `MarkdownThemeData` to customize link text styling.
+- **ADDED**: Per-type alert accent colors via `MarkdownThemeData.alertColors`
+  and `alertColorFor`.
+- **ADDED**: Guarded `$...$` inline LaTeX math conversion to Unicode
+  (code-span and code-block safe; currency like `$5` is preserved).
+- **CHANGED**: Thematic breaks now support `***` and `___` (and spaced variants
+  like `- - -`), and no longer greedily consume text after `---`.
+- **CHANGED**: `~~~` fenced code blocks are now recognized in addition to ` ``` `.
+- **FIXED**: Emphasis no longer leaks to the end of the line for stray or
+  unterminated markers (e.g. `5 * 6 = 30`, `**bold never closed`).
+- **FIXED**: Intraword underscores are no longer treated as emphasis
+  (e.g. `snake_case`, `object_id` are preserved).
+- **FIXED**: ATX headings require a space after `#`; `#hashtag` and 7+ `#`
+  are no longer headings, and trailing `#` sequences are stripped.
+- **FIXED**: Emphasis surrounding a link/image is now merged onto the link span.
+- **FIXED**: Link/image targets support `<url>` and single-quoted titles.
+- **FIXED**: `MarkdownThemeData.copyWith` no longer drops `builder` and `onLinkTap`.
+- **BREAKING**: `MD$Block.map`/`maybeMap` gained an `alert` branch for the new
+  `MD$Alert` block type.
+
 ## 0.0.8
 
 - **CHANGED**: New table render

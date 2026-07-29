@@ -66,6 +66,10 @@ final class Markdown {
           for (final span in spans) {
             buffer.write(span.text);
           }
+        case MD$Alert(:List<MD$Span> spans):
+          for (final span in spans) {
+            buffer.write(span.text);
+          }
         case MD$Code(:String text):
           buffer.write(text);
         case MD$List(:List<MD$ListItem> items):

@@ -1,0 +1,116 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_md/flutter_md.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() => group('MarkdownThemeData', () {
+      MarkdownThemeData base() =>
+          MarkdownThemeData(textStyle: const TextStyle(fontSize: 14));
+
+      group('Alert colors', () {
+        test('defaults to the GitHub palette', () {
+          final theme = base();
+          expect(
+              theme.alertColorFor(MD$AlertType.note), const Color(0xFF0969DA));
+          expect(theme.alertColorFor(MD$AlertType.warning),
+              const Color(0xFF9A6700));
+          expect(theme.alertColorFor(MD$AlertType.caution),
+              const Color(0xFFCF222E));
+        });
+
+        test('respects overrides while keeping defaults for the rest', () {
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            alertColors: const <MD$AlertType, Color>{
+              MD$AlertType.note: Color(0xFF123456),
+            },
+          );
+          expect(
+              theme.alertColorFor(MD$AlertType.note), const Color(0xFF123456));
+          // Unspecified types still use the default palette.
+          expect(
+              theme.alertColorFor(MD$AlertType.tip), const Color(0xFF1A7F37));
+        });
+      });
+
+      group('linkStyle', () {
+        test('is merged into link spans', () {
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            linkColor: Colors.blue,
+            linkStyle: const TextStyle(
+              color: Colors.red,
+              decoration: TextDecoration.underline,
+            ),
+          );
+          final linkStyle = theme.textStyleFor(MD$Style.link);
+          expect(linkStyle.color, Colors.red); // linkStyle overrides linkColor
+          expect(linkStyle.decoration, TextDecoration.underline);
+        });
+
+        test('non-link styles are unaffected by linkStyle', () {
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            linkStyle: const TextStyle(color: Colors.red),
+          );
+          expect(theme.textStyleFor(MD$Style.bold).color, isNot(Colors.red));
+        });
+      });
+
+      group('copyWith', () {
+        test('preserves builder and onLinkTap (regression)', () {
+          var called = false;
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            onLinkTap: (_, __) => called = true,
+          );
+          final copy = theme.copyWith() as MarkdownThemeData;
+          expect(copy.onLinkTap, isNotNull);
+          copy.onLinkTap!('t', 'u');
+          expect(called, isTrue);
+        });
+
+        test('overrides provided fields', () {
+          final copy = base().copyWith(
+            linkColor: Colors.green,
+            linkStyle: const TextStyle(fontStyle: FontStyle.italic),
+          ) as MarkdownThemeData;
+          expect(copy.linkColor, Colors.green);
+          expect(copy.linkStyle?.fontStyle, FontStyle.italic);
+        });
+      });
+
+      group('lerp', () {
+        test('identical returns the same instance', () {
+          final theme = base();
+          expect(identical(theme.lerp(theme, 0.5), theme), isTrue);
+        });
+
+        test('interpolates the text style', () {
+          final a = MarkdownThemeData(textStyle: const TextStyle(fontSize: 10));
+          final b = MarkdownThemeData(textStyle: const TextStyle(fontSize: 20));
+          final mid = a.lerp(b, 0.5) as MarkdownThemeData;
+          expect(mid.textStyle.fontSize, 15);
+        });
+      });
+
+      testWidgets('mergeTheme derives from ThemeData', (tester) async {
+        late MarkdownThemeData derived;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.light(),
+            home: Builder(
+              builder: (context) {
+                derived = MarkdownThemeData.mergeTheme(
+                  Theme.of(context),
+                  linkStyle: const TextStyle(color: Colors.purple),
+                );
+                return const SizedBox();
+              },
+            ),
+          ),
+        );
+        expect(derived.linkStyle?.color, Colors.purple);
+        expect(
+            derived.alertColorFor(MD$AlertType.note), const Color(0xFF0969DA));
+      });
+    });

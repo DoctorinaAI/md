@@ -23,12 +23,18 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 
 ### Text Formatting
 
-- **Bold**: `**text**` or `__text__`
+- **Bold**: `**text**`
+- **Underline**: `__text__`
 - _Italic_: `*text*` or `_text_`
 - ~~Strikethrough~~: `~~text~~`
 - `Inline code`: `` `code` ``
 - ==Highlight==: `==text==`
 - ||Spoiler||: `||text||`
+- Inline math: `$\alpha$`, `$\pi \approx 3.14$` (common LaTeX commands → Unicode)
+
+Emphasis follows CommonMark-inspired flanking rules, so stray markers
+(`5 * 6 = 30`), intraword underscores (`snake_case`), and unterminated markers
+(`**oops`) are left as literal text instead of leaking styles.
 
 ### Headers
 
@@ -58,6 +64,9 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 2. Another numbered item
    1. Nested numbered item
    2. Another nested item
+
+- [x] Completed task-list item
+- [ ] Pending task-list item
 ```
 
 ### Blockquotes
@@ -67,6 +76,27 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 > It can span multiple lines
 >
 > And have multiple paragraphs
+```
+
+### Alerts (Admonitions)
+
+GitHub-style alerts are rendered from blockquotes with a type marker:
+
+```markdown
+> [!NOTE]
+> Highlights information that users should take into account.
+
+> [!TIP]
+> Optional information to help a user be more successful.
+
+> [!IMPORTANT]
+> Crucial information necessary for users to succeed.
+
+> [!WARNING]
+> Critical content demanding immediate user attention.
+
+> [!CAUTION]
+> Negative potential consequences of an action.
 ```
 
 ### Code Blocks
@@ -81,9 +111,12 @@ void main() {
 
 ### Tables
 
+Column alignment is supported via the delimiter row (`:---` left, `:--:`
+center, `---:` right):
+
 ```markdown
-| Header 1 | Header 2 | Header 3 |
-| -------- | -------- | -------- |
+| Left     | Center   | Right    |
+| :------- | :------: | -------: |
 | Cell 1   | Cell 2   | Cell 3   |
 | **Bold** | _Italic_ | `Code`   |
 ```
@@ -99,8 +132,12 @@ Images currently not displayed!
 
 ### Horizontal Rules
 
+Any of `---`, `***`, or `___` (optionally spaced, e.g. `- - -`) produce a rule:
+
 ```markdown
 ---
+***
+___
 ```
 
 ## 🚀 Quick Start
@@ -143,15 +180,23 @@ MarkdownTheme(
       fontStyle: FontStyle.italic,
       color: Colors.grey[600],
     ),
+    // Customize link text styling (merged on top of linkColor)
+    linkStyle: const TextStyle(
+      decoration: TextDecoration.underline,
+    ),
+    // Per-type accent colors for GitHub alert blocks
+    alertColors: const {
+      MD$AlertType.warning: Color(0xFF9A6700),
+    },
     // Handle link taps
     onLinkTap: (title, url) {
       print('Tapped link: $title -> $url');
       // Launch URL or navigate
     },
-    // Filter blocks (e.g., exclude images)
-    blockFilter: (block) => block is! MD$Image,
-    // Filter spans (e.g., exclude certain styles)
-    spanFilter: (span) => !span.style.contains(MD$Style.spoiler),
+    // Filter blocks (e.g., hide code blocks)
+    blockFilter: (block) => block is! MD$Code,
+    // Filter spans (e.g., exclude images or certain styles)
+    spanFilter: (span) => !span.style.contains(MD$Style.image),
   ),
   child: MarkdownWidget(
     markdown: yourMarkdown,
