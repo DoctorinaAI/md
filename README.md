@@ -1,6 +1,7 @@
 # flutter_md - Markdown Parser and Renderer for Flutter
 
 [![Checkout](https://github.com/DoctorinaAI/md/actions/workflows/checkout.yml/badge.svg)](https://github.com/DoctorinaAI/md/actions/workflows/checkout.yml)
+[![codecov](https://codecov.io/gh/DoctorinaAI/md/branch/master/graph/badge.svg)](https://codecov.io/gh/DoctorinaAI/md)
 [![Pub Package](https://img.shields.io/pub/v/flutter_md.svg)](https://pub.dev/packages/flutter_md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Dart](https://img.shields.io/badge/Dart-%230175C2.svg?style=flat&logo=dart&logoColor=white)](https://dart.dev)
@@ -10,14 +11,17 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 
 ## 🌟 Features
 
-- **🚀 High Performance**: Optimized parsing with minimal memory footprint
+- **🚀 High Performance**: Hand-tuned single-pass parser with minimal allocations
 - **🎨 Fully Customizable**: Theme-based styling with complete control over appearance
 - **📱 Flutter Native**: Built from the ground up for Flutter with custom render objects
 - **🔗 Interactive Elements**: Clickable links with customizable tap handlers
 - **🌐 Cross Platform**: Works on all Flutter-supported platforms
-- **📝 Rich Syntax Support**: Comprehensive Markdown syntax coverage
+- **📝 GitHub Flavored**: Alerts (`> [!NOTE]`), task lists (`- [x]`), tables with
+  column alignment, thematic breaks, strikethrough, and more
+- **🧮 Inline Math**: Opt-in `$...$` LaTeX → Unicode (commands + super/subscripts)
 - **🎯 AI-Optimized**: Specifically designed for AI-generated content display
 - **🔧 Extensible**: Easy to extend with custom block and span renderers
+- **✅ Well Tested**: 370+ tests; parser and node model at ~100% line coverage
 
 ## 📋 Supported Markdown Syntax
 
@@ -92,6 +96,9 @@ a literal dollar. Write `\$\alpha\$` to keep a literal `$\alpha$`.
 - [ ] Pending task-list item
 ```
 
+Task-list state is exposed on `MD$ListItem.checked` (`true`/`false`/`null`) and
+`MD$ListItem.isTask`, and rendered as a checkbox.
+
 ### Blockquotes
 
 ```markdown
@@ -121,6 +128,10 @@ GitHub-style alerts are rendered from blockquotes with a type marker:
 > [!CAUTION]
 > Negative potential consequences of an action.
 ```
+
+Each alert becomes an `MD$Alert` block (`MD$AlertType.note`, `.tip`,
+`.important`, `.warning`, `.caution`). Per-type accent colors are configurable
+via `MarkdownThemeData.alertColors` / `alertColorFor`.
 
 ### Code Blocks
 
@@ -275,9 +286,19 @@ class _MyWidgetState extends State<MyWidget> {
 
 ## 📊 Performance
 
-- **Parsing**: ~300 us for typical AI responses, 15x times faster than `markdown` package
+- **Parsing**: single-pass, lookup-table driven parser with a plain-text fast
+  path and hand-rolled (regex-free) block/inline scanning. The hot path was
+  rewritten for a ~45% speedup, and it parses typical AI responses roughly
+  **10× faster** than the `markdown` package.
 - **Rendering**: 120 FPS smooth scrolling for chat-like interfaces
 - **Memory**: Minimal memory footprint with efficient span filtering
+
+Benchmarks live in `benchmark/`:
+
+```bash
+dart run benchmark/parser_benchmark.dart   # multi-scenario, vs. `markdown`
+dart run benchmark/compare.dart --save      # low-noise before/after tool
+```
 
 ## 🔧 Advanced Features
 

@@ -1,4 +1,4 @@
-## 0.0.9
+## 0.1.0
 
 - **ADDED**: GitHub-style alert blocks (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`,
   `> [!WARNING]`, `> [!CAUTION]`) via the new `MD$Alert` block and `MD$AlertType`.
@@ -43,11 +43,17 @@
   representative workloads (links −68%, lists −61%, escapes −68%). Output is
   byte-identical, guarded by a golden snapshot test.
 - **TESTS**: Added a golden characterization snapshot, a corner-case regression
-  suite, and span-offset invariants; wired every test file into
-  `test/unit_test.dart` so CI runs the full suite (was running only a fraction).
+  suite, span-offset invariants, and unit tests for the node model, theme, and
+  widget; wired every test file into `test/unit_test.dart` so CI runs the full
+  suite (**370+ tests**, previously only a fraction ran). `parser.dart`,
+  `nodes.dart`, `markdown.dart`, `theme.dart`, and `widget.dart` are now at
+  ~100% line coverage.
 - **ADDED**: `benchmark/parser_benchmark.dart` (a multi-scenario
   `benchmark_harness` suite) and `benchmark/compare.dart` (a low-noise
   before/after comparison tool).
+- **CI**: Upload coverage to Codecov and add a coverage badge to the README.
+- **DOCS**: Documented alerts, task lists, table alignment, thematic-break
+  variants, and opt-in inline math in the README.
 
 ## 0.0.8
 
