@@ -208,6 +208,62 @@ void main() {
       expect(controller.getText(), '', reason: 'no documentId => inert');
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('drag with only an empty (zero-size) document does not crash',
+        (tester) async {
+      // Regression: positionForGlobal's nearest-surface fallback used to invert
+      // num.clamp for a zero-area surface, throwing ArgumentError mid-drag.
+      final controller = MarkdownSelectionController()
+        ..setDocuments(const <MarkdownDocumentRef>[
+          MarkdownDocumentRef(id: 'e', model: Markdown.empty()),
+        ]);
+      await tester.pumpWidget(_wrap(
+        controller,
+        const SizedBox(width: 400, height: 200, child: _Doc('e')),
+      ));
+      await tester.pumpAndSettle();
+
+      await _mouseDrag(tester, const Offset(20, 20), const Offset(220, 160));
+      expect(tester.takeException(), isNull);
+      expect(controller.getText(), '');
+    });
+
+    testWidgets('drag past an empty document still selects a real one',
+        (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          const MarkdownDocumentRef(
+              id: 'empty', model: Markdown.empty(), order: 0),
+          MarkdownDocumentRef(
+              id: 'real',
+              model: Markdown.fromString('Real content here'),
+              order: 1),
+        ]);
+      await tester.pumpWidget(_wrap(
+        controller,
+        const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 400,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[_Doc('empty'), _Doc('real')],
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final realWidget = find.byWidgetPredicate(
+          (w) => w is MarkdownWidget && w.documentId == 'real');
+      await _mouseDrag(
+        tester,
+        tester.getTopLeft(realWidget) + const Offset(1, 3),
+        tester.getBottomRight(realWidget) - const Offset(1, 3),
+      );
+      expect(tester.takeException(), isNull);
+      expect(controller.getText(), 'Real content here');
+    });
   });
 }
 

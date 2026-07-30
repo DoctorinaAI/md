@@ -767,8 +767,14 @@ abstract interface class BlockPainter {
 /// A [BlockPainter] that supports text selection. All coordinates are local to
 /// the block's top-left corner (as passed to [paint]'s `offset`).
 ///
-/// The [renderedText] MUST match [markdownBlockRenderedText] for the same block
-/// so that hit-testing, highlighting, and extraction agree on the offset space.
+/// The [renderedText] should match [markdownBlockRenderedText] for the same
+/// block so that hit-testing, highlighting, and model-side extraction agree on
+/// the offset space.
+///
+/// Caveat: a [MarkdownThemeData.spanFilter] that drops text-bearing spans
+/// shifts the painter's offset space relative to the (unfiltered) model, so the
+/// on-screen highlight stays correct but copied text may be misaligned. Avoid
+/// dropping text-bearing spans when selection is enabled.
 abstract interface class SelectableBlockPainter implements BlockPainter {
   /// The block's rendered plain text.
   String get renderedText;

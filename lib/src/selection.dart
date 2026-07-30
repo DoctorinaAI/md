@@ -552,6 +552,9 @@ class MarkdownSelectionController extends ChangeNotifier {
     var bestDistance = double.infinity;
     for (final surface in _surfaces.values) {
       final bounds = surface.globalBounds;
+      // A zero-area surface (an empty document, or one that lays out to zero
+      // width/height) has nothing to select and would invert the clamp below.
+      if (bounds.isEmpty) continue;
       if (bounds.contains(globalPosition)) {
         return surface.positionForGlobal(globalPosition);
       }
@@ -567,9 +570,15 @@ class MarkdownSelectionController extends ChangeNotifier {
     }
     if (nearest == null) return null;
     final bounds = nearest.globalBounds;
+    // Clamp INTO the surface, keeping the upper bound >= the lower bound so a
+    // very small surface never inverts the limits (num.clamp throws then).
+    final maxX = bounds.right - 0.01;
+    final maxY = bounds.bottom - 0.01;
     final clamped = Offset(
-      globalPosition.dx.clamp(bounds.left, bounds.right - 0.01),
-      globalPosition.dy.clamp(bounds.top, bounds.bottom - 0.01),
+      globalPosition.dx
+          .clamp(bounds.left, maxX < bounds.left ? bounds.left : maxX),
+      globalPosition.dy
+          .clamp(bounds.top, maxY < bounds.top ? bounds.top : maxY),
     );
     return nearest.positionForGlobal(clamped);
   }
