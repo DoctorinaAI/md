@@ -267,6 +267,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
     );
     final overlay = _selectionOverlay;
     if (overlay == null) {
+      if (Overlay.maybeOf(context) == null) return; // no host for handles
       _selectionOverlay = SelectionOverlay(
         context: context,
         startHandleType: TextSelectionHandleType.left,
@@ -448,6 +449,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   void showToolbar([Offset? location]) {
     final builder = widget.contextMenuBuilder;
     if (builder == null) return;
+    if (Overlay.maybeOf(context, rootOverlay: true) == null) return;
     _lastSecondaryTapDown = location;
     _contextMenuController.remove();
     _contextMenuController.show(
