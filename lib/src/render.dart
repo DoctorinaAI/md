@@ -12,10 +12,15 @@ import 'package:meta/meta.dart' as meta show internal;
 
 import 'markdown.dart';
 import 'nodes.dart';
+import 'selection.dart';
 import 'theme.dart';
 
+/// Default color used to paint the selection highlight beneath the glyphs.
+const Color _kSelectionColor = Color(0x552196F3);
+
 @meta.internal
-class MarkdownRenderObject extends RenderBox {
+class MarkdownRenderObject extends RenderBox
+    implements MarkdownSelectionSurface {
   MarkdownRenderObject({
     required Markdown markdown,
     required MarkdownThemeData theme,
@@ -27,13 +32,81 @@ class MarkdownRenderObject extends RenderBox {
   /// Painter for rendering markdown content.
   final MarkdownPainter _painter;
 
+  /// The selection controller this render object participates in, if any.
+  MarkdownSelectionController? _controller;
+
+  /// The stable document id used to anchor selection positions.
+  Object? _documentId;
+
+  static final Paint _highlightPaint = Paint()..color = _kSelectionColor;
+
+  void _onSelectionChange() {
+    if (!_disposed) markNeedsPaint();
+  }
+
+  bool _disposed = false;
+
+  void _attachController() {
+    final controller = _controller;
+    if (controller == null) return;
+    controller.addListener(_onSelectionChange);
+    if (attached) controller.attachSurface(this);
+  }
+
+  void _detachController() {
+    final controller = _controller;
+    if (controller == null) return;
+    controller.removeListener(_onSelectionChange);
+    controller.detachSurface(this);
+  }
+
+  /// Wires (or rewires) this render object to a selection [controller] under
+  /// [documentId]. Passing a null controller makes it non-selectable (inert).
+  @meta.internal
+  void updateSelection(
+    MarkdownSelectionController? controller,
+    Object? documentId,
+  ) {
+    if (identical(controller, _controller) && documentId == _documentId) return;
+    _detachController();
+    _controller = controller;
+    _documentId = documentId;
+    _attachController();
+    if (attached) {
+      markNeedsCompositingBitsUpdate();
+      markNeedsPaint();
+    }
+  }
+
+  // --- MarkdownSelectionSurface ---
+
+  @override
+  Object get documentId => _documentId!;
+
+  @override
+  Rect get globalBounds => localToGlobal(Offset.zero) & size;
+
+  @override
+  MarkdownPosition? positionForGlobal(Offset globalPosition) {
+    final id = _documentId;
+    if (id == null) return null;
+    final local = globalToLocal(globalPosition);
+    final hit = _painter.positionForLocal(local);
+    if (hit == null) return null;
+    return MarkdownPosition(
+      documentId: id,
+      blockIndex: hit.$1,
+      offset: hit.$2,
+    );
+  }
+
   /// Current size of the render box.
   @override
   Size get size => _size;
   Size _size = Size.zero;
 
   @override
-  bool get isRepaintBoundary => false;
+  bool get isRepaintBoundary => _controller != null;
 
   @override
   bool get alwaysNeedsCompositing => false;
@@ -107,10 +180,10 @@ class MarkdownRenderObject extends RenderBox {
   }
 
   @override
-  // ignore: unnecessary_overrides
   void attach(PipelineOwner owner) {
     super.attach(owner);
     PaintingBinding.instance.systemFonts.addListener(_handleSystemFontsChange);
+    _controller?.attachSurface(this);
   }
 
   /// Updates the render object with a new values.
@@ -134,12 +207,15 @@ class MarkdownRenderObject extends RenderBox {
   void detach() {
     PaintingBinding.instance.systemFonts
         .removeListener(_handleSystemFontsChange);
+    _controller?.detachSurface(this);
     super.detach();
   }
 
   @override
   @protected
   void dispose() {
+    _disposed = true;
+    _controller?.removeListener(_onSelectionChange);
     super.dispose();
     _painter.dispose();
   }
@@ -150,11 +226,22 @@ class MarkdownRenderObject extends RenderBox {
     if (_painter.isEmpty)
       return; // If the markdown is empty, do not paint anything.
 
-    // ignore: unused_local_variable
     final canvas = context.canvas
       ..save()
       ..translate(offset.dx, offset.dy);
     //..clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    // Paint the selection highlight OUTSIDE the cached content Picture, beneath
+    // the glyphs, so drag/streaming repaints never rebuild the glyph cache.
+    final controller = _controller;
+    final id = _documentId;
+    if (controller != null && id != null) {
+      _painter.paintHighlight(
+        canvas,
+        (source) => controller.rangeFor(id, source),
+        _highlightPaint,
+      );
+    }
 
     _painter.paint(canvas, size);
 
@@ -195,6 +282,10 @@ class MarkdownPainter {
 
   Float32List _blockOffsets = Float32List(0);
   List<BlockPainter> _blockPainters = const <BlockPainter>[];
+
+  /// Source `Markdown.blocks` index for each painter (differs from the painter
+  /// index whenever a `blockFilter` drops blocks).
+  List<int> _sourceIndices = const <int>[];
 
   static BlockPainter _defaultBlockBuilder(
     MD$Block block,
@@ -250,16 +341,71 @@ class MarkdownPainter {
     _needsLayout = true; // Mark that layout needs to be recalculated.
     _size = Size.zero; // Reset size before rebuilding.
     final filter = _theme.blockFilter;
-    final filtered =
-        filter != null ? _markdown.blocks.where(filter) : _markdown.blocks;
     final builder = _theme.builder ?? _defaultBlockBuilder;
-    _blockPainters = filtered
-        .map<BlockPainter>(
-          (block) =>
-              builder(block, _theme) ?? _defaultBlockBuilder(block, _theme),
-        )
-        .toList(growable: false);
+    final blocks = _markdown.blocks;
+    final painters = <BlockPainter>[];
+    final sources = <int>[];
+    for (var i = 0; i < blocks.length; i++) {
+      final block = blocks[i];
+      if (filter != null && !filter(block)) continue;
+      painters
+          .add(builder(block, _theme) ?? _defaultBlockBuilder(block, _theme));
+      sources.add(i);
+    }
+    _blockPainters = painters;
+    _sourceIndices = sources;
     _blockOffsets = Float32List(_blockPainters.length);
+  }
+
+  /// Binary-searches the painter index whose vertical band contains [dy].
+  int _blockIndexForDy(double dy) {
+    var min = 0;
+    var max = _blockOffsets.length;
+    var idx = 0;
+    while (min < max) {
+      final mid = min + ((max - min) >> 1);
+      final offset = _blockOffsets[mid];
+      if (offset > dy) {
+        max = mid;
+      } else {
+        idx = mid;
+        if (offset == dy) break;
+        min = mid + 1;
+      }
+    }
+    return idx;
+  }
+
+  /// Maps a content-local [local] offset to `(sourceBlockIndex, offset)`, or
+  /// null if the hit block does not support selection.
+  (int, int)? positionForLocal(Offset local) {
+    if (_blockPainters.isEmpty) return null;
+    final idx = _blockIndexForDy(local.dy);
+    final painter = _blockPainters[idx];
+    if (painter is! SelectableBlockPainter) return null;
+    final blockLocal = Offset(local.dx, local.dy - _blockOffsets[idx]);
+    final len = painter.renderedText.length;
+    final offset = painter.offsetForLocalPosition(blockLocal).clamp(0, len);
+    return (_sourceIndices[idx], offset);
+  }
+
+  /// Paints the selection highlight of every selectable block, using [rangeOf]
+  /// to look up the selected rendered range for a source block index.
+  void paintHighlight(
+    Canvas canvas,
+    TextRange? Function(int sourceIndex) rangeOf,
+    Paint paint,
+  ) {
+    for (var i = 0; i < _blockPainters.length; i++) {
+      final painter = _blockPainters[i];
+      if (painter is! SelectableBlockPainter) continue;
+      final range = rangeOf(_sourceIndices[i]);
+      if (range == null || range.start >= range.end) continue;
+      final top = _blockOffsets[i];
+      for (final rect in painter.boxesForRange(range.start, range.end)) {
+        canvas.drawRect(rect.shift(Offset(0, top)), paint);
+      }
+    }
   }
 
   /// Update the painter with new values.
@@ -618,6 +764,46 @@ abstract interface class BlockPainter {
   void dispose();
 }
 
+/// A [BlockPainter] that supports text selection. All coordinates are local to
+/// the block's top-left corner (as passed to [paint]'s `offset`).
+///
+/// The [renderedText] MUST match [markdownBlockRenderedText] for the same block
+/// so that hit-testing, highlighting, and extraction agree on the offset space.
+abstract interface class SelectableBlockPainter implements BlockPainter {
+  /// The block's rendered plain text.
+  String get renderedText;
+
+  /// Maps a block-local [local] offset to a rendered-text index.
+  int offsetForLocalPosition(Offset local);
+
+  /// Highlight rectangles (block-local) for the rendered range `[start, end)`.
+  List<Rect> boxesForRange(int start, int end);
+}
+
+/// Provides [SelectableBlockPainter] for a block backed by a single
+/// [TextPainter]. Subclasses supply [selectionPainter] and, when the glyphs are
+/// not painted at the block origin, [selectionOrigin].
+mixin SelectableTextBlock implements SelectableBlockPainter {
+  /// The text painter that owns the selectable glyphs.
+  TextPainter get selectionPainter;
+
+  /// Block-local origin where [selectionPainter] is painted.
+  Offset get selectionOrigin => Offset.zero;
+
+  @override
+  String get renderedText => selectionPainter.plainText;
+
+  @override
+  int offsetForLocalPosition(Offset local) =>
+      selectionPainter.getPositionForOffset(local - selectionOrigin).offset;
+
+  @override
+  List<Rect> boxesForRange(int start, int end) => selectionPainter
+      .getBoxesForSelection(TextSelection(baseOffset: start, extentOffset: end))
+      .map((box) => box.toRect().shift(selectionOrigin))
+      .toList(growable: false);
+}
+
 @meta.internal
 mixin ParagraphGestureHandler {
   /// Handle tap events with a [TextPainter].
@@ -636,8 +822,11 @@ mixin ParagraphGestureHandler {
 /// A class for painting a paragraph block in markdown.
 @meta.internal
 class BlockPainter$Paragraph
-    with ParagraphGestureHandler
+    with ParagraphGestureHandler, SelectableTextBlock
     implements BlockPainter {
+  @override
+  TextPainter get selectionPainter => painter;
+
   BlockPainter$Paragraph({
     required List<MD$Span> spans,
     required this.theme,
@@ -710,8 +899,11 @@ class BlockPainter$Paragraph
 /// A class for painting a paragraph block in markdown.
 @meta.internal
 class BlockPainter$Heading
-    with ParagraphGestureHandler
+    with ParagraphGestureHandler, SelectableTextBlock
     implements BlockPainter {
+  @override
+  TextPainter get selectionPainter => painter;
+
   BlockPainter$Heading({
     required int level,
     required List<MD$Span> spans,
@@ -785,7 +977,14 @@ class BlockPainter$Heading
 
 /// A class for painting a quote block in markdown.
 @meta.internal
-class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
+class BlockPainter$Quote
+    with ParagraphGestureHandler, SelectableTextBlock
+    implements BlockPainter {
+  @override
+  TextPainter get selectionPainter => painter;
+  @override
+  Offset get selectionOrigin => Offset(lineIndent + indent * lineIndent, 0);
+
   BlockPainter$Quote({
     required List<MD$Span> spans,
     required this.indent,
@@ -893,7 +1092,14 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
 
 /// A class for painting a GitHub-style alert (admonition) block in markdown.
 @meta.internal
-class BlockPainter$Alert with ParagraphGestureHandler implements BlockPainter {
+class BlockPainter$Alert
+    with ParagraphGestureHandler, SelectableTextBlock
+    implements BlockPainter {
+  @override
+  TextPainter get selectionPainter => bodyPainter;
+  @override
+  Offset get selectionOrigin => _bodyOrigin;
+
   BlockPainter$Alert({
     required this.alert,
     required List<MD$Span> spans,
@@ -1287,7 +1493,12 @@ class BlockPainter$Divider implements BlockPainter {
 
 /// A class for painting a code block in markdown.
 @meta.internal
-class BlockPainter$Code implements BlockPainter {
+class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
+  @override
+  TextPainter get selectionPainter => painter;
+  @override
+  Offset get selectionOrigin => const Offset(padding, padding);
+
   BlockPainter$Code({
     required String text,
     required String? language,

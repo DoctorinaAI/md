@@ -391,12 +391,18 @@ class MarkdownSelectionController extends ChangeNotifier {
   MarkdownSelectionController({
     MarkdownReconciliationPolicy? reconciliation,
     MarkdownSelectionFormatter formatter = const MarkdownPlainTextFormatter(),
+    MarkdownSelectionGroup? group,
   })  : reconciliation = reconciliation ??
             const MarkdownReconciliationPolicy.contentAnchored(),
-        _formatter = formatter;
+        _formatter = formatter,
+        _group = group {
+    group?._add(this);
+  }
 
   /// The anchor-remapping policy used on document updates.
   final MarkdownReconciliationPolicy reconciliation;
+
+  final MarkdownSelectionGroup? _group;
 
   MarkdownSelectionFormatter _formatter;
 
@@ -419,7 +425,14 @@ class MarkdownSelectionController extends ChangeNotifier {
   set selection(MarkdownSelection? value) {
     if (value == _selection) return;
     _selection = value;
+    if (value != null && !value.isCollapsed) _group?._claim(this);
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _group?._remove(this);
+    super.dispose();
   }
 
   /// The registered documents, in reading order.
@@ -530,13 +543,35 @@ class MarkdownSelectionController extends ChangeNotifier {
   Iterable<MarkdownSelectionSurface> get mountedSurfaces => _surfaces.values;
 
   /// Maps a global point to a logical position by asking mounted surfaces.
+  ///
+  /// When the point is inside a surface it is used directly; otherwise the
+  /// vertically-nearest surface is chosen and the point clamped into it, so a
+  /// drag through the gaps/edges between widgets still extends the selection.
   MarkdownPosition? positionForGlobal(Offset globalPosition) {
+    MarkdownSelectionSurface? nearest;
+    var bestDistance = double.infinity;
     for (final surface in _surfaces.values) {
-      if (surface.globalBounds.contains(globalPosition)) {
+      final bounds = surface.globalBounds;
+      if (bounds.contains(globalPosition)) {
         return surface.positionForGlobal(globalPosition);
       }
+      final dy = globalPosition.dy < bounds.top
+          ? bounds.top - globalPosition.dy
+          : (globalPosition.dy > bounds.bottom
+              ? globalPosition.dy - bounds.bottom
+              : 0.0);
+      if (dy < bestDistance) {
+        bestDistance = dy;
+        nearest = surface;
+      }
     }
-    return null;
+    if (nearest == null) return null;
+    final bounds = nearest.globalBounds;
+    final clamped = Offset(
+      globalPosition.dx.clamp(bounds.left, bounds.right - 0.01),
+      globalPosition.dy.clamp(bounds.top, bounds.bottom - 0.01),
+    );
+    return nearest.positionForGlobal(clamped);
   }
 
   // --- mutation ------------------------------------------------------------
@@ -679,4 +714,30 @@ class MarkdownSelectionController extends ChangeNotifier {
       _compare(sel.base, sel.extent) <= 0
           ? (sel.base, sel.extent)
           : (sel.extent, sel.base);
+}
+
+/// Coordinates several controllers (and external selectables) so that at most
+/// one has an active selection at a time. Pass the same group
+/// to each controller; when one starts a (non-collapsed) selection the others
+/// are cleared. Call [clearExternal] when a non-Markdown selectable (e.g. a
+/// plain `SelectableText` / `SelectionArea`) begins its own selection.
+class MarkdownSelectionGroup {
+  final Set<MarkdownSelectionController> _members =
+      <MarkdownSelectionController>{};
+
+  void _add(MarkdownSelectionController controller) => _members.add(controller);
+
+  void _remove(MarkdownSelectionController controller) =>
+      _members.remove(controller);
+
+  void _claim(MarkdownSelectionController owner) {
+    for (final member in _members) {
+      if (!identical(member, owner)) member.clear();
+    }
+  }
+
+  /// Clears the selection of every member controller in this group.
+  void clearExternal() {
+    for (final member in _members) member.clear();
+  }
 }
