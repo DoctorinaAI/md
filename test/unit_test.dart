@@ -9,6 +9,7 @@ import 'parser/inline_test.dart' as inline_test;
 import 'parser/math_test.dart' as math_test;
 import 'parser/parser_test.dart' as parser_test;
 import 'parser/regression_test.dart' as regression_test;
+import 'selection/selection_test.dart' as selection_test;
 import 'theme/theme_test.dart' as theme_test;
 import 'widget/render_test.dart' as render_test;
 import 'widget/widget_test.dart' as widget_test;
@@ -24,6 +25,7 @@ void main() => group('Unit', () {
       golden_test.main();
       nodes_test.main();
       theme_test.main();
+      selection_test.main();
       render_test.main();
       widget_test.main();
     });
