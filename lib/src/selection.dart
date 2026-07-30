@@ -21,9 +21,9 @@ String markdownBlockRenderedText(MD$Block block) => block.map<String>(
       alert: (a) => _spans(a.spans),
       code: (c) => c.text,
       list: (l) {
-        final buffer = StringBuffer();
-        _listItems(l.items, buffer);
-        return buffer.toString();
+        final parts = <String>[];
+        _collectListItems(l.items, parts);
+        return parts.join('\n');
       },
       table: (t) => <String>[
         t.header.cells.map(_spans).join('\t'),
@@ -39,11 +39,13 @@ String _spans(List<MD$Span> spans) {
   return buffer.toString();
 }
 
-void _listItems(List<MD$ListItem> items, StringBuffer buffer) {
+// Flattens list items depth-first into one text run per item. Joined with `\n`
+// unconditionally (one separator between every item, matching the painter's
+// per-item fragments) so empty items still occupy their own line.
+void _collectListItems(List<MD$ListItem> items, List<String> out) {
   for (final item in items) {
-    if (buffer.isNotEmpty) buffer.write('\n');
-    buffer.write(_spans(item.spans));
-    if (item.children.isNotEmpty) _listItems(item.children, buffer);
+    out.add(_spans(item.spans));
+    if (item.children.isNotEmpty) _collectListItems(item.children, out);
   }
 }
 
@@ -780,9 +782,13 @@ class MarkdownSelectionController extends ChangeNotifier {
     final moved = positionForGlobal(globalPosition);
     if (moved == null) return;
     final (a, b) = _ordered(sel);
-    selection = isStart
+    final next = isStart
         ? MarkdownSelection(base: b, extent: moved)
         : MarkdownSelection(base: a, extent: moved);
+    // Don't let a handle drag collapse the selection out from under itself
+    // (that would dispose the overlay mid-gesture); keep one caret gap.
+    if (next.isCollapsed) return;
+    selection = next;
   }
 
   // --- geometry (mounted surfaces) -----------------------------------------

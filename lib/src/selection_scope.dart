@@ -165,9 +165,12 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   void didUpdateWidget(covariant MarkdownSelectionScope oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.controller, widget.controller)) {
+      _clearHandles(); // drop leaders/overlay bound to the old controller
       oldWidget.controller.removeListener(_onControllerChanged);
       widget.controller.addListener(_onControllerChanged);
       _lastSelection = widget.controller.selection;
+      _applySelectionColor();
+      _syncOverlay();
     }
     if (oldWidget.selectionColor != widget.selectionColor) {
       _applySelectionColor();

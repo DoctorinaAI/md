@@ -46,6 +46,13 @@ void main() {
           .blocks
           .firstWhere((b) => b.type == 'list');
       expect(markdownBlockRenderedText(tasks), 'done\ntodo');
+
+      // An empty leading item still occupies its own line, so the model offset
+      // space matches the painter's one-fragment-per-item layout.
+      final emptyLead = Markdown.fromString('- [ ]\n- [x] Done')
+          .blocks
+          .firstWhere((b) => b.type == 'list');
+      expect(markdownBlockRenderedText(emptyLead), '\nDone');
     });
 
     test('cross-document extraction with default formatter', () {
