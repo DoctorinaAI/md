@@ -1,3 +1,22 @@
+## 0.2.0
+
+- **ADDED**: Cross-block and cross-widget text selection. A
+  `MarkdownSelectionController` anchors the selection on the immutable model, so
+  it spans multiple blocks and multiple `MarkdownWidget`s and survives list
+  disposal (e.g. chat scrolling). New public API: `MarkdownSelectionController`,
+  `MarkdownSelectionScope`, `MarkdownSelectionGroup`, `MarkdownPosition`,
+  `MarkdownSelection`, `MarkdownDocumentRef`, `MarkdownSelectedContent`
+  (+ document/block), `MarkdownSelectionFormatter` /
+  `MarkdownPlainTextFormatter`, `MarkdownReconciliationPolicy`,
+  `MarkdownSelectionSurface`, `markdownBlockRenderedText`, and
+  `SelectableBlockPainter` / `SelectableTextBlock`.
+- **ADDED**: `MarkdownWidget` gains optional `documentId` and `controller`
+  parameters (resolved from the ambient scope). Backward compatible: a widget
+  with no `documentId` is inert.
+- **CHANGED**: `MarkdownWidget`'s render object now draws the selection
+  highlight outside the cached content `Picture` and becomes a repaint boundary
+  when selectable, so selection/drag repaints do not rebuild the glyph cache.
+
 ## 0.1.0
 
 - **ADDED**: GitHub-style alert blocks (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`,

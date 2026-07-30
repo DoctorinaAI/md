@@ -14,6 +14,8 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 - **🎨 Fully Customizable**: Theme-based styling with complete control over appearance
 - **📱 Flutter Native**: Built from the ground up for Flutter with custom render objects
 - **🔗 Interactive Elements**: Clickable links with customizable tap handlers
+- **✂️ Text Selection**: Cross-block and cross-widget (chat) selection via a
+  controller that survives list disposal and streaming updates
 - **🌐 Cross Platform**: Works on all Flutter-supported platforms
 - **📝 GitHub Flavored**: Alerts (`> [!NOTE]`), task lists (`- [x]`), tables with
   column alignment, thematic breaks, strikethrough, and more
@@ -189,6 +191,57 @@ Then run:
 ```bash
 flutter pub get
 ```
+
+## ✂️ Text Selection
+
+Selection is anchored on the immutable Markdown model, not on the render
+objects, so it spans multiple blocks (heading → paragraph → list → table cell)
+**and** multiple `MarkdownWidget`s (e.g. chat messages), and it survives widgets
+being scrolled off-screen and disposed. Wrap a group of widgets in a
+`MarkdownSelectionScope`, give each a stable `documentId`, and register the
+models with the controller:
+
+```dart
+final controller = MarkdownSelectionController();
+
+// Register the documents in reading order (a chat feeds this from its list).
+controller.setDocuments([
+  for (final (i, m) in messages.indexed)
+    MarkdownDocumentRef(id: m.id, model: m.markdown, order: i),
+]);
+
+MarkdownSelectionScope(
+  controller: controller,
+  child: ListView.builder(
+    itemCount: messages.length,
+    itemBuilder: (context, i) => MarkdownWidget(
+      documentId: messages[i].id,
+      markdown: messages[i].markdown,
+    ),
+  ),
+);
+
+// Any time — even for messages scrolled off-screen:
+final String text = controller.getText();                 // default formatter
+final MarkdownSelectedContent structured = controller.selectedContent();
+```
+
+- **Get the text your way.** `getText()` uses the default
+  `MarkdownPlainTextFormatter` (configurable block/document separators); pass a
+  custom `MarkdownSelectionFormatter` for e.g. "Copy as Markdown".
+  `selectedContent()` returns the structured per-document / per-block result.
+- **Streaming stays anchored.** Call `controller.putDocument(id, newModel)` when
+  a message grows; the default `MarkdownReconciliationPolicy.contentAnchored`
+  keeps the selection (append fast-path, else relocate by content, else clamp).
+- **One selection at a time.** Share a `MarkdownSelectionGroup` between
+  controllers so selecting in one clears the others; call `group.clearExternal()`
+  when a plain `SelectableText`/`SelectionArea` starts its own selection.
+- **Gestures.** A mouse/trackpad/stylus drag selects; on touch a
+  long-press-then-drag selects (so a plain swipe still scrolls the list).
+- **Opt-in & compatible.** A `MarkdownWidget` with no `documentId`/controller is
+  inert — existing usage is unchanged.
+
+See the runnable **Selection** and **Chat** tabs in `example/`.
 
 ## 🎨 Customization
 
