@@ -51,7 +51,6 @@
 - **ADDED**: `benchmark/parser_benchmark.dart` (a multi-scenario
   `benchmark_harness` suite) and `benchmark/compare.dart` (a low-noise
   before/after comparison tool).
-- **CI**: Upload coverage to Codecov and add a coverage badge to the README.
 - **DOCS**: Documented alerts, task lists, table alignment, thematic-break
   variants, and opt-in inline math in the README.
 

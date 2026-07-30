@@ -1,7 +1,6 @@
 # flutter_md - Markdown Parser and Renderer for Flutter
 
 [![Checkout](https://github.com/DoctorinaAI/md/actions/workflows/checkout.yml/badge.svg)](https://github.com/DoctorinaAI/md/actions/workflows/checkout.yml)
-[![codecov](https://codecov.io/gh/DoctorinaAI/md/branch/master/graph/badge.svg)](https://codecov.io/gh/DoctorinaAI/md)
 [![Pub Package](https://img.shields.io/pub/v/flutter_md.svg)](https://pub.dev/packages/flutter_md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Dart](https://img.shields.io/badge/Dart-%230175C2.svg?style=flat&logo=dart&logoColor=white)](https://dart.dev)
