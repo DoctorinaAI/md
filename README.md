@@ -1,6 +1,7 @@
 # flutter_md - Markdown Parser and Renderer for Flutter
 
 [![Checkout](https://github.com/DoctorinaAI/md/actions/workflows/checkout.yml/badge.svg)](https://github.com/DoctorinaAI/md/actions/workflows/checkout.yml)
+[![codecov](https://codecov.io/gh/DoctorinaAI/md/branch/master/graph/badge.svg)](https://codecov.io/gh/DoctorinaAI/md)
 [![Pub Package](https://img.shields.io/pub/v/flutter_md.svg)](https://pub.dev/packages/flutter_md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Dart](https://img.shields.io/badge/Dart-%230175C2.svg?style=flat&logo=dart&logoColor=white)](https://dart.dev)
@@ -10,25 +11,57 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 
 ## 🌟 Features
 
-- **🚀 High Performance**: Optimized parsing with minimal memory footprint
+- **🚀 High Performance**: Hand-tuned single-pass parser with minimal allocations
 - **🎨 Fully Customizable**: Theme-based styling with complete control over appearance
 - **📱 Flutter Native**: Built from the ground up for Flutter with custom render objects
 - **🔗 Interactive Elements**: Clickable links with customizable tap handlers
 - **🌐 Cross Platform**: Works on all Flutter-supported platforms
-- **📝 Rich Syntax Support**: Comprehensive Markdown syntax coverage
+- **📝 GitHub Flavored**: Alerts (`> [!NOTE]`), task lists (`- [x]`), tables with
+  column alignment, thematic breaks, strikethrough, and more
+- **🧮 Inline Math**: Opt-in `$...$` LaTeX → Unicode (commands + super/subscripts)
 - **🎯 AI-Optimized**: Specifically designed for AI-generated content display
 - **🔧 Extensible**: Easy to extend with custom block and span renderers
+- **✅ Well Tested**: 370+ tests; parser and node model at ~100% line coverage
 
 ## 📋 Supported Markdown Syntax
 
 ### Text Formatting
 
-- **Bold**: `**text**` or `__text__`
+- **Bold**: `**text**`
+- **Underline**: `__text__`
 - _Italic_: `*text*` or `_text_`
 - ~~Strikethrough~~: `~~text~~`
 - `Inline code`: `` `code` ``
 - ==Highlight==: `==text==`
 - ||Spoiler||: `||text||`
+- Inline math (**opt-in**): `$\alpha$`, `$\pi \approx 3.14$`, `$x^2$`, `$H_2O$`
+  (common LaTeX commands + super/subscripts → Unicode)
+
+Emphasis follows CommonMark-inspired flanking rules, so stray markers
+(`5 * 6 = 30`), intraword underscores (`snake_case`), and unterminated markers
+(`**oops`) are left as literal text instead of leaking styles.
+
+#### Inline math (opt-in)
+
+Inline `$...$` LaTeX math is **disabled by default** (so prices like `$5` and
+shell variables like `$HOME` are never altered). Enable it per parse or per
+decoder:
+
+```dart
+// Per parse:
+final md = Markdown.fromString(r'The angle $\alpha$ and $x^2 + y^2$.',
+    inlineMath: true);
+
+// Or a reusable decoder, optionally extending the command table:
+const decoder = MarkdownDecoder(
+  inlineMath: true,
+  mathReplacements: {...kMarkdownMathCommands, r'\R': 'ℝ'},
+);
+```
+
+It converts LaTeX commands (`\alpha`, `\rightarrow`, ...) and super/subscripts
+(`x^2`, `H_2O`, `x^{10}`), is code-span and code-block safe, and treats `\$` as
+a literal dollar. Write `\$\alpha\$` to keep a literal `$\alpha$`.
 
 ### Headers
 
@@ -58,7 +91,13 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 2. Another numbered item
    1. Nested numbered item
    2. Another nested item
+
+- [x] Completed task-list item
+- [ ] Pending task-list item
 ```
+
+Task-list state is exposed on `MD$ListItem.checked` (`true`/`false`/`null`) and
+`MD$ListItem.isTask`, and rendered as a checkbox.
 
 ### Blockquotes
 
@@ -68,6 +107,31 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 >
 > And have multiple paragraphs
 ```
+
+### Alerts (Admonitions)
+
+GitHub-style alerts are rendered from blockquotes with a type marker:
+
+```markdown
+> [!NOTE]
+> Highlights information that users should take into account.
+
+> [!TIP]
+> Optional information to help a user be more successful.
+
+> [!IMPORTANT]
+> Crucial information necessary for users to succeed.
+
+> [!WARNING]
+> Critical content demanding immediate user attention.
+
+> [!CAUTION]
+> Negative potential consequences of an action.
+```
+
+Each alert becomes an `MD$Alert` block (`MD$AlertType.note`, `.tip`,
+`.important`, `.warning`, `.caution`). Per-type accent colors are configurable
+via `MarkdownThemeData.alertColors` / `alertColorFor`.
 
 ### Code Blocks
 
@@ -81,9 +145,12 @@ void main() {
 
 ### Tables
 
+Column alignment is supported via the delimiter row (`:---` left, `:--:`
+center, `---:` right):
+
 ```markdown
-| Header 1 | Header 2 | Header 3 |
-| -------- | -------- | -------- |
+| Left     | Center   | Right    |
+| :------- | :------: | -------: |
 | Cell 1   | Cell 2   | Cell 3   |
 | **Bold** | _Italic_ | `Code`   |
 ```
@@ -99,8 +166,12 @@ Images currently not displayed!
 
 ### Horizontal Rules
 
+Any of `---`, `***`, or `___` (optionally spaced, e.g. `- - -`) produce a rule:
+
 ```markdown
 ---
+***
+___
 ```
 
 ## 🚀 Quick Start
@@ -143,15 +214,23 @@ MarkdownTheme(
       fontStyle: FontStyle.italic,
       color: Colors.grey[600],
     ),
+    // Customize link text styling (merged on top of linkColor)
+    linkStyle: const TextStyle(
+      decoration: TextDecoration.underline,
+    ),
+    // Per-type accent colors for GitHub alert blocks
+    alertColors: const {
+      MD$AlertType.warning: Color(0xFF9A6700),
+    },
     // Handle link taps
     onLinkTap: (title, url) {
       print('Tapped link: $title -> $url');
       // Launch URL or navigate
     },
-    // Filter blocks (e.g., exclude images)
-    blockFilter: (block) => block is! MD$Image,
-    // Filter spans (e.g., exclude certain styles)
-    spanFilter: (span) => !span.style.contains(MD$Style.spoiler),
+    // Filter blocks (e.g., hide code blocks)
+    blockFilter: (block) => block is! MD$Code,
+    // Filter spans (e.g., exclude images or certain styles)
+    spanFilter: (span) => !span.style.contains(MD$Style.image),
   ),
   child: MarkdownWidget(
     markdown: yourMarkdown,
@@ -207,9 +286,19 @@ class _MyWidgetState extends State<MyWidget> {
 
 ## 📊 Performance
 
-- **Parsing**: ~300 us for typical AI responses, 15x times faster than `markdown` package
+- **Parsing**: single-pass, lookup-table driven parser with a plain-text fast
+  path and hand-rolled (regex-free) block/inline scanning. The hot path was
+  rewritten for a ~45% speedup, and it parses typical AI responses roughly
+  **10× faster** than the `markdown` package.
 - **Rendering**: 120 FPS smooth scrolling for chat-like interfaces
 - **Memory**: Minimal memory footprint with efficient span filtering
+
+Benchmarks live in `benchmark/`:
+
+```bash
+dart run benchmark/parser_benchmark.dart   # multi-scenario, vs. `markdown`
+dart run benchmark/compare.dart --save      # low-noise before/after tool
+```
 
 ## 🔧 Advanced Features
 

@@ -22,10 +22,12 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.h6Style,
     this.quoteStyle,
     this.linkColor = Colors.indigo,
+    this.linkStyle,
     this.surfaceColor = const Color.fromARGB(255, 235, 235, 235),
     this.highlightBackgroundColor = const Color(0x40FF5722),
     this.monospaceBackgroundColor = const Color(0x409E9E9E),
     this.dividerColor,
+    this.alertColors,
     this.blockFilter,
     this.spanFilter,
     this.builder,
@@ -47,10 +49,12 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     TextStyle? h6Style,
     TextStyle? quoteStyle,
     Color? linkColor,
+    TextStyle? linkStyle,
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
     Color? dividerColor,
+    Map<MD$AlertType, Color>? alertColors,
     bool Function(MD$Block block)? blockFilter,
     bool Function(MD$Span span)? spanFilter,
     BlockPainter? Function(MD$Block block, MarkdownThemeData theme)? builder,
@@ -73,12 +77,14 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
               color:
                   theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.75)),
       linkColor: linkColor ?? theme.colorScheme.primary,
+      linkStyle: linkStyle,
       surfaceColor: surfaceColor ?? theme.colorScheme.surfaceContainerHigh,
       highlightBackgroundColor:
           highlightBackgroundColor ?? theme.colorScheme.errorContainer,
       monospaceBackgroundColor:
           monospaceBackgroundColor ?? theme.colorScheme.surfaceContainerHigh,
       dividerColor: dividerColor ?? theme.dividerColor.withValues(alpha: 0.12),
+      alertColors: alertColors,
       blockFilter: blockFilter,
       spanFilter: spanFilter,
       builder: builder,
@@ -122,6 +128,10 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// The color to use for link text.
   final Color? linkColor;
 
+  /// An optional text style to merge into link spans, applied on top of the
+  /// default link styling (bold + [linkColor]).
+  final TextStyle? linkStyle;
+
   /// The color to use for the background of the quote, block, table and etc.
   final Color? surfaceColor;
 
@@ -133,6 +143,26 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// The color to use for the divider.
   final Color? dividerColor;
+
+  /// Optional accent colors for GitHub-style alert blocks, keyed by type.
+  /// Missing entries fall back to the GitHub default palette
+  /// (see [alertColorFor]).
+  final Map<MD$AlertType, Color>? alertColors;
+
+  /// The default GitHub-style accent color for each alert type (light theme).
+  static const Map<MD$AlertType, Color> _defaultAlertColors =
+      <MD$AlertType, Color>{
+    MD$AlertType.note: Color(0xFF0969DA), // blue
+    MD$AlertType.tip: Color(0xFF1A7F37), // green
+    MD$AlertType.important: Color(0xFF8250DF), // purple
+    MD$AlertType.warning: Color(0xFF9A6700), // amber
+    MD$AlertType.caution: Color(0xFFCF222E), // red
+  };
+
+  /// Returns the accent color for the given alert [type], using [alertColors]
+  /// when provided and falling back to the GitHub default palette.
+  Color alertColorFor(MD$AlertType type) =>
+      alertColors?[type] ?? _defaultAlertColors[type]!;
 
   /// A filter function to determine whether a block should be rendered.
   /// If the function returns `true`, the block will be rendered.
@@ -209,34 +239,42 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// Returns a [TextStyle] for the given [MD$Style].
   TextStyle textStyleFor(MD$Style style) => _textStyles.putIfAbsent(
         style.hashCode,
-        () => textStyle.copyWith(
-          fontWeight: switch (style) {
-            var s when s.contains(MD$Style.bold) => FontWeight.bold,
-            var s when s.contains(MD$Style.link) => FontWeight.bold,
-            var s when s.contains(MD$Style.highlight) => FontWeight.bold,
-            _ => null,
-          },
-          fontStyle: style.contains(MD$Style.italic) ? FontStyle.italic : null,
-          decoration: switch (style) {
-            var s when s.contains(MD$Style.underline) =>
-              TextDecoration.underline,
-            var s when s.contains(MD$Style.strikethrough) =>
-              TextDecoration.lineThrough,
-            _ => null,
-          },
-          fontFamily: style.contains(MD$Style.monospace) ? 'monospace' : null,
-          color: switch (style) {
-            var s when s.contains(MD$Style.link) => linkColor,
-            _ => null,
-          },
-          backgroundColor: switch (style) {
-            var s when s.contains(MD$Style.highlight) =>
-              highlightBackgroundColor,
-            var s when s.contains(MD$Style.monospace) =>
-              monospaceBackgroundColor,
-            _ => null,
-          },
-        ),
+        () {
+          final resolved = textStyle.copyWith(
+            fontWeight: switch (style) {
+              var s when s.contains(MD$Style.bold) => FontWeight.bold,
+              var s when s.contains(MD$Style.link) => FontWeight.bold,
+              var s when s.contains(MD$Style.highlight) => FontWeight.bold,
+              _ => null,
+            },
+            fontStyle:
+                style.contains(MD$Style.italic) ? FontStyle.italic : null,
+            decoration: switch (style) {
+              var s when s.contains(MD$Style.underline) =>
+                TextDecoration.underline,
+              var s when s.contains(MD$Style.strikethrough) =>
+                TextDecoration.lineThrough,
+              _ => null,
+            },
+            fontFamily: style.contains(MD$Style.monospace) ? 'monospace' : null,
+            color: switch (style) {
+              var s when s.contains(MD$Style.link) => linkColor,
+              _ => null,
+            },
+            backgroundColor: switch (style) {
+              var s when s.contains(MD$Style.highlight) =>
+                highlightBackgroundColor,
+              var s when s.contains(MD$Style.monospace) =>
+                monospaceBackgroundColor,
+              _ => null,
+            },
+          );
+          // Merge the optional link style on top of the default link styling.
+          if (linkStyle != null && style.contains(MD$Style.link)) {
+            return resolved.merge(linkStyle);
+          }
+          return resolved;
+        },
       );
 
   @override
@@ -252,12 +290,16 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     TextStyle? h6Style,
     TextStyle? quoteStyle,
     Color? linkColor,
+    TextStyle? linkStyle,
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
     Color? dividerColor,
+    Map<MD$AlertType, Color>? alertColors,
     bool Function(MD$Block block)? blockFilter,
     bool Function(MD$Span span)? spanFilter,
+    BlockPainter? Function(MD$Block block, MarkdownThemeData theme)? builder,
+    void Function(String title, String url)? onLinkTap,
   }) =>
       MarkdownThemeData(
         textDirection: textDirection ?? this.textDirection,
@@ -271,14 +313,18 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
         h6Style: h6Style ?? this.h6Style,
         quoteStyle: quoteStyle ?? this.quoteStyle,
         linkColor: linkColor ?? this.linkColor,
+        linkStyle: linkStyle ?? this.linkStyle,
         surfaceColor: surfaceColor ?? this.surfaceColor,
         highlightBackgroundColor:
             highlightBackgroundColor ?? this.highlightBackgroundColor,
         monospaceBackgroundColor:
             monospaceBackgroundColor ?? this.monospaceBackgroundColor,
         dividerColor: dividerColor ?? this.dividerColor,
+        alertColors: alertColors ?? this.alertColors,
         blockFilter: blockFilter ?? this.blockFilter,
         spanFilter: spanFilter ?? this.spanFilter,
+        builder: builder ?? this.builder,
+        onLinkTap: onLinkTap ?? this.onLinkTap,
       );
 
   @override
@@ -302,12 +348,14 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       h6Style: TextStyle.lerp(h6Style, other?.h6Style, t),
       quoteStyle: TextStyle.lerp(quoteStyle, other?.quoteStyle, t),
       linkColor: Color.lerp(linkColor, other?.linkColor, t),
+      linkStyle: TextStyle.lerp(linkStyle, other?.linkStyle, t),
       surfaceColor: Color.lerp(surfaceColor, other?.surfaceColor, t),
       highlightBackgroundColor: Color.lerp(
           highlightBackgroundColor, other?.highlightBackgroundColor, t),
       monospaceBackgroundColor: Color.lerp(
           monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
       dividerColor: Color.lerp(dividerColor, other?.dividerColor, t),
+      alertColors: t < 0.5 ? alertColors : other?.alertColors,
       blockFilter: t < 0.5 ? blockFilter : other?.blockFilter,
       spanFilter: t < 0.5 ? spanFilter : other?.spanFilter,
       builder: t < 0.5 ? builder : other?.builder,

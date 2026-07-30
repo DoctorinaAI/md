@@ -109,7 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    final initialMarkdown = Markdown.fromString(_inputController.text);
+    // `inlineMath` is opt-in (disabled by default); enabled here to showcase
+    // the `$...$` LaTeX conversion.
+    final initialMarkdown =
+        Markdown.fromString(_inputController.text, inlineMath: true);
     _outputController.value = initialMarkdown;
     _inputController.addListener(_onInputChanged);
   }
@@ -129,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (text == _outputController.value.markdown) {
       return; // No change, no need to update
     } else {
-      final markdown = Markdown.fromString(text);
+      final markdown = Markdown.fromString(text, inlineMath: true);
       _outputController.value = markdown;
     }
   }
@@ -360,6 +363,59 @@ alert(message);
 ## Inline code
 
 This example is using `package:flutter_md/flutter_md.dart`.
+
+---
+
+## Alerts
+
+> [!NOTE]
+> Highlights information that users should take into account.
+
+> [!TIP]
+> Optional information to help a user be more successful.
+
+> [!IMPORTANT]
+> Crucial information necessary for users to succeed.
+
+> [!WARNING]
+> Critical content demanding immediate user attention.
+
+> [!CAUTION]
+> Negative potential consequences of an action.
+
+---
+
+## Task lists
+
+- [x] Write the parser
+- [x] Add GitHub alerts
+- [ ] Ship selection support
+    - [x] Nested done
+    - [ ] Nested todo
+
+---
+
+## Aligned tables
+
+| Left   | Center | Right |
+| :----- | :----: | ----: |
+| a      | b      | c     |
+| longer | text   | here  |
+
+---
+
+## Inline math (opt-in)
+
+Enabled via `inlineMath: true`. Greek letters and operators: $\alpha$, $\beta$, $\pi \approx 3.14$, $x \rightarrow \infty$, plus superscripts and subscripts like $x^2$ and $H_2O$.
+
+---
+
+## Thematic breaks
+
+Dashes, asterisks and underscores all produce a horizontal rule:
+
+***
+___
 
 ---
 

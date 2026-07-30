@@ -103,3 +103,14 @@ jobs:
         timeout-minutes: 5
         run: |
           flutter test --coverage --concurrency=40 test/unit_test.dart
+
+      - name: 📊 Upload coverage to Codecov
+        id: upload-coverage
+        timeout-minutes: 2
+        uses: codecov/codecov-action@v5
+        continue-on-error: true
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

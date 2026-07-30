@@ -1,7 +1,7 @@
 import 'package:meta/meta.dart';
 
 import 'nodes.dart';
-import 'parser.dart' show markdownDecoder;
+import 'parser.dart' show MarkdownDecoder, markdownDecoder;
 
 /// {@template markdown}
 /// Markdown entity.
@@ -25,11 +25,16 @@ final class Markdown {
   /// This method uses the [markdownDecoder] to parse the string
   /// and convert it into a list of [MD$Block] objects.
   ///
+  /// Set [inlineMath] to `true` to convert simple `$...$` inline LaTeX math to
+  /// Unicode (disabled by default). For finer control — such as a custom
+  /// command table — construct a [MarkdownDecoder] directly.
+  ///
   /// This method is relatively expensive and should be used
   /// sparingly, outside build phase, especially for large markdown strings.
   /// {@macro markdown}
-  factory Markdown.fromString(String markdown) =>
-      markdownDecoder.convert(markdown);
+  factory Markdown.fromString(String markdown, {bool inlineMath = false}) =>
+      (inlineMath ? const MarkdownDecoder(inlineMath: true) : markdownDecoder)
+          .convert(markdown);
 
   /// The original markdown string.
   final String markdown;
@@ -63,6 +68,10 @@ final class Markdown {
             buffer.write(span.text);
           }
         case MD$Quote(:List<MD$Span> spans):
+          for (final span in spans) {
+            buffer.write(span.text);
+          }
+        case MD$Alert(:List<MD$Span> spans):
           for (final span in spans) {
             buffer.write(span.text);
           }

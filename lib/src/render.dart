@@ -230,6 +230,12 @@ class MarkdownPainter {
         table: (t) => BlockPainter$Table(
           header: t.header,
           rows: t.rows,
+          alignments: t.alignments,
+          theme: theme,
+        ),
+        alert: (a) => BlockPainter$Alert(
+          alert: a.alert,
+          spans: a.spans,
           theme: theme,
         ),
         spacer: (s) => BlockPainter$Spacer(
@@ -885,6 +891,150 @@ class BlockPainter$Quote with ParagraphGestureHandler implements BlockPainter {
   }
 }
 
+/// A class for painting a GitHub-style alert (admonition) block in markdown.
+@meta.internal
+class BlockPainter$Alert with ParagraphGestureHandler implements BlockPainter {
+  BlockPainter$Alert({
+    required this.alert,
+    required List<MD$Span> spans,
+    required this.theme,
+  })  : _accent = theme.alertColorFor(alert),
+        titlePainter = TextPainter(
+          text: TextSpan(
+            text: alert.title,
+            style: theme.textStyle.copyWith(
+              color: theme.alertColorFor(alert),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          textAlign: TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        ),
+        bodyPainter = TextPainter(
+          text: _paragraphFromMarkdownSpans(spans: spans, theme: theme),
+          textAlign: TextAlign.start,
+          textDirection: theme.textDirection,
+          textScaler: theme.textScaler,
+        );
+
+  /// The kind of the alert being painted.
+  final MD$AlertType alert;
+
+  final MarkdownThemeData theme;
+
+  final Color _accent;
+
+  /// Painter for the alert title (e.g. "Note").
+  final TextPainter titlePainter;
+
+  /// Painter for the alert body content.
+  final TextPainter bodyPainter;
+
+  static const double padding = 10.0;
+  static const double barWidth = 4.0;
+  static const double gap = 10.0;
+  static const double titleGap = 4.0;
+
+  /// Left offset where the title/body content begins.
+  double get _contentLeft => padding + barWidth + gap;
+
+  @override
+  Size get size => _size;
+  Size _size = Size.zero;
+
+  /// Whether the body has any content to paint.
+  bool _hasBody = false;
+
+  /// Last span hit by the tap down event.
+  TextSpan? _lastSpan;
+
+  Offset get _bodyOrigin =>
+      Offset(_contentLeft, padding + titlePainter.height + titleGap);
+
+  TextSpan? _spanForPosition(Offset localPosition) {
+    if (!_hasBody) return null;
+    final local = localPosition - _bodyOrigin;
+    if (local.dx < 0 ||
+        local.dy < 0 ||
+        local.dx > bodyPainter.width ||
+        local.dy > bodyPainter.height) return null;
+    final position = bodyPainter.getPositionForOffset(local);
+    final span = bodyPainter.text?.getSpanForPosition(position);
+    return span is TextSpan ? span : null;
+  }
+
+  @override
+  void handleTapDown(PointerDownEvent event) {
+    _lastSpan = _spanForPosition(event.localPosition);
+  }
+
+  @override
+  void handleTapUp(PointerUpEvent event) {
+    if (_lastSpan == null) return;
+    final span = _spanForPosition(event.localPosition);
+    if (span != null && _lastSpan == span) {
+      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
+        onTap?.call();
+    }
+    _lastSpan = null;
+  }
+
+  @override
+  Size layout(double width) {
+    final available = math.max(0.0, width - _contentLeft - padding);
+    titlePainter.layout(minWidth: 0, maxWidth: available);
+    bodyPainter.layout(minWidth: 0, maxWidth: available);
+    _hasBody = bodyPainter.text?.toPlainText().isNotEmpty ?? false;
+
+    final contentWidth = math.max(
+      titlePainter.width,
+      _hasBody ? bodyPainter.width : 0.0,
+    );
+    final contentHeight =
+        titlePainter.height + (_hasBody ? titleGap + bodyPainter.height : 0.0);
+    return _size = Size(
+      _contentLeft + contentWidth + padding,
+      contentHeight + padding * 2,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size, double offset) {
+    if (size.width < _size.width) return;
+
+    final rect = Rect.fromLTWH(0, offset, size.width, _size.height);
+    // Tinted background.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(6.0)),
+      Paint()
+        ..color = _accent.withValues(alpha: 0.10)
+        ..style = PaintingStyle.fill,
+    );
+    // Accent bar on the left.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, offset, barWidth, _size.height),
+        const Radius.circular(barWidth / 2),
+      ),
+      Paint()
+        ..color = _accent
+        ..style = PaintingStyle.fill,
+    );
+
+    titlePainter.paint(canvas, Offset(_contentLeft, offset + padding));
+    if (_hasBody) {
+      bodyPainter.paint(canvas, _bodyOrigin + Offset(0, offset));
+    }
+  }
+
+  @override
+  void dispose() {
+    titlePainter.dispose();
+    bodyPainter.dispose();
+  }
+}
+
 /// A helper class to store layout information for a single list item.
 class _ListItemMetrics {
   _ListItemMetrics({
@@ -982,15 +1132,17 @@ class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
     void layoutItems(List<MD$ListItem> items, int level) {
       final indent = _baseIndent + level * _levelIndent;
       for (final item in items) {
+        // Task-list items render a checkbox instead of a bullet/number.
+        final bulletText = switch (item.checked) {
+          true => '☑',
+          false => '☐',
+          null => switch (item.marker) {
+              '-' || '*' || '+' => '•',
+              _ => item.marker,
+            },
+        };
         final bulletPainter = TextPainter(
-          text: TextSpan(
-              text: '${switch (item.marker) {
-                '-' => '•',
-                '*' => '•',
-                '+' => '•',
-                _ => item.marker,
-              }} ',
-              style: theme.textStyle),
+          text: TextSpan(text: '$bulletText ', style: theme.textStyle),
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
         )..layout();
@@ -1219,6 +1371,7 @@ class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
     required this.header,
     required this.rows,
     required this.theme,
+    this.alignments = const <MD$TableColumnAlign>[],
   })  : columns = header.cells.length,
         _columnWidths = List<double>.filled(header.cells.length, 0.0),
         _rowHeights = List<double>.filled(rows.length + 1, 0.0),
@@ -1241,6 +1394,26 @@ class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
 
   /// The number of columns in the table.
   final int columns;
+
+  /// The per-column alignment derived from the delimiter row.
+  final List<MD$TableColumnAlign> alignments;
+
+  /// Resolves the alignment for column [c], defaulting to
+  /// [MD$TableColumnAlign.none] when unspecified.
+  MD$TableColumnAlign _columnAlign(int c) => c >= 0 && c < alignments.length
+      ? alignments[c]
+      : MD$TableColumnAlign.none;
+
+  /// The horizontal offset of a cell's text within its column, honoring the
+  /// column alignment (falling back to centered headers / left-aligned data).
+  double _cellHorizontalPadding(int r, int c, double painterWidth) =>
+      switch (_columnAlign(c)) {
+        MD$TableColumnAlign.left => padding,
+        MD$TableColumnAlign.center => (_columnWidths[c] - painterWidth) / 2,
+        MD$TableColumnAlign.right => _columnWidths[c] - painterWidth - padding,
+        MD$TableColumnAlign.none =>
+          (r == 0) ? (_columnWidths[c] - painterWidth) / 2 : padding,
+      };
 
   final List<double> _columnWidths;
   final List<double> _rowHeights;
@@ -1310,7 +1483,7 @@ class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
             // In this cell.
             final verticalPadding = (rowHeight - painter.height) / 2;
             final horizontalPadding =
-                (r == 0) ? (columnWidth - painter.width) / 2 : padding;
+                _cellHorizontalPadding(r, c, painter.width);
 
             final painterOffset = Offset(
                 currentX + horizontalPadding, currentY + verticalPadding);
@@ -1369,7 +1542,13 @@ class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
         final textPainter = TextPainter(
           text: _paragraphFromMarkdownSpans(
               spans: cell, theme: theme, textStyle: style),
-          textAlign: (r == 0) ? TextAlign.center : TextAlign.start,
+          textAlign: switch (_columnAlign(c)) {
+            MD$TableColumnAlign.left => TextAlign.left,
+            MD$TableColumnAlign.center => TextAlign.center,
+            MD$TableColumnAlign.right => TextAlign.right,
+            MD$TableColumnAlign.none =>
+              (r == 0) ? TextAlign.center : TextAlign.start,
+          },
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
         );
@@ -1475,9 +1654,7 @@ class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
         }
 
         final verticalPadding = (rowHeights[r] - painter.height) / 2;
-        final horizontalPadding = (r == 0)
-            ? (_columnWidths[c] - painter.width) / 2 // Center for header rows
-            : padding; // Left align for data rows
+        final horizontalPadding = _cellHorizontalPadding(r, c, painter.width);
 
         painter.paint(
           canvas,

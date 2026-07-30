@@ -149,6 +149,90 @@ final class MD$Span {
   String toString() => text;
 }
 
+/// {@template markdown_alert_type}
+/// The kind of a GitHub-style alert (admonition) block.
+///
+/// Rendered from the blockquote marker syntax, e.g.:
+/// ```markdown
+/// > [!NOTE]
+/// > Useful information that users should know.
+/// ```
+/// {@endtemplate}
+enum MD$AlertType {
+  /// Highlights information that users should take into account.
+  /// Symbol: `> [!NOTE]`.
+  note('NOTE'),
+
+  /// Optional information to help a user be more successful.
+  /// Symbol: `> [!TIP]`.
+  tip('TIP'),
+
+  /// Crucial information necessary for users to succeed.
+  /// Symbol: `> [!IMPORTANT]`.
+  important('IMPORTANT'),
+
+  /// Critical content demanding immediate user attention due to risks.
+  /// Symbol: `> [!WARNING]`.
+  warning('WARNING'),
+
+  /// Negative potential consequences of an action.
+  /// Symbol: `> [!CAUTION]`.
+  caution('CAUTION');
+
+  /// {@macro markdown_alert_type}
+  const MD$AlertType(this.marker);
+
+  /// The uppercase marker keyword used in the source syntax,
+  /// e.g. `NOTE` for `> [!NOTE]`.
+  final String marker;
+
+  /// A human-readable title for the alert, e.g. `Note` for [MD$AlertType.note].
+  String get title => switch (this) {
+        MD$AlertType.note => 'Note',
+        MD$AlertType.tip => 'Tip',
+        MD$AlertType.important => 'Important',
+        MD$AlertType.warning => 'Warning',
+        MD$AlertType.caution => 'Caution',
+      };
+
+  /// Parses an [MD$AlertType] from its [marker] keyword (case-insensitive).
+  /// Returns `null` if the keyword does not match any known alert type.
+  static MD$AlertType? tryParse(String keyword) {
+    switch (keyword.toUpperCase()) {
+      case 'NOTE':
+        return MD$AlertType.note;
+      case 'TIP':
+        return MD$AlertType.tip;
+      case 'IMPORTANT':
+        return MD$AlertType.important;
+      case 'WARNING':
+        return MD$AlertType.warning;
+      case 'CAUTION':
+        return MD$AlertType.caution;
+      default:
+        return null;
+    }
+  }
+}
+
+/// {@template markdown_table_align}
+/// The horizontal alignment of a Markdown table column,
+/// derived from the delimiter row, e.g. `:---`, `:--:`, `---:`.
+/// {@endtemplate}
+enum MD$TableColumnAlign {
+  /// No explicit alignment specified (`---`).
+  none,
+
+  /// Left aligned (`:---`).
+  left,
+
+  /// Center aligned (`:--:`).
+  center,
+
+  /// Right aligned (`---:`).
+  right,
+}
+
 /// {@template markdown_block}
 /// A base class for all Markdown blocks.
 /// {@endtemplate}
@@ -173,6 +257,7 @@ sealed class MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   });
 
@@ -186,6 +271,7 @@ sealed class MD$Block {
     T Function(MD$List l)? list,
     T Function(MD$Divider d)? divider,
     T Function(MD$Table t)? table,
+    T Function(MD$Alert a)? alert,
     T Function(MD$Spacer s)? spacer,
     required T Function(MD$Block b) orElse,
   }) =>
@@ -197,6 +283,7 @@ sealed class MD$Block {
         list: list ?? orElse,
         divider: divider ?? orElse,
         table: table ?? orElse,
+        alert: alert ?? orElse,
         spacer: spacer ?? orElse,
       );
 
@@ -235,6 +322,7 @@ final class MD$Paragraph extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       paragraph(this);
@@ -274,6 +362,7 @@ final class MD$Heading extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       heading(this);
@@ -315,9 +404,51 @@ final class MD$Quote extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       quote(this);
+}
+
+/// A block representing a GitHub-style alert (admonition) in Markdown.
+/// Built from a blockquote whose first line is an alert marker such as
+/// `> [!NOTE]`, `> [!WARNING]`, etc.
+/// Always a leaf node in the Markdown tree.
+/// {@macro markdown_block}
+final class MD$Alert extends MD$Block {
+  /// Creates a new instance of [MD$Alert].
+  /// {@macro markdown_block}
+  const MD$Alert({
+    required this.alert,
+    required this.text,
+    required this.spans,
+  });
+
+  @override
+  String get type => 'alert';
+
+  /// The kind of the alert (note, tip, important, warning, caution).
+  final MD$AlertType alert;
+
+  @override
+  final String text;
+
+  /// The inline text spans within the alert body.
+  final List<MD$Span> spans;
+
+  @override
+  T map<T>({
+    required T Function(MD$Paragraph p) paragraph,
+    required T Function(MD$Heading h) heading,
+    required T Function(MD$Quote q) quote,
+    required T Function(MD$Code c) code,
+    required T Function(MD$List l) list,
+    required T Function(MD$Divider d) divider,
+    required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
+    required T Function(MD$Spacer s) spacer,
+  }) =>
+      alert(this);
 }
 
 /// A block representing a code block in Markdown.
@@ -350,6 +481,7 @@ final class MD$Code extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       code(this);
@@ -369,12 +501,23 @@ final class MD$ListItem {
     required this.text,
     required this.spans,
     this.indent = 0,
+    this.checked,
     this.children = const <MD$ListItem>[],
   });
 
   /// The indent of the list block in the document.
   /// This is used to determine the indentation level of the list.
   final int indent;
+
+  /// Task-list checkbox state for this item.
+  ///
+  /// * `null` — the item is a regular (non-task) list item.
+  /// * `false` — an unchecked task item (`- [ ]`).
+  /// * `true` — a checked task item (`- [x]`).
+  final bool? checked;
+
+  /// Whether this list item is a GitHub task-list item (`- [ ]` / `- [x]`).
+  bool get isTask => checked != null;
 
   /// The marker used for the list item.
   final String marker;
@@ -396,6 +539,7 @@ final class MD$ListItem {
     String? text,
     List<MD$Span>? spans,
     int? indent,
+    bool? checked,
     List<MD$ListItem>? children,
   }) =>
       MD$ListItem(
@@ -403,6 +547,7 @@ final class MD$ListItem {
         text: text ?? this.text,
         spans: spans ?? this.spans,
         indent: indent ?? this.indent,
+        checked: checked ?? this.checked,
         children: children ?? this.children,
       );
 
@@ -456,6 +601,7 @@ final class MD$List extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       list(this);
@@ -486,6 +632,7 @@ final class MD$Divider extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       divider(this);
@@ -528,6 +675,7 @@ final class MD$Table extends MD$Block {
     required this.text,
     required this.header,
     required this.rows,
+    this.alignments = const <MD$TableColumnAlign>[],
   });
 
   @override
@@ -542,6 +690,18 @@ final class MD$Table extends MD$Block {
   /// The rows of the table.
   final List<MD$TableRow> rows;
 
+  /// The per-column horizontal alignment, derived from the delimiter row.
+  /// May be shorter than the number of columns; use [alignmentFor] for
+  /// safe access.
+  final List<MD$TableColumnAlign> alignments;
+
+  /// Returns the alignment for the given column [index],
+  /// defaulting to [MD$TableColumnAlign.none] when unspecified.
+  MD$TableColumnAlign alignmentFor(int index) =>
+      index >= 0 && index < alignments.length
+          ? alignments[index]
+          : MD$TableColumnAlign.none;
+
   @override
   T map<T>({
     required T Function(MD$Paragraph p) paragraph,
@@ -551,6 +711,7 @@ final class MD$Table extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       table(this);
@@ -596,6 +757,7 @@ final class MD$Image extends MD$Block {
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
     required T Function(MD$Image i) image,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       image(this);
@@ -630,6 +792,7 @@ class MD$Spacer extends MD$Block {
     required T Function(MD$List l) list,
     required T Function(MD$Divider d) divider,
     required T Function(MD$Table t) table,
+    required T Function(MD$Alert a) alert,
     required T Function(MD$Spacer s) spacer,
   }) =>
       spacer(this);
