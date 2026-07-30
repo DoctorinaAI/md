@@ -38,7 +38,7 @@ class MarkdownRenderObject extends RenderBox
   /// The stable document id used to anchor selection positions.
   Object? _documentId;
 
-  static final Paint _highlightPaint = Paint()..color = _kSelectionColor;
+  final Paint _highlightPaint = Paint()..color = _kSelectionColor;
 
   void _onSelectionChange() {
     if (!_disposed) markNeedsPaint();
@@ -98,6 +98,17 @@ class MarkdownRenderObject extends RenderBox
       blockIndex: hit.$1,
       offset: hit.$2,
     );
+  }
+
+  @override
+  List<Rect> globalSelectionRects() {
+    final controller = _controller;
+    final id = _documentId;
+    if (controller == null || id == null) return const <Rect>[];
+    final local = _painter.selectionBoxes((s) => controller.rangeFor(id, s));
+    if (local.isEmpty) return const <Rect>[];
+    final origin = localToGlobal(Offset.zero);
+    return <Rect>[for (final rect in local) rect.shift(origin)];
   }
 
   /// Current size of the render box.
@@ -236,6 +247,7 @@ class MarkdownRenderObject extends RenderBox
     final controller = _controller;
     final id = _documentId;
     if (controller != null && id != null) {
+      _highlightPaint.color = controller.selectionColor ?? _kSelectionColor;
       _painter.paintHighlight(
         canvas,
         (source) => controller.rangeFor(id, source),
@@ -406,6 +418,24 @@ class MarkdownPainter {
         canvas.drawRect(rect.shift(Offset(0, top)), paint);
       }
     }
+  }
+
+  /// Content-local rectangles covering the selection described by [rangeOf], in
+  /// reading order. Same geometry [paintHighlight] draws, collected instead of
+  /// painted — used to position selection handles, the magnifier and toolbar.
+  List<Rect> selectionBoxes(TextRange? Function(int sourceIndex) rangeOf) {
+    final out = <Rect>[];
+    for (var i = 0; i < _blockPainters.length; i++) {
+      final painter = _blockPainters[i];
+      if (painter is! SelectableBlockPainter) continue;
+      final range = rangeOf(_sourceIndices[i]);
+      if (range == null || range.start >= range.end) continue;
+      final top = _blockOffsets[i];
+      for (final rect in painter.boxesForRange(range.start, range.end)) {
+        out.add(rect.shift(Offset(0, top)));
+      }
+    }
+    return out;
   }
 
   /// Update the painter with new values.

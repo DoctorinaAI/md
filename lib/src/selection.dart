@@ -1,4 +1,4 @@
-import 'dart:ui' show Offset, Rect, TextRange;
+import 'dart:ui' show Color, Offset, Rect, TextRange;
 
 import 'package:flutter/foundation.dart';
 
@@ -68,6 +68,18 @@ final class MarkdownPosition {
 
   /// Offset into the block's rendered text (see [markdownBlockRenderedText]).
   final int offset;
+
+  /// A copy with the given fields replaced.
+  MarkdownPosition copyWith({
+    Object? documentId,
+    int? blockIndex,
+    int? offset,
+  }) =>
+      MarkdownPosition(
+        documentId: documentId ?? this.documentId,
+        blockIndex: blockIndex ?? this.blockIndex,
+        offset: offset ?? this.offset,
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -369,6 +381,12 @@ abstract interface class MarkdownSelectionSurface {
 
   /// Maps a global point to a logical position, or null if outside any text.
   MarkdownPosition? positionForGlobal(Offset globalPosition);
+
+  /// Global (screen-space) rectangles covering the selected part of this
+  /// surface's document, in reading order. Empty when nothing here is
+  /// selected. Used to place selection handles, the magnifier and the toolbar
+  /// anchor.
+  List<Rect> globalSelectionRects();
 }
 
 class _DocEntry {
@@ -411,6 +429,18 @@ class MarkdownSelectionController extends ChangeNotifier {
   set formatter(MarkdownSelectionFormatter value) {
     if (identical(value, _formatter)) return;
     _formatter = value;
+    notifyListeners();
+  }
+
+  Color? _selectionColor;
+
+  /// The color of the selection highlight, or null to use the render layer's
+  /// default. Usually set by [MarkdownSelectionScope] from the ambient
+  /// `DefaultSelectionStyle` / `TextSelectionTheme`.
+  Color? get selectionColor => _selectionColor;
+  set selectionColor(Color? value) {
+    if (value == _selectionColor) return;
+    _selectionColor = value;
     notifyListeners();
   }
 
@@ -629,6 +659,94 @@ class MarkdownSelectionController extends ChangeNotifier {
     );
   }
 
+  // --- keyboard extension --------------------------------------------------
+
+  void _extendExtent(MarkdownPosition Function(MarkdownPosition) step) {
+    final sel = _selection;
+    if (sel == null) return;
+    final next = step(sel.extent);
+    if (next == sel.extent) return;
+    selection = MarkdownSelection(base: sel.base, extent: next);
+  }
+
+  /// Extends the moving end of the selection by one character ([forward] =
+  /// toward the end of the text). No-op without a current selection.
+  void extendSelectionByCharacter({required bool forward}) =>
+      _extendExtent((p) => _stepCharacter(p, forward: forward));
+
+  /// Extends the moving end of the selection by one word.
+  void extendSelectionByWord({required bool forward}) =>
+      _extendExtent((p) => _stepWord(p, forward: forward));
+
+  /// Extends the moving end of the selection to the start/end of its block
+  /// (the closest analogue of a line-break extension for Markdown blocks).
+  void extendSelectionToLineBreak({required bool forward}) =>
+      _extendExtent((p) => _stepLineBreak(p, forward: forward));
+
+  /// Extends the moving end of the selection to the very start of the first
+  /// document or the very end of the last one.
+  void extendSelectionToDocumentBoundary({required bool forward}) {
+    if (_docs.isEmpty) return;
+    _extendExtent((_) => _documentBoundary(forward: forward));
+  }
+
+  /// Extends the moving end of the selection to the adjacent visual line, using
+  /// on-screen geometry (falls back to nothing when the endpoint is unmounted).
+  void extendSelectionToAdjacentLine({required bool forward}) {
+    final sel = _selection;
+    if (sel == null) return;
+    final rects = globalSelectionRects();
+    if (rects.isEmpty) return;
+    final (a, _) = _ordered(sel);
+    final rect = sel.extent == a ? rects.first : rects.last;
+    final target = Offset(
+      rect.center.dx,
+      rect.center.dy + (forward ? rect.height : -rect.height),
+    );
+    final moved = positionForGlobal(target);
+    if (moved != null) {
+      selection = MarkdownSelection(base: sel.base, extent: moved);
+    }
+  }
+
+  /// Moves one edge of the selection to a global point, keeping the other edge
+  /// fixed. Used by the draggable selection handles: [isStart] moves the
+  /// reading-order start edge, otherwise the end edge.
+  void moveSelectionEdgeToGlobal(
+    Offset globalPosition, {
+    required bool isStart,
+  }) {
+    final sel = _selection;
+    if (sel == null) return;
+    final moved = positionForGlobal(globalPosition);
+    if (moved == null) return;
+    final (a, b) = _ordered(sel);
+    selection = isStart
+        ? MarkdownSelection(base: b, extent: moved)
+        : MarkdownSelection(base: a, extent: moved);
+  }
+
+  // --- geometry (mounted surfaces) -----------------------------------------
+
+  /// Global rects covering the current selection across every mounted surface,
+  /// in reading order. Unmounted documents contribute nothing (they have no
+  /// geometry). Empty when the selection is collapsed or entirely off-screen.
+  List<Rect> globalSelectionRects() {
+    final sel = _selection;
+    if (sel == null || sel.isCollapsed) return const <Rect>[];
+    final (a, b) = _ordered(sel);
+    final startDoc = _orderIndex(a.documentId);
+    final endDoc = _orderIndex(b.documentId);
+    if (startDoc < 0 || endDoc < 0) return const <Rect>[];
+    final out = <Rect>[];
+    for (var d = startDoc; d <= endDoc; d++) {
+      final surface = _surfaces[_docs[d].id];
+      if (surface == null) continue;
+      out.addAll(surface.globalSelectionRects());
+    }
+    return out;
+  }
+
   /// The selected range within [documentId]'s block [blockIndex], or null when
   /// that block is not part of the current selection. Used by surfaces to paint
   /// their highlight.
@@ -723,6 +841,102 @@ class MarkdownSelectionController extends ChangeNotifier {
       _compare(sel.base, sel.extent) <= 0
           ? (sel.base, sel.extent)
           : (sel.extent, sel.base);
+
+  // --- position stepping (keyboard) ----------------------------------------
+
+  String _blockTextAt(int docIndex, int blockIndex) {
+    final blocks = _docs[docIndex].model.blocks;
+    if (blockIndex < 0 || blockIndex >= blocks.length) return '';
+    return markdownBlockRenderedText(blocks[blockIndex]);
+  }
+
+  static bool _isSpace(String ch) => ch == ' ' || ch == '\t' || ch == '\n';
+
+  /// The next/previous block (scanning across documents) that has non-empty
+  /// rendered text, as `(docIndex, blockIndex)`, or null at the ends.
+  (int, int)? _adjacentBlock(int di, int bi, {required bool forward}) {
+    var d = di;
+    var b = bi;
+    for (var guard = 0; guard < 1000000; guard++) {
+      if (forward) {
+        b++;
+        while (d < _docs.length && b >= _docs[d].model.blocks.length) {
+          d++;
+          b = 0;
+        }
+        if (d >= _docs.length) return null;
+      } else {
+        b--;
+        while (d >= 0 && b < 0) {
+          d--;
+          if (d >= 0) b = _docs[d].model.blocks.length - 1;
+        }
+        if (d < 0) return null;
+      }
+      if (_blockTextAt(d, b).isNotEmpty) return (d, b);
+    }
+    return null;
+  }
+
+  MarkdownPosition _stepCharacter(MarkdownPosition p, {required bool forward}) {
+    final di = _orderIndex(p.documentId);
+    if (di < 0) return p;
+    final len = _blockTextAt(di, p.blockIndex).length;
+    if (forward) {
+      if (p.offset < len) return p.copyWith(offset: p.offset + 1);
+      final adj = _adjacentBlock(di, p.blockIndex, forward: true);
+      return adj == null
+          ? p
+          : MarkdownPosition(
+              documentId: _docs[adj.$1].id, blockIndex: adj.$2, offset: 0);
+    }
+    if (p.offset > 0) return p.copyWith(offset: p.offset - 1);
+    final adj = _adjacentBlock(di, p.blockIndex, forward: false);
+    return adj == null
+        ? p
+        : MarkdownPosition(
+            documentId: _docs[adj.$1].id,
+            blockIndex: adj.$2,
+            offset: _blockTextAt(adj.$1, adj.$2).length);
+  }
+
+  MarkdownPosition _stepWord(MarkdownPosition p, {required bool forward}) {
+    final di = _orderIndex(p.documentId);
+    if (di < 0) return p;
+    final text = _blockTextAt(di, p.blockIndex);
+    if (forward) {
+      if (p.offset >= text.length) return _stepCharacter(p, forward: true);
+      var i = p.offset;
+      while (i < text.length && _isSpace(text[i])) i++;
+      while (i < text.length && !_isSpace(text[i])) i++;
+      return p.copyWith(offset: i);
+    }
+    if (p.offset <= 0) return _stepCharacter(p, forward: false);
+    var i = p.offset;
+    while (i > 0 && _isSpace(text[i - 1])) i--;
+    while (i > 0 && !_isSpace(text[i - 1])) i--;
+    return p.copyWith(offset: i);
+  }
+
+  MarkdownPosition _stepLineBreak(MarkdownPosition p, {required bool forward}) {
+    final di = _orderIndex(p.documentId);
+    if (di < 0) return p;
+    return p.copyWith(
+        offset: forward ? _blockTextAt(di, p.blockIndex).length : 0);
+  }
+
+  MarkdownPosition _documentBoundary({required bool forward}) {
+    if (forward) {
+      final di = _docs.length - 1;
+      final bi = _docs[di].model.blocks.length - 1;
+      return MarkdownPosition(
+          documentId: _docs[di].id,
+          blockIndex: bi < 0 ? 0 : bi,
+          offset: bi < 0 ? 0 : _blockTextAt(di, bi).length);
+    }
+    return MarkdownPosition(
+        documentId: _docs.first.id, blockIndex: 0, offset: 0);
+  }
 }
 
 /// Coordinates several controllers (and external selectables) so that at most

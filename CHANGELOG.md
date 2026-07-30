@@ -18,9 +18,23 @@
   and highlight boxes across the many `TextPainter`s of a list's items or a
   table's cells, so a drag can start or end inside a list item or table cell and
   the copied text keeps the `\n` / `\t` separators of `markdownBlockRenderedText`.
+- **ADDED**: Keyboard shortcuts and a context toolbar on `MarkdownSelectionScope`,
+  mirroring `SelectableRegion`/`SelectableText`. When focused: `Ctrl/Cmd+C`
+  copies, `Ctrl/Cmd+A` selects all, `Shift`+arrows extend by character / word /
+  line / document (and vertically by geometry), `Esc` clears. Right-click
+  (desktop) / long-press (mobile) shows an adaptive Copy / Select-all toolbar.
+  The scope is now a `StatefulWidget` with a public `MarkdownSelectionScopeState`
+  (`copySelection` / `selectAll` / `clearSelection` / `showToolbar` /
+  `hideToolbar` / `contextMenuButtonItems` / `contextMenuAnchors`). New
+  customization params: `focusNode`, `enabled`, `selectionColor`,
+  `contextMenuBuilder`, `magnifierConfiguration`, `selectionControls`,
+  `onSelectionChanged`. New controller ops: `selectionColor`,
+  `globalSelectionRects`, `moveSelectionEdgeToGlobal`, and the
+  `extendSelectionBy*` family; `MarkdownPosition.copyWith`.
 - **CHANGED**: `MarkdownWidget`'s render object now draws the selection
   highlight outside the cached content `Picture` and becomes a repaint boundary
   when selectable, so selection/drag repaints do not rebuild the glyph cache.
+  The highlight color is now customizable via the controller / scope.
 - **EXAMPLE**: Reworked the demo tabs — a longer, richer chat (tables, code,
   nested/task lists, alerts, math, token-by-token streaming with a typing
   indicator, Select-all/Clear) and a Selection tab that spans every block type.
