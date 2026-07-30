@@ -1,6 +1,7 @@
 import 'dart:ui' show Color, Offset, Rect, TextRange;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart' show LayerLink;
 
 import 'markdown.dart';
 import 'nodes.dart';
@@ -387,6 +388,58 @@ abstract interface class MarkdownSelectionSurface {
   /// selected. Used to place selection handles, the magnifier and the toolbar
   /// anchor.
   List<Rect> globalSelectionRects();
+
+  /// Content-local rectangles covering the selected part of this surface's
+  /// document, in reading order. The local-space twin of [globalSelectionRects]
+  /// used to anchor handle leader layers.
+  List<Rect> localSelectionRects();
+
+  /// Sets the selection-handle leader layers this surface paints, so the
+  /// scope's `SelectionOverlay` handles follow the content. Pass a [startLink]
+  /// or [endLink] with its content-local anchor; pass null to remove a handle.
+  void setSelectionHandleLayers({
+    LayerLink? startLink,
+    Offset? startLocal,
+    LayerLink? endLink,
+    Offset? endLocal,
+  });
+
+  /// Requests a repaint of just the selection highlight (e.g. after a color
+  /// change). Safe to call during a build phase (schedules paint, not build).
+  void repaintSelection();
+}
+
+/// The mounted geometry at the two ends of a selection, for placing handles.
+@immutable
+class MarkdownHandleEndpoints {
+  /// Creates endpoints binding each edge to its owning surface with the local
+  /// and global caret rects at that edge.
+  const MarkdownHandleEndpoints({
+    required this.startSurface,
+    required this.startLocal,
+    required this.startGlobal,
+    required this.endSurface,
+    required this.endLocal,
+    required this.endGlobal,
+  });
+
+  /// The surface owning the reading-order start edge.
+  final MarkdownSelectionSurface startSurface;
+
+  /// The local caret rect at the start edge (within [startSurface]).
+  final Rect startLocal;
+
+  /// The global caret rect at the start edge.
+  final Rect startGlobal;
+
+  /// The surface owning the reading-order end edge.
+  final MarkdownSelectionSurface endSurface;
+
+  /// The local caret rect at the end edge (within [endSurface]).
+  final Rect endLocal;
+
+  /// The global caret rect at the end edge.
+  final Rect endGlobal;
 }
 
 class _DocEntry {
@@ -437,11 +490,17 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// The color of the selection highlight, or null to use the render layer's
   /// default. Usually set by [MarkdownSelectionScope] from the ambient
   /// `DefaultSelectionStyle` / `TextSelectionTheme`.
+  ///
+  /// Changing it repaints mounted surfaces directly rather than notifying
+  /// listeners — it is a rendering detail, not a selection change, and is often
+  /// set during a build phase (from `didChangeDependencies`).
   Color? get selectionColor => _selectionColor;
   set selectionColor(Color? value) {
     if (value == _selectionColor) return;
     _selectionColor = value;
-    notifyListeners();
+    for (final surface in _surfaces.values) {
+      surface.repaintSelection();
+    }
   }
 
   final List<_DocEntry> _docs = <_DocEntry>[];
@@ -745,6 +804,45 @@ class MarkdownSelectionController extends ChangeNotifier {
       out.addAll(surface.globalSelectionRects());
     }
     return out;
+  }
+
+  /// Resolves the mounted surfaces and local/global caret rects at the two ends
+  /// of the current selection, for placing selection handles. Null when the
+  /// selection is collapsed or neither end is mounted.
+  MarkdownHandleEndpoints? selectionHandleEndpoints() {
+    final sel = _selection;
+    if (sel == null || sel.isCollapsed) return null;
+    final (a, b) = _ordered(sel);
+    final startDoc = _orderIndex(a.documentId);
+    final endDoc = _orderIndex(b.documentId);
+    if (startDoc < 0 || endDoc < 0) return null;
+    MarkdownSelectionSurface? startSurface, endSurface;
+    Rect? startLocal, startGlobal, endLocal, endGlobal;
+    for (var d = startDoc; d <= endDoc; d++) {
+      final surface = _surfaces[_docs[d].id];
+      if (surface == null) continue;
+      final local = surface.localSelectionRects();
+      if (local.isEmpty) continue;
+      final global = surface.globalSelectionRects();
+      if (global.length != local.length) continue;
+      if (startSurface == null) {
+        startSurface = surface;
+        startLocal = local.first;
+        startGlobal = global.first;
+      }
+      endSurface = surface;
+      endLocal = local.last;
+      endGlobal = global.last;
+    }
+    if (startSurface == null || endSurface == null) return null;
+    return MarkdownHandleEndpoints(
+      startSurface: startSurface,
+      startLocal: startLocal!,
+      startGlobal: startGlobal!,
+      endSurface: endSurface,
+      endLocal: endLocal!,
+      endGlobal: endGlobal!,
+    );
   }
 
   /// The selected range within [documentId]'s block [blockIndex], or null when

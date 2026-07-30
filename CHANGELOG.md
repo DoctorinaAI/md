@@ -31,6 +31,16 @@
   `onSelectionChanged`. New controller ops: `selectionColor`,
   `globalSelectionRects`, `moveSelectionEdgeToGlobal`, and the
   `extendSelectionBy*` family; `MarkdownPosition.copyWith`.
+- **ADDED**: Native selection handles and a magnifier on touch platforms,
+  driven by Flutter's `SelectionOverlay`. Selection endpoints push
+  `LeaderLayer`s from the render objects so the handles follow the content as it
+  scrolls (and across multiple `MarkdownWidget`s); dragging a handle adjusts the
+  selection and shows the platform magnifier. Handles/magnifier respect the
+  platform (`selectionControls`, `magnifierConfiguration`) and are absent on
+  desktop, matching `SelectableText`. New surface geometry:
+  `localSelectionRects`, `setSelectionHandleLayers`, `repaintSelection`, and
+  `MarkdownSelectionController.selectionHandleEndpoints` /
+  `MarkdownHandleEndpoints`.
 - **CHANGED**: `MarkdownWidget`'s render object now draws the selection
   highlight outside the cached content `Picture` and becomes a repaint boundary
   when selectable, so selection/drag repaints do not rebuild the glyph cache.

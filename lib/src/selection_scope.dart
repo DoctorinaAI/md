@@ -1,5 +1,10 @@
+import 'package:flutter/cupertino.dart'
+    show
+        cupertinoTextSelectionHandleControls,
+        cupertinoDesktopTextSelectionHandleControls;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import 'selection.dart';
@@ -128,6 +133,10 @@ class MarkdownSelectionScope extends StatefulWidget {
 /// `SelectableRegionState`.
 class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   final ContextMenuController _contextMenuController = ContextMenuController();
+  final LayerLink _startHandleLink = LayerLink();
+  final LayerLink _endHandleLink = LayerLink();
+  final LayerLink _toolbarLink = LayerLink();
+  SelectionOverlay? _selectionOverlay;
   FocusNode? _internalFocusNode;
   Offset? _lastSecondaryTapDown;
   MarkdownSelection? _lastSelection;
@@ -169,6 +178,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
     _contextMenuController.remove();
+    _selectionOverlay?.dispose();
+    _selectionOverlay = null;
     _internalFocusNode?.dispose();
     super.dispose();
   }
@@ -185,6 +196,172 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
       widget.onSelectionChanged?.call(sel);
     }
     if (sel == null || sel.isCollapsed) hideToolbar();
+    _syncOverlay();
+  }
+
+  // --- native handles + magnifier ------------------------------------------
+
+  bool get _handlesEnabled =>
+      widget.enabled &&
+      switch (Theme.of(context).platform) {
+        TargetPlatform.android ||
+        TargetPlatform.iOS ||
+        TargetPlatform.fuchsia =>
+          true,
+        _ => false,
+      };
+
+  TextSelectionControls get _effectiveControls =>
+      widget.selectionControls ??
+      switch (Theme.of(context).platform) {
+        TargetPlatform.android ||
+        TargetPlatform.fuchsia =>
+          materialTextSelectionHandleControls,
+        TargetPlatform.linux ||
+        TargetPlatform.windows =>
+          desktopTextSelectionHandleControls,
+        TargetPlatform.iOS => cupertinoTextSelectionHandleControls,
+        TargetPlatform.macOS => cupertinoDesktopTextSelectionHandleControls,
+      };
+
+  TextMagnifierConfiguration get _effectiveMagnifier =>
+      widget.magnifierConfiguration ??
+      TextMagnifier.adaptiveMagnifierConfiguration;
+
+  /// Syncs the handle overlay, deferring to a post-frame callback when called
+  /// during a build/layout/paint phase (e.g. a streaming `setState`).
+  void _syncOverlay() {
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _updateHandlesAndOverlay();
+      });
+    } else {
+      _updateHandlesAndOverlay();
+    }
+  }
+
+  void _updateHandlesAndOverlay() {
+    if (!_handlesEnabled) {
+      _clearHandles();
+      return;
+    }
+    final endpoints = controller.selectionHandleEndpoints();
+    if (endpoints == null) {
+      _clearHandles();
+      return;
+    }
+    _applyHandles(endpoints);
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final startPoint = TextSelectionPoint(
+      box.globalToLocal(
+          Offset(endpoints.startGlobal.left, endpoints.startGlobal.bottom)),
+      TextDirection.ltr,
+    );
+    final endPoint = TextSelectionPoint(
+      box.globalToLocal(
+          Offset(endpoints.endGlobal.right, endpoints.endGlobal.bottom)),
+      TextDirection.ltr,
+    );
+    final overlay = _selectionOverlay;
+    if (overlay == null) {
+      _selectionOverlay = SelectionOverlay(
+        context: context,
+        startHandleType: TextSelectionHandleType.left,
+        lineHeightAtStart: endpoints.startLocal.height,
+        onStartHandleDragStart: (d) => _onHandleDragStart(d, isStart: true),
+        onStartHandleDragUpdate: (d) => _onHandleDragUpdate(d, isStart: true),
+        onStartHandleDragEnd: (_) => _onHandleDragEnd(),
+        endHandleType: TextSelectionHandleType.right,
+        lineHeightAtEnd: endpoints.endLocal.height,
+        onEndHandleDragStart: (d) => _onHandleDragStart(d, isStart: false),
+        onEndHandleDragUpdate: (d) => _onHandleDragUpdate(d, isStart: false),
+        onEndHandleDragEnd: (_) => _onHandleDragEnd(),
+        selectionEndpoints: <TextSelectionPoint>[startPoint, endPoint],
+        selectionControls: _effectiveControls,
+        selectionDelegate: null,
+        clipboardStatus: null,
+        startHandleLayerLink: _startHandleLink,
+        endHandleLayerLink: _endHandleLink,
+        toolbarLayerLink: _toolbarLink,
+        magnifierConfiguration: _effectiveMagnifier,
+      )..showHandles();
+    } else {
+      overlay
+        ..startHandleType = TextSelectionHandleType.left
+        ..lineHeightAtStart = endpoints.startLocal.height
+        ..endHandleType = TextSelectionHandleType.right
+        ..lineHeightAtEnd = endpoints.endLocal.height
+        ..selectionEndpoints = <TextSelectionPoint>[startPoint, endPoint];
+    }
+  }
+
+  /// Assigns the two handle leader layers to their owning surfaces (and clears
+  /// them everywhere else) in a single pass, so nothing repaints needlessly.
+  void _applyHandles(MarkdownHandleEndpoints? e) {
+    final startSurface = e?.startSurface;
+    final endSurface = e?.endSurface;
+    final startLocal =
+        e == null ? null : Offset(e.startLocal.left, e.startLocal.bottom);
+    final endLocal =
+        e == null ? null : Offset(e.endLocal.right, e.endLocal.bottom);
+    for (final surface in controller.mountedSurfaces) {
+      final isStart = identical(surface, startSurface);
+      final isEnd = identical(surface, endSurface);
+      surface.setSelectionHandleLayers(
+        startLink: isStart ? _startHandleLink : null,
+        startLocal: isStart ? startLocal : null,
+        endLink: isEnd ? _endHandleLink : null,
+        endLocal: isEnd ? endLocal : null,
+      );
+    }
+  }
+
+  void _clearHandles() {
+    _applyHandles(null);
+    _selectionOverlay?.hide();
+    _selectionOverlay?.dispose();
+    _selectionOverlay = null;
+  }
+
+  void _onHandleDragStart(DragStartDetails d, {required bool isStart}) {
+    _selectionOverlay
+        ?.showMagnifier(_magnifierInfo(d.globalPosition, isStart: isStart));
+  }
+
+  void _onHandleDragUpdate(DragUpdateDetails d, {required bool isStart}) {
+    final e = controller.selectionHandleEndpoints();
+    final lineHeight =
+        e == null ? 0.0 : (isStart ? e.startLocal.height : e.endLocal.height);
+    controller.moveSelectionEdgeToGlobal(
+      d.globalPosition - Offset(0, lineHeight / 2),
+      isStart: isStart,
+    );
+    _selectionOverlay
+        ?.updateMagnifier(_magnifierInfo(d.globalPosition, isStart: isStart));
+  }
+
+  void _onHandleDragEnd() {
+    _selectionOverlay?.hideMagnifier();
+    showToolbar();
+  }
+
+  MagnifierInfo _magnifierInfo(Offset gesture, {required bool isStart}) {
+    final e = controller.selectionHandleEndpoints();
+    final caret = e == null
+        ? Rect.fromCenter(center: gesture, width: 0, height: 24)
+        : (isStart ? e.startGlobal : e.endGlobal);
+    final bounds = e == null
+        ? caret
+        : (isStart ? e.startSurface.globalBounds : e.endSurface.globalBounds);
+    return MagnifierInfo(
+      globalGesturePosition: gesture,
+      caretRect: caret,
+      fieldBounds: bounds,
+      currentLineBoundaries: bounds,
+    );
   }
 
   // --- public selection ops ------------------------------------------------

@@ -40,6 +40,13 @@ class MarkdownRenderObject extends RenderBox
 
   final Paint _highlightPaint = Paint()..color = _kSelectionColor;
 
+  // Selection-handle leader layers pushed during paint so native handles
+  // (drawn by the scope's SelectionOverlay) follow the content as it scrolls.
+  LayerLink? _startHandleLink;
+  Offset? _startHandleLocal;
+  LayerLink? _endHandleLink;
+  Offset? _endHandleLocal;
+
   void _onSelectionChange() {
     if (!_disposed) markNeedsPaint();
   }
@@ -102,13 +109,45 @@ class MarkdownRenderObject extends RenderBox
 
   @override
   List<Rect> globalSelectionRects() {
-    final controller = _controller;
-    final id = _documentId;
-    if (controller == null || id == null) return const <Rect>[];
-    final local = _painter.selectionBoxes((s) => controller.rangeFor(id, s));
+    final local = localSelectionRects();
     if (local.isEmpty) return const <Rect>[];
     final origin = localToGlobal(Offset.zero);
     return <Rect>[for (final rect in local) rect.shift(origin)];
+  }
+
+  @override
+  List<Rect> localSelectionRects() {
+    final controller = _controller;
+    final id = _documentId;
+    if (controller == null || id == null) return const <Rect>[];
+    return _painter.selectionBoxes((s) => controller.rangeFor(id, s));
+  }
+
+  @override
+  void setSelectionHandleLayers({
+    LayerLink? startLink,
+    Offset? startLocal,
+    LayerLink? endLink,
+    Offset? endLocal,
+  }) {
+    var changed = false;
+    if (!identical(startLink, _startHandleLink) ||
+        startLocal != _startHandleLocal) {
+      _startHandleLink = startLink;
+      _startHandleLocal = startLocal;
+      changed = true;
+    }
+    if (!identical(endLink, _endHandleLink) || endLocal != _endHandleLocal) {
+      _endHandleLink = endLink;
+      _endHandleLocal = endLocal;
+      changed = true;
+    }
+    if (changed && !_disposed && attached) markNeedsPaint();
+  }
+
+  @override
+  void repaintSelection() {
+    if (!_disposed && attached) markNeedsPaint();
   }
 
   /// Current size of the render box.
@@ -258,8 +297,32 @@ class MarkdownRenderObject extends RenderBox
     _painter.paint(canvas, size);
 
     canvas.restore();
+
+    // Push handle leader layers (empty layers) so the scope's SelectionOverlay
+    // handles follow this content as it scrolls.
+    final startLink = _startHandleLink;
+    final startLocal = _startHandleLocal;
+    if (startLink != null && startLocal != null) {
+      context.pushLayer(
+        LeaderLayer(link: startLink, offset: offset + startLocal),
+        _paintNothing,
+        Offset.zero,
+      );
+    }
+    final endLink = _endHandleLink;
+    final endLocal = _endHandleLocal;
+    if (endLink != null && endLocal != null) {
+      context.pushLayer(
+        LeaderLayer(link: endLink, offset: offset + endLocal),
+        _paintNothing,
+        Offset.zero,
+      );
+    }
   }
 }
+
+/// A no-op paint callback for pushing childless [LeaderLayer]s.
+void _paintNothing(PaintingContext context, Offset offset) {}
 
 /// A painter for rendering markdown content via blocks and spans.
 @meta.internal
