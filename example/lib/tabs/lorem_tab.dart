@@ -125,6 +125,27 @@ class _LoremTabState extends State<LoremTab> {
         child: Text(text, style: Theme.of(context).textTheme.labelLarge),
       );
 
+  /// A custom [contextMenuBuilder] that appends a "Copy LOUD" action to the
+  /// default Copy / Select-all buttons.
+  Widget _loudContextMenu(
+    BuildContext context,
+    MarkdownSelectionScopeState state,
+  ) =>
+      AdaptiveTextSelectionToolbar.buttonItems(
+        anchors: state.contextMenuAnchors,
+        buttonItems: <ContextMenuButtonItem>[
+          ...state.contextMenuButtonItems,
+          ContextMenuButtonItem(
+            label: 'Copy LOUD',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(
+                  text: state.controller.getText().toUpperCase()));
+              state.hideToolbar();
+            },
+          ),
+        ],
+      );
+
   @override
   Widget build(BuildContext context) => Column(
         children: <Widget>[
@@ -134,16 +155,19 @@ class _LoremTabState extends State<LoremTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  _label('Markdown A — its own controller'),
+                  _label('Markdown A — custom toolbar (right-click / '
+                      'long-press for a "Copy LOUD" action)'),
                   MarkdownSelectionScope(
                     controller: _a,
+                    contextMenuBuilder: _loudContextMenu,
                     child: MarkdownWidget(markdown: _docA, documentId: 'A'),
                   ),
                   const Divider(height: 40),
-                  _label('Markdown B — a different controller '
+                  _label('Markdown B — custom selection color '
                       '(selecting one clears the other)'),
                   MarkdownSelectionScope(
                     controller: _b,
+                    selectionColor: Colors.amber.withValues(alpha: 0.4),
                     child: MarkdownWidget(markdown: _docB, documentId: 'B'),
                   ),
                   const Divider(height: 40),
@@ -172,9 +196,14 @@ class _LoremTabState extends State<LoremTab> {
                 child: Row(
                   children: <Widget>[
                     Expanded(
-                      child: Text(_mdActive
-                          ? 'Markdown selection active'
-                          : 'Drag across a Markdown block to select'),
+                      child: Text(
+                        _mdActive
+                            ? 'Selection active — Ctrl/Cmd+C to copy, '
+                                'right-click for the toolbar, Esc to clear'
+                            : 'Drag to select · Ctrl/Cmd+A all · '
+                                'Shift+arrows extend · right-click toolbar',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ),
                     FilledButton.icon(
                       onPressed: _copy,

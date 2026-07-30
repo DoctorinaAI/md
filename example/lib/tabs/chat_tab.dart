@@ -199,8 +199,9 @@ class _SelectionBar extends StatelessWidget {
                       final n = controller.getText().length;
                       return Text(
                         n == 0
-                            ? 'Drag (mouse) or long-press-drag (touch) across '
-                                'messages — even ones scrolled off-screen.'
+                            ? 'Drag / long-press-drag across messages · '
+                                'Ctrl/Cmd+C copy · right-click or long-press '
+                                'for the toolbar · handles on touch'
                             : 'Selected $n characters across messages',
                         style: Theme.of(context).textTheme.bodySmall,
                       );

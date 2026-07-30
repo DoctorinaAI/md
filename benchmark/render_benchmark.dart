@@ -17,8 +17,11 @@
 //   paint_hit      same painter+size: paint again      (cache hit → drawPicture)
 //   stream_append  update(newModel) + relayout         (LLM streaming rebuild)
 //   scroll_frame   wall time per pump during a drag     (widget-level)
-// NOTE: a `selection_drag` tier (asserting zero content-Picture rebuilds, per
-// spike S7) will be added once the selection overlay lands in lib/.
+//   selection_drag highlight repaint over cached Picture (must NOT rebuild it)
+//
+// The selection_drag tier encodes the spike-S7 invariant: a selection drag
+// repaints only the highlight overlay, reusing the cached content Picture, so a
+// drag frame must be far cheaper than a fresh (cache-miss) paint.
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -131,8 +134,32 @@ void main() {
     });
     p.dispose();
 
+    // selection_drag (grow a highlight over the cached content Picture each
+    // frame; the content Picture must be reused, not re-recorded).
+    final selPaint = Paint()..color = const Color(0x552196F3);
+    final selPainter = MarkdownPainter(markdown: large, theme: theme);
+    final selSize = selPainter.layout(maxWidth: _kWidth);
+    _paintOnce(selPainter, selSize); // prime the content cache
+    var off = 0;
+    _results['selection_drag'] = _bench(() {
+      off = (off + 1) % 8;
+      final rec = ui.PictureRecorder();
+      final canvas = Canvas(rec);
+      selPainter.paintHighlight(
+        canvas,
+        (source) => source == 0 ? TextRange(start: 0, end: off) : null,
+        selPaint,
+      );
+      selPainter.paint(canvas, selSize); // cache hit — no new Picture
+      rec.endRecording().dispose();
+    });
+    selPainter.dispose();
+
     // Sanity: the cache must make a hit dramatically cheaper than a miss.
     expect(_results['paint_hit']!, lessThan(_results['paint_miss']!));
+    // A selection-drag frame must not rebuild the content Picture, so it stays
+    // far below a fresh paint (spike S7 invariant).
+    expect(_results['selection_drag']!, lessThan(_results['paint_miss']! / 3));
   });
 
   testWidgets('widget: scroll_frame wall time', (tester) async {

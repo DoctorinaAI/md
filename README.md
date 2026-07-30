@@ -241,8 +241,42 @@ final MarkdownSelectedContent structured = controller.selectedContent();
   when a plain `SelectableText`/`SelectionArea` starts its own selection.
 - **Gestures.** A mouse/trackpad/stylus drag selects; on touch a
   long-press-then-drag selects (so a plain swipe still scrolls the list).
+- **Native handles, magnifier & toolbar.** On touch platforms the selection
+  shows draggable handles and a magnifier (they follow the content as it
+  scrolls, even across widgets); right-click (desktop) or long-press (mobile)
+  shows an adaptive Copy / Select-all toolbar.
+- **Keyboard shortcuts.** When the scope is focused: `Ctrl/Cmd+C` copies,
+  `Ctrl/Cmd+A` selects all, `Shift`+arrows extend (character / word / line /
+  document, plus vertical), `Esc` clears — using the ambient
+  `DefaultTextEditingShortcuts`.
+- **Customizable like `SelectableText`.** `MarkdownSelectionScope` takes
+  `selectionColor`, `contextMenuBuilder`, `magnifierConfiguration`,
+  `selectionControls`, `focusNode`, `enabled` and `onSelectionChanged`; its
+  public `MarkdownSelectionScopeState` exposes `copySelection` / `selectAll` /
+  `clearSelection` / `showToolbar` / `contextMenuButtonItems` /
+  `contextMenuAnchors` for a fully custom menu.
 - **Opt-in & compatible.** A `MarkdownWidget` with no `documentId`/controller is
   inert — existing usage is unchanged.
+
+```dart
+MarkdownSelectionScope(
+  controller: controller,
+  selectionColor: Colors.amber.withOpacity(0.3),
+  onSelectionChanged: (sel) => debugPrint('selection: $sel'),
+  contextMenuBuilder: (context, state) => AdaptiveTextSelectionToolbar.buttonItems(
+    anchors: state.contextMenuAnchors,
+    buttonItems: [
+      ...state.contextMenuButtonItems, // Copy, Select all
+      ContextMenuButtonItem(
+        label: 'Copy LOUD',
+        onPressed: () => Clipboard.setData(
+            ClipboardData(text: state.controller.getText().toUpperCase())),
+      ),
+    ],
+  ),
+  child: /* ... */,
+);
+```
 
 See the runnable **Selection** and **Chat** tabs in `example/`.
 
