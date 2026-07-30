@@ -36,6 +36,16 @@ void main() {
           .blocks
           .firstWhere((b) => b.type == 'table');
       expect(markdownBlockRenderedText(table), 'a\tb\n1\t2');
+
+      final list = Markdown.fromString('- one\n- two\n  - nested\n- three')
+          .blocks
+          .firstWhere((b) => b.type == 'list');
+      expect(markdownBlockRenderedText(list), 'one\ntwo\nnested\nthree');
+
+      final tasks = Markdown.fromString('- [x] done\n- [ ] todo')
+          .blocks
+          .firstWhere((b) => b.type == 'list');
+      expect(markdownBlockRenderedText(tasks), 'done\ntodo');
     });
 
     test('cross-document extraction with default formatter', () {

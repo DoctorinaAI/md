@@ -226,6 +226,9 @@ final String text = controller.getText();                 // default formatter
 final MarkdownSelectedContent structured = controller.selectedContent();
 ```
 
+- **Every block is selectable.** Paragraphs, headings, quotes, code, alerts,
+  lists and tables — a drag can start or end inside a list item or table cell,
+  and copied text preserves the list `\n` / table `\t` separators.
 - **Get the text your way.** `getText()` uses the default
   `MarkdownPlainTextFormatter` (configurable block/document separators); pass a
   custom `MarkdownSelectionFormatter` for e.g. "Copy as Markdown".

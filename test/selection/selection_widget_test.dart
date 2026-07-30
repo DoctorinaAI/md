@@ -264,6 +264,83 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(controller.getText(), 'Real content here');
     });
+
+    testWidgets('drag selects the cells of a table', (tester) async {
+      final md =
+          Markdown.fromString('| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |');
+      final table = md.blocks.firstWhere((b) => b.type == 'table');
+      final controller = MarkdownSelectionController()
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+
+      await tester.pumpWidget(_wrap(
+        controller,
+        const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 400, child: _Doc('d')),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+      final br = tester.getBottomRight(find.byType(MarkdownWidget));
+      await _mouseDrag(
+          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+
+      expect(controller.getText(), markdownBlockRenderedText(table));
+      expect(controller.getText(), 'A\tB\n1\t2\n3\t4');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('drag selects the items of a list', (tester) async {
+      final md = Markdown.fromString('- alpha\n- beta\n- gamma');
+      final controller = MarkdownSelectionController()
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+
+      await tester.pumpWidget(_wrap(
+        controller,
+        const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 400, child: _Doc('d')),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+      final br = tester.getBottomRight(find.byType(MarkdownWidget));
+      await _mouseDrag(
+          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+
+      expect(controller.getText(), 'alpha\nbeta\ngamma');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('selection spanning a table includes its cells',
+        (tester) async {
+      final md = Markdown.fromString(
+          'Intro line\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nOutro line');
+      final controller = MarkdownSelectionController()
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+
+      await tester.pumpWidget(_wrap(
+        controller,
+        const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 400, child: _Doc('d')),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+      final br = tester.getBottomRight(find.byType(MarkdownWidget));
+      await _mouseDrag(
+          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+
+      expect(controller.getText(), 'Intro line\nA\tB\n1\t2\nOutro line');
+      expect(tester.takeException(), isNull);
+    });
   });
 }
 

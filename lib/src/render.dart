@@ -810,6 +810,97 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
       .toList(growable: false);
 }
 
+/// One selectable text run inside a multi-painter block (a list item or a table
+/// cell): the [painter] that owns its glyphs, the block-local [origin] where it
+/// is painted, and the [textStart] index of its text within the block's
+/// [markdownBlockRenderedText] linearization.
+@meta.internal
+class SelectableFragment {
+  /// Creates a fragment for [painter] painted at [origin], whose text begins at
+  /// [textStart] in the block's rendered text.
+  SelectableFragment(this.painter, this.origin, this.textStart);
+
+  /// The text painter that owns this run's glyphs.
+  final TextPainter painter;
+
+  /// Block-local top-left where [painter] is painted.
+  final Offset origin;
+
+  /// Index of this run's first character in the block's rendered text.
+  final int textStart;
+
+  /// Length of this run's text.
+  int get length => painter.plainText.length;
+
+  /// One-past-the-last index of this run's text in the block's rendered text.
+  int get textEnd => textStart + length;
+}
+
+/// Provides [SelectableBlockPainter] for a block whose text is spread across
+/// several [TextPainter]s painted at different origins (lists, tables).
+///
+/// [fragments] must be listed in the same order their text appears in
+/// [markdownBlockRenderedText], with each fragment's `textStart` matching that
+/// linearization (the gaps between fragments are the `\n`/`\t` separators, which
+/// have no glyphs of their own). [renderedText] must equal that linearization.
+mixin MultiPainterSelectable implements SelectableBlockPainter {
+  /// The selectable runs of this block, in rendered-text order. Rebuilt on each
+  /// [BlockPainter.layout].
+  List<SelectableFragment> get fragments;
+
+  @override
+  int offsetForLocalPosition(Offset local) {
+    final frags = fragments;
+    if (frags.isEmpty) return 0;
+    SelectableFragment? best;
+    var bestDistance = double.infinity;
+    for (final fragment in frags) {
+      final rect = fragment.origin & fragment.painter.size;
+      final distance = _distanceToRect(local, rect);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = fragment;
+        if (distance == 0) break;
+      }
+    }
+    final fragment = best!;
+    final inner =
+        fragment.painter.getPositionForOffset(local - fragment.origin).offset;
+    return fragment.textStart + inner.clamp(0, fragment.length);
+  }
+
+  @override
+  List<Rect> boxesForRange(int start, int end) {
+    final out = <Rect>[];
+    for (final fragment in fragments) {
+      final localStart = start.clamp(fragment.textStart, fragment.textEnd) -
+          fragment.textStart;
+      final localEnd =
+          end.clamp(fragment.textStart, fragment.textEnd) - fragment.textStart;
+      if (localEnd <= localStart) continue;
+      final boxes = fragment.painter.getBoxesForSelection(
+          TextSelection(baseOffset: localStart, extentOffset: localEnd));
+      for (final box in boxes) {
+        out.add(box.toRect().shift(fragment.origin));
+      }
+    }
+    return out;
+  }
+}
+
+/// Shortest distance from [point] to [rect] (0 when the point is inside).
+double _distanceToRect(Offset point, Rect rect) {
+  final dx = point.dx < rect.left
+      ? rect.left - point.dx
+      : (point.dx > rect.right ? point.dx - rect.right : 0.0);
+  final dy = point.dy < rect.top
+      ? rect.top - point.dy
+      : (point.dy > rect.bottom ? point.dy - rect.bottom : 0.0);
+  if (dx == 0) return dy;
+  if (dy == 0) return dx;
+  return math.sqrt(dx * dx + dy * dy);
+}
+
 @meta.internal
 mixin ParagraphGestureHandler {
   /// Handle tap events with a [TextPainter].
@@ -1272,7 +1363,9 @@ class _ListItemMetrics {
 
 /// A class for painting a list block in markdown.
 @meta.internal
-class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
+class BlockPainter$List
+    with ParagraphGestureHandler, MultiPainterSelectable
+    implements BlockPainter {
   BlockPainter$List({
     required List<MD$ListItem> items,
     required this.theme,
@@ -1282,6 +1375,14 @@ class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
   final MarkdownThemeData theme;
   final List<MD$ListItem> _items;
   final List<_ListItemMetrics> _painters;
+
+  @override
+  List<SelectableFragment> get fragments => _fragments;
+  List<SelectableFragment> _fragments = const <SelectableFragment>[];
+
+  @override
+  String get renderedText => _renderedText;
+  String _renderedText = '';
 
   // Indentation for the entire list block.
   static const double _baseIndent = 8.0;
@@ -1383,7 +1484,23 @@ class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
     }
 
     layoutItems(_items, 0);
+    _rebuildFragments();
     return _size = Size(maxContentWidth, currentHeight);
+  }
+
+  /// Rebuilds the selectable fragments from the laid-out item metrics. Items
+  /// (depth-first, matching `markdownBlockRenderedText`) are joined by `\n`.
+  void _rebuildFragments() {
+    final frags = <SelectableFragment>[];
+    var textPos = 0;
+    for (final metrics in _painters) {
+      if (frags.isNotEmpty) textPos += 1; // the '\n' item separator
+      final origin = metrics.offset + Offset(metrics.bulletPainter.width, 0);
+      frags.add(SelectableFragment(metrics.contentPainter, origin, textPos));
+      textPos += metrics.contentPainter.plainText.length;
+    }
+    _fragments = frags;
+    _renderedText = frags.map((f) => f.painter.plainText).join('\n');
   }
 
   @override
@@ -1404,6 +1521,7 @@ class BlockPainter$List with ParagraphGestureHandler implements BlockPainter {
       metrics.dispose();
     }
     _painters.clear();
+    _fragments = const <SelectableFragment>[];
   }
 }
 
@@ -1583,7 +1701,9 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
 
 /// A class for painting a table block in markdown.
 @meta.internal
-class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
+class BlockPainter$Table
+    with ParagraphGestureHandler, MultiPainterSelectable
+    implements BlockPainter {
   BlockPainter$Table({
     required this.header,
     required this.rows,
@@ -1650,6 +1770,14 @@ class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
   Size _size = Size.zero;
 
   List<List<TextPainter>> _cellPainters = const [];
+
+  @override
+  List<SelectableFragment> get fragments => _fragments;
+  List<SelectableFragment> _fragments = const <SelectableFragment>[];
+
+  @override
+  String get renderedText => _renderedText;
+  String _renderedText = '';
 
   /// Last span hit by the tap down event.
   TextSpan? _lastSpan;
@@ -1840,7 +1968,39 @@ class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
     }
     _borderPoints = points;
 
+    _rebuildFragments(allRows);
+
     return _size = Size(totalWidth, totalHeight);
+  }
+
+  /// Rebuilds the selectable fragments (row-major: cells joined by `\t`, rows by
+  /// `\n`) so they line up with `markdownBlockRenderedText`. Only the cells that
+  /// exist in the source row contribute text, matching the painted cells.
+  void _rebuildFragments(List<MD$TableRow> allRows) {
+    final frags = <SelectableFragment>[];
+    final text = StringBuffer();
+    var rowTop = 0.0;
+    for (var r = 0; r < allRows.length; r++) {
+      if (r > 0) text.write('\n');
+      final cells = allRows[r].cells;
+      var colLeft = 0.0;
+      for (var c = 0; c < columns; c++) {
+        if (c < cells.length) {
+          if (c > 0) text.write('\t');
+          final painter = _cellPainters[r][c];
+          final verticalPadding = (_rowHeights[r] - painter.height) / 2;
+          final horizontalPadding = _cellHorizontalPadding(r, c, painter.width);
+          final origin =
+              Offset(colLeft + horizontalPadding, rowTop + verticalPadding);
+          frags.add(SelectableFragment(painter, origin, text.length));
+          text.write(painter.plainText);
+        }
+        colLeft += _columnWidths[c];
+      }
+      rowTop += _rowHeights[r];
+    }
+    _fragments = frags;
+    _renderedText = text.toString();
   }
 
   @override
@@ -1913,6 +2073,7 @@ class BlockPainter$Table with ParagraphGestureHandler implements BlockPainter {
       }
     }
     _cellPainters = const [];
+    _fragments = const <SelectableFragment>[];
   }
 
   /// Helper function to distribute widths among columns, respecting minimums.

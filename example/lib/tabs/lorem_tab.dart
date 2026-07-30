@@ -3,24 +3,49 @@ import 'package:flutter/services.dart';
 import 'package:flutter_md/flutter_md.dart';
 
 const String _loremMdA = '''
-# Lorem ipsum
+# Cross-block selection
 
-**Lorem ipsum** dolor sit amet, consectetur _adipiscing_ elit. Sed do eiusmod
-tempor incididunt ut labore et dolore magna aliqua, drag across these blocks.
+**Lorem ipsum** dolor sit amet, consectetur _adipiscing_ elit. Drag from this
+heading straight down through every block below — headings, quotes, lists,
+tables and code all join into one selection with sensible separators.
 
-> Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.
+> Ut enim ad minim veniam, quis nostrud exercitation `ullamco` laboris nisi ut
+> aliquip ex ea commodo consequat.
+
+A nested list:
 
 - alpha item
+    - alpha one
+    - alpha two
 - beta item
 - gamma item
-''';
+
+And a table — its cells are selectable too:
+
+| Lang   | Typing   | Year |
+| ------ | -------- | ---: |
+| Dart   | static   | 2011 |
+| Python | dynamic  | 1991 |
+| Rust   | static   | 2010 |
+
+```dart
+void main() => print('selectable code block');
+```
+
+> [!TIP]
+> Selecting Markdown clears the plain `SelectableText` below, and vice-versa.''';
 
 const String _loremMdB = '''
 ## A different document
 
 Duis aute irure dolor in `reprehenderit` in voluptate velit esse cillum dolore
-eu fugiat nulla pariatur — this block belongs to a **second** controller.
-''';
+eu fugiat nulla pariatur — this block belongs to a **second** controller, so
+selecting here clears the selection above.
+
+| Column A | Column B |
+| -------- | -------- |
+| one      | two      |
+| three    | four     |''';
 
 const String _loremPlain =
     'This is a plain SelectableText (not Markdown). Selecting here clears the '

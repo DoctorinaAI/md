@@ -13,9 +13,17 @@
 - **ADDED**: `MarkdownWidget` gains optional `documentId` and `controller`
   parameters (resolved from the ambient scope). Backward compatible: a widget
   with no `documentId` is inert.
+- **ADDED**: Lists and tables are now interactively selectable. A new
+  `MultiPainterSelectable` mixin (+ `SelectableFragment`) maps pointer positions
+  and highlight boxes across the many `TextPainter`s of a list's items or a
+  table's cells, so a drag can start or end inside a list item or table cell and
+  the copied text keeps the `\n` / `\t` separators of `markdownBlockRenderedText`.
 - **CHANGED**: `MarkdownWidget`'s render object now draws the selection
   highlight outside the cached content `Picture` and becomes a repaint boundary
   when selectable, so selection/drag repaints do not rebuild the glyph cache.
+- **EXAMPLE**: Reworked the demo tabs — a longer, richer chat (tables, code,
+  nested/task lists, alerts, math, token-by-token streaming with a typing
+  indicator, Select-all/Clear) and a Selection tab that spans every block type.
 
 ## 0.1.0
 
