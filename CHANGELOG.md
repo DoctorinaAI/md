@@ -1,5 +1,10 @@
 ## 0.2.0
 
+> **Upgrading from 0.0.x?** See the
+> [migration guide](docs/migration/0.0.x-to-0.2.x.md). 0.2.x is almost entirely
+> backward compatible — the only required code change is a new `alert` branch
+> for direct `MD$Block.map` / `switch` callers.
+
 - **ADDED**: Cross-block and cross-widget text selection. A
   `MarkdownSelectionController` anchors the selection on the immutable model, so
   it spans multiple blocks and multiple `MarkdownWidget`s and survives list

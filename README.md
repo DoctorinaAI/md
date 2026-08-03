@@ -192,6 +192,10 @@ Then run:
 flutter pub get
 ```
 
+> **Upgrading from 0.0.x?** See the
+> [Migration guide: 0.0.x → 0.2.x](docs/migration/0.0.x-to-0.2.x.md). The upgrade
+> is almost entirely backward compatible — most apps need no code changes.
+
 ## ✂️ Text Selection
 
 Selection is anchored on the immutable Markdown model, not on the render
