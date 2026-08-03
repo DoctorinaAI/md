@@ -10,7 +10,8 @@ import 'tabs/lorem_tab.dart';
 
 void main() => runZonedGuarded<void>(
       () => runApp(ThemeModel(
-          notifier: ValueNotifier<ThemeMode>(ThemeMode.dark), child: const App())),
+          notifier: ValueNotifier<ThemeMode>(ThemeMode.dark),
+          child: const App())),
       (e, s) => print(e),
     );
 
@@ -61,7 +62,8 @@ class ThemeModel extends InheritedNotifier<ValueNotifier<ThemeMode>> {
   /// The state from the closest instance of this class
   /// that encloses the given context, if any.
   /// e.g. `Theme.maybeOf(context)`.
-  static ValueNotifier<ThemeMode>? maybeOf(BuildContext context, {bool listen = true}) =>
+  static ValueNotifier<ThemeMode>? maybeOf(BuildContext context,
+          {bool listen = true}) =>
       listen
           ? context.dependOnInheritedWidgetOfExactType<ThemeModel>()?.notifier
           : context.getInheritedWidgetOfExactType<ThemeModel>()?.notifier;
@@ -75,7 +77,8 @@ class ThemeModel extends InheritedNotifier<ValueNotifier<ThemeMode>> {
   /// The state from the closest instance of this class
   /// that encloses the given context.
   /// e.g. `Theme.of(context)`
-  static ValueNotifier<ThemeMode> of(BuildContext context, {bool listen = true}) =>
+  static ValueNotifier<ThemeMode> of(BuildContext context,
+          {bool listen = true}) =>
       maybeOf(context, listen: listen) ?? _notFoundInheritedWidgetOfExactType();
 
   @override
@@ -99,7 +102,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 /// State for widget HomeScreen.
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: 3, vsync: this);
 
   @override
@@ -117,7 +121,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Switch.adaptive(
               value: ThemeModel.of(context).value == ThemeMode.dark,
               onChanged: (value) {
-                ThemeModel.of(context).value = value ? ThemeMode.dark : ThemeMode.light;
+                ThemeModel.of(context).value =
+                    value ? ThemeMode.dark : ThemeMode.light;
               },
             ),
           ],
@@ -167,7 +172,8 @@ class _EditorTabState extends State<EditorTab> {
     super.initState();
     // `inlineMath` is opt-in (disabled by default); enabled here to showcase
     // the `$...$` LaTeX conversion.
-    final initialMarkdown = Markdown.fromString(_inputController.text, inlineMath: true);
+    final initialMarkdown =
+        Markdown.fromString(_inputController.text, inlineMath: true);
     _outputController.value = initialMarkdown;
     _inputController.addListener(_onInputChanged);
   }
@@ -240,7 +246,8 @@ class _EditorTabState extends State<EditorTab> {
                               icon: const Icon(
                                 Icons.refresh,
                               ),
-                              onPressed: () => _inputController.text = _markdownExample,
+                              onPressed: () =>
+                                  _inputController.text = _markdownExample,
                             ),
                           ],
                         ),
@@ -280,14 +287,16 @@ class _HomeScreenLayoutDelegate extends MultiChildLayoutDelegate {
   void performLayout(Size size) {
     if (size.width >= size.height) {
       final width = size.width / 2;
-      final constraints = BoxConstraints.tightFor(width: width, height: size.height);
+      final constraints =
+          BoxConstraints.tightFor(width: width, height: size.height);
       layoutChild(0, constraints);
       layoutChild(1, constraints);
       positionChild(0, Offset.zero);
       positionChild(1, Offset(width, 0));
     } else {
       final height = size.height / 2;
-      final constraints = BoxConstraints.tightFor(width: size.width, height: height);
+      final constraints =
+          BoxConstraints.tightFor(width: size.width, height: height);
       layoutChild(0, constraints);
       layoutChild(1, constraints);
       positionChild(0, Offset.zero);

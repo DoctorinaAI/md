@@ -38,7 +38,8 @@ abstract interface class MdSurface {
 }
 
 class MdController extends ChangeNotifier {
-  MdController(this.docs); // app-supplied, ordered, ALL messages (mounted or not)
+  MdController(
+      this.docs); // app-supplied, ordered, ALL messages (mounted or not)
   final List<(Object id, String text)> docs;
 
   final Map<Object, MdSurface> _surfaces = <Object, MdSurface>{};
@@ -98,7 +99,8 @@ class MdController extends ChangeNotifier {
       final text = docs[d].$2;
       final from = d == start ? a.offset : 0;
       final to = d == end ? b.offset : text.length;
-      chunks.add(text.substring(from.clamp(0, text.length), to.clamp(0, text.length)));
+      chunks.add(
+          text.substring(from.clamp(0, text.length), to.clamp(0, text.length)));
     }
     return chunks.join(docSep);
   }
@@ -114,7 +116,8 @@ class _Scope extends InheritedWidget {
 }
 
 class MarkdownScope extends StatelessWidget {
-  const MarkdownScope({required this.controller, required this.child, super.key});
+  const MarkdownScope(
+      {required this.controller, required this.child, super.key});
   final MdController controller;
   final Widget child;
 
@@ -227,7 +230,8 @@ void main() {
     // Only the first few messages are mounted (surfaces). Anchor the selection
     // across m0..m1 by hit-testing their mounted surfaces — exactly what the
     // scope gesture layer does on a real drag.
-    final p0 = tester.getTopLeft(find.byType(MdMessage).first) + const Offset(1, 3);
+    final p0 =
+        tester.getTopLeft(find.byType(MdMessage).first) + const Offset(1, 3);
     final m1 = find.byWidgetPredicate((w) => w is MdMessage && w.docId == 'm1');
     final p1 = tester.getBottomRight(m1) - const Offset(1, 3);
     controller.startAt(p0);
@@ -241,8 +245,8 @@ void main() {
     // Scroll so m0 is disposed.
     scroll.jumpTo(80.0 * 6);
     await tester.pumpAndSettle();
-    expect(
-        find.byWidgetPredicate((w) => w is MdMessage && w.docId == 'm0'), findsNothing);
+    expect(find.byWidgetPredicate((w) => w is MdMessage && w.docId == 'm0'),
+        findsNothing);
     expect(controller.mountedDocIds, isNot(contains('m0')),
         reason: 'm0 surface unregistered on disposal');
 

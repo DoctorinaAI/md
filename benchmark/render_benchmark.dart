@@ -123,7 +123,8 @@ void main() {
     hitPainter.dispose();
 
     // stream_append (toggle model so update() always sees a change)
-    final p = MarkdownPainter(markdown: large, theme: theme)..layout(maxWidth: _kWidth);
+    final p = MarkdownPainter(markdown: large, theme: theme)
+      ..layout(maxWidth: _kWidth);
     var flip = false;
     _results['stream_append'] = _bench(() {
       flip = !flip;

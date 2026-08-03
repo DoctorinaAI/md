@@ -68,7 +68,8 @@ void main(List<String> args) {
 }
 
 /// Returns the minimum per-op time in microseconds for parsing [input].
-double _bench(String input, {int warmupMs = 200, int batches = 25, int minBatchMs = 8}) {
+double _bench(String input,
+    {int warmupMs = 200, int batches = 25, int minBatchMs = 8}) {
   // Warmup to trigger JIT compilation / reach steady state.
   final warmupSw = Stopwatch()..start();
   while (warmupSw.elapsedMilliseconds < warmupMs) {

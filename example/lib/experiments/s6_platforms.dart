@@ -178,7 +178,8 @@ class MdSelectionController extends ChangeNotifier {
       final text = docs[d].text;
       final from = d == start ? a.offset : 0;
       final to = d == end ? b.offset : text.length;
-      chunks.add(text.substring(from.clamp(0, text.length), to.clamp(0, text.length)));
+      chunks.add(
+          text.substring(from.clamp(0, text.length), to.clamp(0, text.length)));
     }
     return chunks.join(docSep);
   }
@@ -233,7 +234,8 @@ class MarkdownSelectionScope extends StatelessWidget {
             () => LongPressGestureRecognizer(),
             (r) => r
               ..onLongPressStart = ((d) => controller.startAt(d.globalPosition))
-              ..onLongPressMoveUpdate = ((d) => controller.extendTo(d.globalPosition)),
+              ..onLongPressMoveUpdate =
+                  ((d) => controller.extendTo(d.globalPosition)),
           ),
         },
         child: child,
@@ -269,7 +271,9 @@ class _MdMessageBox extends RenderBox implements MdSurface {
             text: doc.text,
             style: TextStyle(
               fontSize: 16,
-              color: doc.isLink ? const Color(0xFF1565C0) : const Color(0xFF111111),
+              color: doc.isLink
+                  ? const Color(0xFF1565C0)
+                  : const Color(0xFF111111),
               decoration: doc.isLink ? TextDecoration.underline : null,
             ),
           ),

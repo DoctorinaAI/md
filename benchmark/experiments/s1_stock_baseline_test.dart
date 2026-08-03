@@ -39,21 +39,25 @@ void main() {
     // Mouse-drag select from the very start of "Alpha" to the very end of
     // "Charlie" — i.e. everything.
     final start = tester.getTopLeft(find.text('Alpha')) + const Offset(1, 3);
-    final end = tester.getBottomRight(find.text('Charlie')) - const Offset(1, 3);
-    final gesture = await tester.startGesture(start, kind: PointerDeviceKind.mouse);
+    final end =
+        tester.getBottomRight(find.text('Charlie')) - const Offset(1, 3);
+    final gesture =
+        await tester.startGesture(start, kind: PointerDeviceKind.mouse);
     await tester.pump(const Duration(milliseconds: 200));
     await gesture.moveTo(end);
     await tester.pump(const Duration(milliseconds: 200));
     await gesture.up();
     await tester.pumpAndSettle();
 
-    debugPrint('S1.1 captured plainText = ${captured!.replaceAll('\n', r'\n')}');
+    debugPrint(
+        'S1.1 captured plainText = ${captured!.replaceAll('\n', r'\n')}');
 
     // The defect: the three fragments are glued with no separator between them.
     expect(captured, isNotNull);
     expect(captured, contains('Bravo'));
     expect(captured, isNot(contains('\n')),
-        reason: 'DEFECT CONFIRMED if this passes: no separators inserted between '
+        reason:
+            'DEFECT CONFIRMED if this passes: no separators inserted between '
             'selectables — "Alpha", "Bravo", "Charlie" are glued.');
     // Concretely, the whole selection is the bare concatenation.
     expect(captured, 'AlphaBravoCharlie');
@@ -91,7 +95,8 @@ void main() {
     // Select across Item0 and Item1 (both on screen).
     final start = tester.getTopLeft(find.text('Item0')) + const Offset(1, 3);
     final end = tester.getBottomRight(find.text('Item1')) - const Offset(1, 3);
-    final gesture = await tester.startGesture(start, kind: PointerDeviceKind.mouse);
+    final gesture =
+        await tester.startGesture(start, kind: PointerDeviceKind.mouse);
     await tester.pump(const Duration(milliseconds: 200));
     await gesture.moveTo(end);
     await tester.pump(const Duration(milliseconds: 200));
@@ -105,7 +110,8 @@ void main() {
     // Scroll far so Item0 (and Item1) are disposed.
     controller.jumpTo(itemExtent * 20);
     await tester.pumpAndSettle();
-    expect(find.text('Item0'), findsNothing, reason: 'Item0 should be disposed');
+    expect(find.text('Item0'), findsNothing,
+        reason: 'Item0 should be disposed');
 
     debugPrint('S1.2 after scroll  = ${captured?.replaceAll('\n', r'\n')}');
     // FINDING: disposing the selectable does NOT re-fire onSelectionChanged, so
@@ -116,6 +122,7 @@ void main() {
     // app's perspective. (S2 proves at the delegate level that the LIVE
     // getSelectedContent() actually drops the disposed text.)
     expect(captured, equals(beforeScroll),
-        reason: 'onSelectionChanged did not re-fire on disposal → stale value.');
+        reason:
+            'onSelectionChanged did not re-fire on disposal → stale value.');
   });
 }

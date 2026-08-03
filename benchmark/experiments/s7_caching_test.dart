@@ -81,7 +81,8 @@ class CachingBox extends RenderBox {
     canvas.translate(offset.dx, offset.dy);
     // Dynamic overlay drawn fresh each paint, OUTSIDE the cached Picture.
     if (_selectionRect != null) {
-      canvas.drawRect(_selectionRect!, Paint()..color = const Color(0x552196F3));
+      canvas.drawRect(
+          _selectionRect!, Paint()..color = const Color(0x552196F3));
     }
     canvas.drawPicture(_content!);
     canvas.restore();
@@ -121,7 +122,9 @@ void main() {
           child: StatefulBuilder(builder: (_, setState) {
             setOuter = setState;
             return CacheWidget(
-                text: 'Selectable content here', revision: 0, selectionRect: sel);
+                text: 'Selectable content here',
+                revision: 0,
+                selectionRect: sel);
           }),
         ),
       ),
@@ -141,11 +144,13 @@ void main() {
     debugPrint('S7.1 contentRebuilds=${box.contentRebuilds} '
         'paints=${box.paintCount}');
     // The overlay redrew every frame (paints grew) but the Picture never rebuilt.
-    expect(box.contentRebuilds, 1, reason: 'content Picture reused across drag');
+    expect(box.contentRebuilds, 1,
+        reason: 'content Picture reused across drag');
     expect(box.paintCount, greaterThan(paintsAfterFirst));
   });
 
-  testWidgets('S7.2 content or size change DOES rebuild the Picture', (tester) async {
+  testWidgets('S7.2 content or size change DOES rebuild the Picture',
+      (tester) async {
     var text = 'first';
     var rev = 0;
     late StateSetter setOuter;

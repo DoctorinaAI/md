@@ -62,7 +62,8 @@ void main() => group('Edge cases & robustness', () {
 
         test('emphasis works around unicode content', () {
           final md = markdownDecoder.convert('**жирный**');
-          expect((md.blocks.single as MD$Paragraph).spans.single.style, MD$Style.bold);
+          expect((md.blocks.single as MD$Paragraph).spans.single.style,
+              MD$Style.bold);
         });
       });
 
@@ -103,7 +104,8 @@ void main() => group('Edge cases & robustness', () {
         });
 
         test('a lone hash line with text after space is a heading', () {
-          expect(markdownDecoder.convert('# ok').blocks.single, isA<MD$Heading>());
+          expect(
+              markdownDecoder.convert('# ok').blocks.single, isA<MD$Heading>());
         });
       });
     });

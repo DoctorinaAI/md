@@ -15,15 +15,16 @@ void main() => group('GFM extensions', () {
             'CAUTION': MD$AlertType.caution,
           };
           for (final entry in cases.entries) {
-            final md =
-                markdownDecoder.convert('> [!${entry.key}]\n> Body of the alert.');
+            final md = markdownDecoder
+                .convert('> [!${entry.key}]\n> Body of the alert.');
             expect(md.blocks, hasLength(1),
                 reason: 'alert ${entry.key} is a single block');
             expect(
               md.blocks.single,
               isA<MD$Alert>()
                   .having((a) => a.alert, 'alert', entry.value)
-                  .having((a) => _spanText(a.spans), 'body', 'Body of the alert.'),
+                  .having(
+                      (a) => _spanText(a.spans), 'body', 'Body of the alert.'),
             );
           }
         });
@@ -103,21 +104,24 @@ void main() => group('GFM extensions', () {
 
         test('checked task item (lowercase and uppercase x)', () {
           for (final input in ['- [x] done', '- [X] done']) {
-            final list = markdownDecoder.convert(input).blocks.single as MD$List;
+            final list =
+                markdownDecoder.convert(input).blocks.single as MD$List;
             expect(list.items.single.checked, isTrue);
             expect(list.items.single.text, 'done');
           }
         });
 
         test('empty brackets are not a task item', () {
-          final list = markdownDecoder.convert('- [] literal').blocks.single as MD$List;
+          final list =
+              markdownDecoder.convert('- [] literal').blocks.single as MD$List;
           expect(list.items.single.checked, isNull);
           expect(list.items.single.isTask, isFalse);
           expect(list.items.single.text, '[] literal');
         });
 
         test('checkbox with no label yields empty text', () {
-          final list = markdownDecoder.convert('- [ ]').blocks.single as MD$List;
+          final list =
+              markdownDecoder.convert('- [ ]').blocks.single as MD$List;
           expect(list.items.single.checked, isFalse);
           expect(list.items.single.text, isEmpty);
         });
@@ -127,7 +131,8 @@ void main() => group('GFM extensions', () {
               .convert('- [ ] a\n- [x] b\n- normal')
               .blocks
               .single as MD$List;
-          expect(list.items.map((i) => i.checked).toList(), <bool?>[false, true, null]);
+          expect(list.items.map((i) => i.checked).toList(),
+              <bool?>[false, true, null]);
         });
 
         test('nested task items keep their state', () {
@@ -145,37 +150,46 @@ void main() => group('GFM extensions', () {
               .convert('1. [x] first\n2. [ ] second')
               .blocks
               .single as MD$List;
-          expect(list.items.map((i) => i.checked).toList(), <bool?>[true, false]);
+          expect(
+              list.items.map((i) => i.checked).toList(), <bool?>[true, false]);
         });
       });
 
       group('Thematic breaks', () {
         for (final input in ['---', '***', '___', '- - -', '* * *', '_ _ _']) {
           test('"$input" is a divider', () {
-            expect(markdownDecoder.convert(input).blocks.single, isA<MD$Divider>());
+            expect(markdownDecoder.convert(input).blocks.single,
+                isA<MD$Divider>());
           });
         }
 
         test('four or more markers still form a divider', () {
-          expect(markdownDecoder.convert('----').blocks.single, isA<MD$Divider>());
-          expect(markdownDecoder.convert('**********').blocks.single, isA<MD$Divider>());
+          expect(
+              markdownDecoder.convert('----').blocks.single, isA<MD$Divider>());
+          expect(markdownDecoder.convert('**********').blocks.single,
+              isA<MD$Divider>());
         });
 
         test('marker followed by text is NOT a divider', () {
-          expect(markdownDecoder.convert('----text').blocks.single, isA<MD$Paragraph>());
+          expect(markdownDecoder.convert('----text').blocks.single,
+              isA<MD$Paragraph>());
         });
 
         test('fewer than three markers is NOT a divider', () {
-          expect(markdownDecoder.convert('--').blocks.single, isA<MD$Paragraph>());
-          expect(markdownDecoder.convert('**').blocks.single, isA<MD$Paragraph>());
+          expect(
+              markdownDecoder.convert('--').blocks.single, isA<MD$Paragraph>());
+          expect(
+              markdownDecoder.convert('**').blocks.single, isA<MD$Paragraph>());
         });
 
         test('mixed markers are NOT a divider', () {
-          expect(markdownDecoder.convert('-*-').blocks.single, isA<MD$Paragraph>());
+          expect(markdownDecoder.convert('-*-').blocks.single,
+              isA<MD$Paragraph>());
         });
 
         test('up to three leading spaces are allowed', () {
-          expect(markdownDecoder.convert('   ---').blocks.single, isA<MD$Divider>());
+          expect(markdownDecoder.convert('   ---').blocks.single,
+              isA<MD$Divider>());
         });
       });
 
@@ -195,14 +209,17 @@ void main() => group('GFM extensions', () {
         });
 
         test('plain dashes yield no alignment', () {
-          final table = markdownDecoder.convert('|a|b|\n|---|---|\n|1|2|').blocks.single
-              as MD$Table;
-          expect(table.alignments, everyElement(equals(MD$TableColumnAlign.none)));
+          final table = markdownDecoder
+              .convert('|a|b|\n|---|---|\n|1|2|')
+              .blocks
+              .single as MD$Table;
+          expect(
+              table.alignments, everyElement(equals(MD$TableColumnAlign.none)));
         });
 
         test('alignmentFor is safe for out-of-range indices', () {
-          final table =
-              markdownDecoder.convert('|a|\n|:-:|\n|1|').blocks.single as MD$Table;
+          final table = markdownDecoder.convert('|a|\n|:-:|\n|1|').blocks.single
+              as MD$Table;
           expect(table.alignmentFor(5), MD$TableColumnAlign.none);
           expect(table.alignmentFor(-1), MD$TableColumnAlign.none);
         });

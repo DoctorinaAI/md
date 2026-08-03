@@ -697,9 +697,10 @@ final class MD$Table extends MD$Block {
 
   /// Returns the alignment for the given column [index],
   /// defaulting to [MD$TableColumnAlign.none] when unspecified.
-  MD$TableColumnAlign alignmentFor(int index) => index >= 0 && index < alignments.length
-      ? alignments[index]
-      : MD$TableColumnAlign.none;
+  MD$TableColumnAlign alignmentFor(int index) =>
+      index >= 0 && index < alignments.length
+          ? alignments[index]
+          : MD$TableColumnAlign.none;
 
   @override
   T map<T>({

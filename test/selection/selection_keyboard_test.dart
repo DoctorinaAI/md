@@ -38,7 +38,8 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       final md = Markdown.fromString('Hello keyboard world');
       final controller = MarkdownSelectionController()
-        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
       final focus = FocusNode();
       addTearDown(focus.dispose);
 
@@ -64,7 +65,8 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       final md = Markdown.fromString('Hello keyboard world');
       final controller = MarkdownSelectionController()
-        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
         ..selectAll();
       final focus = FocusNode();
       addTearDown(focus.dispose);
@@ -86,11 +88,13 @@ void main() {
       expect(controller.selection, isNull);
     });
 
-    testWidgets('Shift+ArrowRight extends the selection by a character', (tester) async {
+    testWidgets('Shift+ArrowRight extends the selection by a character',
+        (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       final md = Markdown.fromString('Hello');
       final controller = MarkdownSelectionController()
-        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
         ..selection = const MarkdownSelection.collapsed(
             MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 0));
       final focus = FocusNode();
@@ -119,7 +123,8 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       final md = Markdown.fromString('Copy this text');
       final controller = MarkdownSelectionController()
-        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
         ..selectAll();
       final focus = FocusNode();
       addTearDown(focus.dispose);
@@ -156,11 +161,13 @@ void main() {
   });
 
   group('context toolbar', () {
-    testWidgets('right-click over a selection shows a Copy button', (tester) async {
+    testWidgets('right-click over a selection shows a Copy button',
+        (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       final md = Markdown.fromString('Toolbar target text');
       final controller = MarkdownSelectionController()
-        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
         ..selectAll();
 
       await tester.pumpWidget(_wrap(
@@ -185,7 +192,8 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       final md = Markdown.fromString('State driven toolbar');
       final controller = MarkdownSelectionController()
-        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
         ..selectAll();
 
       await tester.pumpWidget(_wrap(
@@ -194,8 +202,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final state =
-          tester.state<MarkdownSelectionScopeState>(find.byType(MarkdownSelectionScope));
+      final state = tester.state<MarkdownSelectionScopeState>(
+          find.byType(MarkdownSelectionScope));
       state.showToolbar();
       await tester.pumpAndSettle();
       expect(find.text('Copy'), findsOneWidget);

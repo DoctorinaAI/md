@@ -42,7 +42,8 @@ class _Block {
 
 const String _blockSeparator = '\n';
 
-class MdSelectableRenderBox extends RenderBox with Selectable, SelectionRegistrant {
+class MdSelectableRenderBox extends RenderBox
+    with Selectable, SelectionRegistrant {
   MdSelectableRenderBox(List<String> blocks, TextStyle style)
       : _blocks = [for (final b in blocks) _Block(b, style)];
 
@@ -141,8 +142,9 @@ class MdSelectableRenderBox extends RenderBox with Selectable, SelectionRegistra
         return SelectionResult.end;
       case final SelectWordSelectionEvent e:
         final pos = _positionForLocal(globalToLocal(e.globalPosition));
-        final range =
-            _blocks[pos.block].painter.getWordBoundary(TextPosition(offset: pos.offset));
+        final range = _blocks[pos.block]
+            .painter
+            .getWordBoundary(TextPosition(offset: pos.offset));
         _start = _Pos(pos.block, range.start);
         _end = _Pos(pos.block, range.end);
         _recompute();
@@ -196,8 +198,8 @@ class MdSelectableRenderBox extends RenderBox with Selectable, SelectionRegistra
 
   void _recompute() {
     if (_start == null || _end == null) {
-      _geometry =
-          const SelectionGeometry(status: SelectionStatus.none, hasContent: true);
+      _geometry = const SelectionGeometry(
+          status: SelectionStatus.none, hasContent: true);
     } else {
       final rects = _selectionRects();
       final collapsed = _start!.compareTo(_end!) == 0;
@@ -205,7 +207,8 @@ class MdSelectableRenderBox extends RenderBox with Selectable, SelectionRegistra
         startSelectionPoint: _pointFor(_start!, TextSelectionHandleType.left),
         endSelectionPoint: _pointFor(_end!, TextSelectionHandleType.right),
         selectionRects: rects,
-        status: collapsed ? SelectionStatus.collapsed : SelectionStatus.uncollapsed,
+        status:
+            collapsed ? SelectionStatus.collapsed : SelectionStatus.uncollapsed,
         hasContent: true,
       );
     }
@@ -237,8 +240,9 @@ class MdSelectableRenderBox extends RenderBox with Selectable, SelectionRegistra
 
   // ---- geometry required by the delegate ----
   @override
-  List<Rect> get boundingBoxes =>
-      <Rect>[for (final b in _blocks) Rect.fromLTWH(0, b.top, size.width, b.height)];
+  List<Rect> get boundingBoxes => <Rect>[
+        for (final b in _blocks) Rect.fromLTWH(0, b.top, size.width, b.height)
+      ];
 
   @override
   void pushHandleLayers(LayerLink? startHandle, LayerLink? endHandle) {
@@ -280,7 +284,8 @@ class MdSelectableRenderBox extends RenderBox with Selectable, SelectionRegistra
 }
 
 class MdSelectableWidget extends LeafRenderObjectWidget {
-  const MdSelectableWidget({required this.blocks, required this.style, super.key});
+  const MdSelectableWidget(
+      {required this.blocks, required this.style, super.key});
   final List<String> blocks;
   final TextStyle style;
 
@@ -298,7 +303,8 @@ class MdSelectableWidget extends LeafRenderObjectWidget {
 void main() {
   const style = TextStyle(fontSize: 20, color: Color(0xFF000000));
 
-  testWidgets('S3 single selectable box spans blocks with separators', (tester) async {
+  testWidgets('S3 single selectable box spans blocks with separators',
+      (tester) async {
     String? captured;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(

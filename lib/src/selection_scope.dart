@@ -117,7 +117,8 @@ class MarkdownSelectionScope extends StatefulWidget {
       context.dependOnInheritedWidgetOfExactType<_ScopeMarker>()?.controller;
 
   /// The nearest ambient controller. Throws if there is no enclosing scope.
-  static MarkdownSelectionController of(BuildContext context) => maybeOf(context)!;
+  static MarkdownSelectionController of(BuildContext context) =>
+      maybeOf(context)!;
 
   /// The nearest ambient scope state, or null when there is no enclosing scope.
   static MarkdownSelectionScopeState? stateOf(BuildContext context) =>
@@ -187,8 +188,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   }
 
   void _applySelectionColor() {
-    controller.selectionColor =
-        widget.selectionColor ?? DefaultSelectionStyle.of(context).selectionColor;
+    controller.selectionColor = widget.selectionColor ??
+        DefaultSelectionStyle.of(context).selectionColor;
   }
 
   void _onControllerChanged() {
@@ -206,7 +207,10 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   bool get _handlesEnabled =>
       widget.enabled &&
       switch (Theme.of(context).platform) {
-        TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.fuchsia => true,
+        TargetPlatform.android ||
+        TargetPlatform.iOS ||
+        TargetPlatform.fuchsia =>
+          true,
         _ => false,
       };
 
@@ -224,7 +228,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
       };
 
   TextMagnifierConfiguration get _effectiveMagnifier =>
-      widget.magnifierConfiguration ?? TextMagnifier.adaptiveMagnifierConfiguration;
+      widget.magnifierConfiguration ??
+      TextMagnifier.adaptiveMagnifierConfiguration;
 
   /// Syncs the handle overlay, deferring to a post-frame callback when called
   /// during a build/layout/paint phase (e.g. a streaming `setState`).
@@ -259,7 +264,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
       TextDirection.ltr,
     );
     final endPoint = TextSelectionPoint(
-      box.globalToLocal(Offset(endpoints.endGlobal.right, endpoints.endGlobal.bottom)),
+      box.globalToLocal(
+          Offset(endpoints.endGlobal.right, endpoints.endGlobal.bottom)),
       TextDirection.ltr,
     );
     final overlay = _selectionOverlay;
@@ -301,8 +307,10 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   void _applyHandles(MarkdownHandleEndpoints? e) {
     final startSurface = e?.startSurface;
     final endSurface = e?.endSurface;
-    final startLocal = e == null ? null : Offset(e.startLocal.left, e.startLocal.bottom);
-    final endLocal = e == null ? null : Offset(e.endLocal.right, e.endLocal.bottom);
+    final startLocal =
+        e == null ? null : Offset(e.startLocal.left, e.startLocal.bottom);
+    final endLocal =
+        e == null ? null : Offset(e.endLocal.right, e.endLocal.bottom);
     for (final surface in controller.mountedSurfaces) {
       final isStart = identical(surface, startSurface);
       final isEnd = identical(surface, endSurface);
@@ -323,7 +331,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   }
 
   void _onHandleDragStart(DragStartDetails d, {required bool isStart}) {
-    _selectionOverlay?.showMagnifier(_magnifierInfo(d.globalPosition, isStart: isStart));
+    _selectionOverlay
+        ?.showMagnifier(_magnifierInfo(d.globalPosition, isStart: isStart));
   }
 
   void _onHandleDragUpdate(DragUpdateDetails d, {required bool isStart}) {
@@ -466,8 +475,10 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
     controller.startAtGlobal(globalPosition);
   }
 
-  Map<Type, GestureRecognizerFactory> get _gestures => <Type, GestureRecognizerFactory>{
-        PanGestureRecognizer: GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
+  Map<Type, GestureRecognizerFactory> get _gestures =>
+      <Type, GestureRecognizerFactory>{
+        PanGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
           () => PanGestureRecognizer(
             supportedDevices: const <PointerDeviceKind>{
               PointerDeviceKind.mouse,
@@ -490,11 +501,13 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
                 ((d) => controller.extendToGlobal(d.globalPosition))
             ..onLongPressEnd = ((_) => showToolbar()),
         ),
-        TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+        TapGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
           () => TapGestureRecognizer(),
           (recognizer) => recognizer
             ..onTapDown = ((_) => hideToolbar())
-            ..onSecondaryTapDown = ((d) => _lastSecondaryTapDown = d.globalPosition)
+            ..onSecondaryTapDown =
+                ((d) => _lastSecondaryTapDown = d.globalPosition)
             ..onSecondaryTapUp = ((d) {
               _focusNode.requestFocus();
               showToolbar(d.globalPosition);
@@ -515,7 +528,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
         return null;
       },
     ),
-    ExtendSelectionByCharacterIntent: CallbackAction<ExtendSelectionByCharacterIntent>(
+    ExtendSelectionByCharacterIntent:
+        CallbackAction<ExtendSelectionByCharacterIntent>(
       onInvoke: (intent) {
         if (!intent.collapseSelection) {
           controller.extendSelectionByCharacter(forward: intent.forward);
@@ -532,7 +546,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
         return null;
       },
     ),
-    ExtendSelectionToLineBreakIntent: CallbackAction<ExtendSelectionToLineBreakIntent>(
+    ExtendSelectionToLineBreakIntent:
+        CallbackAction<ExtendSelectionToLineBreakIntent>(
       onInvoke: (intent) {
         if (!intent.collapseSelection) {
           controller.extendSelectionToLineBreak(forward: intent.forward);

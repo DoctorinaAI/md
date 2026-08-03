@@ -82,9 +82,11 @@ class _ChatTabState extends State<ChatTab> {
     _streamCursor = 0;
     _streamBuffer = '';
     setState(() => _messages.add(_Msg(id, false, const Markdown.empty())));
-    _controller.putDocument(id, const Markdown.empty(), order: _messages.length - 1);
+    _controller.putDocument(id, const Markdown.empty(),
+        order: _messages.length - 1);
     _scrollToBottom();
-    _streamTimer = Timer.periodic(const Duration(milliseconds: 55), (_) => _tick(id));
+    _streamTimer =
+        Timer.periodic(const Duration(milliseconds: 55), (_) => _tick(id));
   }
 
   void _tick(String id) {
@@ -145,7 +147,8 @@ class _ChatTabState extends State<ChatTab> {
               controller: _controller,
               child: ListView.builder(
                 controller: _scroll,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 itemCount: _messages.length,
                 itemBuilder: (context, i) => _Bubble(message: _messages[i]),
               ),
@@ -245,7 +248,8 @@ class _Bubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           if (!isUser) ...<Widget>[
@@ -255,10 +259,12 @@ class _Bubble extends StatelessWidget {
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              constraints:
-                  BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+              constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.78),
               decoration: BoxDecoration(
-                color: isUser ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+                color: isUser
+                    ? scheme.primaryContainer
+                    : scheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -268,7 +274,8 @@ class _Bubble extends StatelessWidget {
               ),
               child: message.markdown.isEmpty
                   ? const _TypingDots()
-                  : MarkdownWidget(markdown: message.markdown, documentId: message.id),
+                  : MarkdownWidget(
+                      markdown: message.markdown, documentId: message.id),
             ),
           ),
           if (isUser) ...<Widget>[
@@ -305,7 +312,8 @@ class _TypingDots extends StatefulWidget {
   State<_TypingDots> createState() => _TypingDotsState();
 }
 
-class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 900),

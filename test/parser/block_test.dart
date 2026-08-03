@@ -28,7 +28,8 @@ void main() => group('Block parsing', () {
         });
 
         test('trailing hashes are stripped', () {
-          expect((_blocks('## Heading ##').single as MD$Heading).text, 'Heading');
+          expect(
+              (_blocks('## Heading ##').single as MD$Heading).text, 'Heading');
           expect((_blocks('### Title ###').single as MD$Heading).text, 'Title');
         });
 
@@ -57,14 +58,16 @@ void main() => group('Block parsing', () {
           final q = _blocks('> quote with **bold**').single as MD$Quote;
           expect(
             q.spans,
-            contains(isA<MD$Span>().having((s) => s.style, 'style', MD$Style.bold)),
+            contains(
+                isA<MD$Span>().having((s) => s.style, 'style', MD$Style.bold)),
           );
         });
       });
 
       group('Fenced code', () {
         test('backtick fence with language', () {
-          final code = _blocks('```dart\nvoid main() {}\n```').single as MD$Code;
+          final code =
+              _blocks('```dart\nvoid main() {}\n```').single as MD$Code;
           expect(code.language, 'dart');
           expect(code.text, 'void main() {}');
         });
@@ -76,8 +79,8 @@ void main() => group('Block parsing', () {
         });
 
         test('code content is never interpreted as markdown', () {
-          final code =
-              _blocks('```\n# not a heading\n- not a list\n```').single as MD$Code;
+          final code = _blocks('```\n# not a heading\n- not a list\n```').single
+              as MD$Code;
           expect(code.text, '# not a heading\n- not a list');
         });
 
@@ -123,7 +126,8 @@ void main() => group('Block parsing', () {
           final list = _blocks('- item with *italic*').single as MD$List;
           expect(
             list.items.single.spans,
-            contains(isA<MD$Span>().having((s) => s.style, 'style', MD$Style.italic)),
+            contains(isA<MD$Span>()
+                .having((s) => s.style, 'style', MD$Style.italic)),
           );
         });
 
@@ -131,7 +135,8 @@ void main() => group('Block parsing', () {
           final list = _blocks('- see [docs](https://x.com)').single as MD$List;
           expect(
             list.items.single.spans,
-            contains(isA<MD$Span>().having((s) => s.style, 'style', MD$Style.link)),
+            contains(
+                isA<MD$Span>().having((s) => s.style, 'style', MD$Style.link)),
           );
         });
       });
@@ -157,7 +162,8 @@ void main() => group('Block parsing', () {
           final firstCell = table.rows.single.cells.first;
           expect(
             firstCell,
-            contains(isA<MD$Span>().having((s) => s.style, 'style', MD$Style.bold)),
+            contains(
+                isA<MD$Span>().having((s) => s.style, 'style', MD$Style.bold)),
           );
         });
 
