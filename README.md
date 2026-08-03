@@ -150,10 +150,10 @@ Column alignment is supported via the delimiter row (`:---` left, `:--:`
 center, `---:` right):
 
 ```markdown
-| Left     | Center   | Right    |
-| :------- | :------: | -------: |
-| Cell 1   | Cell 2   | Cell 3   |
-| **Bold** | _Italic_ | `Code`   |
+| Left     |  Center  |  Right |
+| :------- | :------: | -----: |
+| Cell 1   |  Cell 2  | Cell 3 |
+| **Bold** | _Italic_ | `Code` |
 ```
 
 ### Links and Images
@@ -171,8 +171,9 @@ Any of `---`, `***`, or `___` (optionally spaced, e.g. `- - -`) produce a rule:
 
 ```markdown
 ---
-***
-___
+---
+
+---
 ```
 
 ## 🚀 Quick Start
