@@ -375,18 +375,34 @@ class _MyWidgetState extends State<MyWidget> {
 
 ## 📊 Performance
 
-- **Parsing**: single-pass, lookup-table driven parser with a plain-text fast
-  path and hand-rolled (regex-free) block/inline scanning. The hot path was
-  rewritten for a ~45% speedup, and it parses typical AI responses roughly
-  **10× faster** than the `markdown` package.
-- **Rendering**: 120 FPS smooth scrolling for chat-like interfaces
-- **Memory**: Minimal memory footprint with efficient span filtering
+`flutter_md` is built for speed: a single-pass, lookup-table parser (regex-free
+hot path with a plain-text fast path) and a custom render object that lays the
+whole document into one cached `ui.Picture` instead of a deep tree of per-block
+widgets.
 
-Benchmarks live in `benchmark/`:
+Head-to-head against `flutter_markdown` and `gpt_markdown` on the same machine
+(i7-13700K) with identical styles — full tables and methodology in
+[`benchmark_compare/RESULTS.md`](benchmark_compare/RESULTS.md):
+
+- **Parsing** — **~18× faster** than the `markdown` package that backs
+  `flutter_markdown` (`gpt_markdown` has no standalone parser), sustaining
+  ~60 MB/s on mixed documents.
+- **Rendering** (string → painted pixels) — **~6.6× faster than
+  `flutter_markdown` and ~15.6× faster than `gpt_markdown`** on a large document
+  (1.2–1.6× on small chat bubbles).
+- **Scrolling** — 60 fps with **zero dropped frames** in profile mode, and the
+  lowest UI-thread frame-build cost of the three (99th-percentile frame build
+  **1.6 ms** vs 4.8 / 9.4 ms).
 
 ```bash
-dart run benchmark/parser_benchmark.dart   # multi-scenario, vs. `markdown`
+# In-repo parser micro-benchmarks:
+dart run benchmark/parser_benchmark.dart    # multi-scenario, vs. `markdown`
 dart run benchmark/compare.dart --save      # low-noise before/after tool
+
+# Head-to-head vs flutter_markdown & gpt_markdown (parser + render):
+cd benchmark_compare && flutter pub get
+dart run benchmark/parser_benchmark.dart
+flutter test test/render_benchmark_test.dart
 ```
 
 ## 🔧 Advanced Features

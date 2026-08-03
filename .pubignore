@@ -1,5 +1,10 @@
+.dart_tool/
+pubspec.lock
+benchmark/.baseline.txt
+benchmark/.render_baseline.txt
 .vscode/
 build/
 coverage/
 credentials.json
 *.exe
+benchmark_compare/
