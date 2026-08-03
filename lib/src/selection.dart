@@ -506,6 +506,13 @@ class MarkdownSelectionController extends ChangeNotifier {
   }
 
   final List<_DocEntry> _docs = <_DocEntry>[];
+
+  /// id → index into the sorted [_docs], kept in sync by [_reindex]. Makes
+  /// [_orderIndex] O(1): it is called several times per selectable block on
+  /// every highlight repaint, so a linear scan here would scale with the chat
+  /// size and show up during drags.
+  final Map<Object, int> _indexById = <Object, int>{};
+
   final Map<Object, MarkdownSelectionSurface> _surfaces =
       <Object, MarkdownSelectionSurface>{};
 
@@ -525,6 +532,13 @@ class MarkdownSelectionController extends ChangeNotifier {
     _group?._remove(this);
     super.dispose();
   }
+
+  /// The number of registered documents. Prefer this over `documents.length`,
+  /// which allocates a fresh list on every read.
+  int get documentCount => _docs.length;
+
+  /// Whether any documents are registered.
+  bool get hasDocuments => _docs.isNotEmpty;
 
   /// The registered documents, in reading order.
   List<MarkdownDocumentRef> get documents => <MarkdownDocumentRef>[
@@ -551,7 +565,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// Inserts or updates one document. On a model change the selection is
   /// reconciled via [reconciliation] (this is the streaming entry point).
   void putDocument(Object id, Markdown model, {int? order}) {
-    final idx = _docs.indexWhere((e) => e.id == id);
+    final idx = _orderIndex(id);
     if (idx < 0) {
       _docs.add(_DocEntry(id, model, order ?? _docs.length));
       _sort();
@@ -560,21 +574,23 @@ class MarkdownSelectionController extends ChangeNotifier {
     }
     final entry = _docs[idx];
     final old = entry.model;
-    if (order != null) entry.order = order;
-    if (identical(old, model)) {
-      _sort();
-      notifyListeners();
-      return;
-    }
-    entry.model = model;
-    _sort();
-    _reconcile(id, old, model);
+    final orderChanged = order != null && order != entry.order;
+    final modelChanged = !identical(old, model);
+    // Nothing actually changed — avoid a needless sort/repaint. This matters on
+    // the streaming path, which can call putDocument once per token.
+    if (!orderChanged && !modelChanged) return;
+    if (orderChanged) entry.order = order;
+    if (modelChanged) entry.model = model;
+    // Reordering shifts indices; a model-only update keeps [_indexById] valid.
+    if (orderChanged) _sort();
+    if (modelChanged) _reconcile(id, old, model);
     notifyListeners();
   }
 
   /// Removes a document. If the selection touched it, the selection is dropped.
   void removeDocument(Object id) {
     _docs.removeWhere((e) => e.id == id);
+    _reindex();
     final sel = _selection;
     if (sel != null &&
         (sel.base.documentId == id || sel.extent.documentId == id)) {
@@ -585,6 +601,16 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   void _sort() {
     _docs.sort((a, b) => a.order.compareTo(b.order));
+    _reindex();
+  }
+
+  /// Rebuilds [_indexById] from the current [_docs] order. Called whenever the
+  /// set or order of documents changes (not on model-only updates).
+  void _reindex() {
+    _indexById.clear();
+    for (var i = 0; i < _docs.length; i++) {
+      _indexById[_docs[i].id] = i;
+    }
   }
 
   void _reconcile(Object id, Markdown oldModel, Markdown newModel) {
@@ -863,7 +889,7 @@ class MarkdownSelectionController extends ChangeNotifier {
     final startDoc = _orderIndex(a.documentId);
     final endDoc = _orderIndex(b.documentId);
     if (di < startDoc || di > endDoc) return null;
-    final model = _modelOf(documentId);
+    final model = _docs[di].model; // di is already resolved above
     if (blockIndex < 0 || blockIndex >= model.blocks.length) return null;
     final len = markdownBlockRenderedText(model.blocks[blockIndex]).length;
     final startBlock = di == startDoc ? a.blockIndex : 0;
@@ -929,7 +955,7 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   // --- ordering helpers ----------------------------------------------------
 
-  int _orderIndex(Object id) => _docs.indexWhere((e) => e.id == id);
+  int _orderIndex(Object id) => _indexById[id] ?? -1;
 
   Markdown _modelOf(Object id) => _docs[_orderIndex(id)].model;
 
@@ -961,7 +987,9 @@ class MarkdownSelectionController extends ChangeNotifier {
   (int, int)? _adjacentBlock(int di, int bi, {required bool forward}) {
     var d = di;
     var b = bi;
-    for (var guard = 0; guard < 1000000; guard++) {
+    // Each iteration steps b by one (rolling over document boundaries) and
+    // returns null once it walks off either end, so the scan always terminates.
+    while (true) {
       if (forward) {
         b++;
         while (d < _docs.length && b >= _docs[d].model.blocks.length) {
@@ -979,7 +1007,6 @@ class MarkdownSelectionController extends ChangeNotifier {
       }
       if (_blockTextAt(d, b).isNotEmpty) return (d, b);
     }
-    return null;
   }
 
   MarkdownPosition _stepCharacter(MarkdownPosition p, {required bool forward}) {

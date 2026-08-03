@@ -404,7 +404,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
         onPressed: copySelection,
       ));
     }
-    if (controller.documents.isNotEmpty) {
+    if (controller.hasDocuments) {
       items.add(ContextMenuButtonItem(
         type: ContextMenuButtonType.selectAll,
         onPressed: () {
