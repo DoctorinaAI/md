@@ -385,6 +385,11 @@ abstract interface class MarkdownSelectionSurface {
   /// Maps a global point to a logical position, or null if outside any text.
   MarkdownPosition? positionForGlobal(Offset globalPosition);
 
+  /// The word range at a global point, as `(blockIndex, start, end)` in the
+  /// block's rendered-text space, using the platform word segmentation. Null
+  /// when the point misses selectable text.
+  (int, int, int)? wordBoundaryForGlobal(Offset globalPosition);
+
   /// Global (screen-space) rectangles covering the selected part of this
   /// surface's document, in reading order. Empty when nothing here is
   /// selected. Used to place selection handles, the magnifier and the toolbar
@@ -665,6 +670,15 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// vertically-nearest surface is chosen and the point clamped into it, so a
   /// drag through the gaps/edges between widgets still extends the selection.
   MarkdownPosition? positionForGlobal(Offset globalPosition) {
+    final resolved = _resolveSurfaceAt(globalPosition);
+    return resolved?.$1.positionForGlobal(resolved.$2);
+  }
+
+  /// Resolves the surface a global point belongs to (directly when inside,
+  /// otherwise the vertically-nearest one) together with the point clamped into
+  /// that surface. Shared by [positionForGlobal] and [wordSelectionAt] so a
+  /// gesture through the gaps between widgets still resolves consistently.
+  (MarkdownSelectionSurface, Offset)? _resolveSurfaceAt(Offset globalPosition) {
     MarkdownSelectionSurface? nearest;
     var bestDistance = double.infinity;
     for (final surface in _surfaces.values) {
@@ -672,9 +686,7 @@ class MarkdownSelectionController extends ChangeNotifier {
       // A zero-area surface (an empty document, or one that lays out to zero
       // width/height) has nothing to select and would invert the clamp below.
       if (bounds.isEmpty) continue;
-      if (bounds.contains(globalPosition)) {
-        return surface.positionForGlobal(globalPosition);
-      }
+      if (bounds.contains(globalPosition)) return (surface, globalPosition);
       final dy = globalPosition.dy < bounds.top
           ? bounds.top - globalPosition.dy
           : (globalPosition.dy > bounds.bottom
@@ -697,7 +709,7 @@ class MarkdownSelectionController extends ChangeNotifier {
       globalPosition.dy
           .clamp(bounds.top, maxY < bounds.top ? bounds.top : maxY),
     );
-    return nearest.positionForGlobal(clamped);
+    return (nearest, clamped);
   }
 
   // --- mutation ------------------------------------------------------------
@@ -744,6 +756,138 @@ class MarkdownSelectionController extends ChangeNotifier {
         offset: markdownBlockRenderedText(last.model.blocks[lastBlock]).length,
       ),
     );
+  }
+
+  // --- word / block selection (multi-tap, long-press) ----------------------
+
+  /// The word range around [offset] in a block's rendered [text], as
+  /// `(start, end)`. A "word" is the maximal run of same-class characters
+  /// (letters/digits vs. punctuation vs. whitespace) touching the caret,
+  /// preferring an adjacent word character so clicking a word's edge grabs it.
+  ///
+  /// Exposed for testing; mirrors what double-click / long-press select.
+  @visibleForTesting
+  static (int, int) wordRangeIn(String text, int offset) {
+    final len = text.length;
+    if (len == 0) return (0, 0);
+    final o = offset.clamp(0, len);
+    // Reference character: a word char adjacent to the caret (right first, then
+    // left), else whichever side has a character at all.
+    final int idx;
+    if (o < len && _charClass(text.codeUnitAt(o)) == _clsWord) {
+      idx = o;
+    } else if (o > 0 && _charClass(text.codeUnitAt(o - 1)) == _clsWord) {
+      idx = o - 1;
+    } else if (o < len) {
+      idx = o;
+    } else {
+      idx = o - 1;
+    }
+    final cls = _charClass(text.codeUnitAt(idx));
+    var start = idx, end = idx + 1;
+    while (start > 0 && _charClass(text.codeUnitAt(start - 1)) == cls) start--;
+    while (end < len && _charClass(text.codeUnitAt(end)) == cls) end++;
+    return (start, end);
+  }
+
+  static const int _clsSpace = 0;
+  static const int _clsWord = 1;
+  static const int _clsPunct = 2;
+
+  static int _charClass(int c) {
+    if (c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D) return _clsSpace;
+    final isAsciiWord = (c >= 0x30 && c <= 0x39) || // 0-9
+        (c >= 0x41 && c <= 0x5A) || // A-Z
+        (c >= 0x61 && c <= 0x7A) || // a-z
+        c == 0x5F; // _
+    if (isAsciiWord) return _clsWord;
+    if (c < 0x80) return _clsPunct; // other ASCII => punctuation
+    return _clsWord; // non-ASCII (accents, CJK, emoji) => word-ish
+  }
+
+  /// The ordered selection of the word at a global point, without applying it.
+  ///
+  /// Prefers the mounted painter's platform word segmentation
+  /// (`TextPainter.getWordBoundary`, keeping intra-word punctuation like
+  /// apostrophes); falls back to the text-based [wordRangeIn] heuristic when
+  /// the surface can't answer (e.g. an unmounted document during a drag).
+  MarkdownSelection? wordSelectionAt(Offset globalPosition) {
+    final resolved = _resolveSurfaceAt(globalPosition);
+    if (resolved == null) return null;
+    final (surface, point) = resolved;
+    final id = surface.documentId;
+    final wb = surface.wordBoundaryForGlobal(point);
+    if (wb != null) {
+      return MarkdownSelection(
+        base:
+            MarkdownPosition(documentId: id, blockIndex: wb.$1, offset: wb.$2),
+        extent:
+            MarkdownPosition(documentId: id, blockIndex: wb.$1, offset: wb.$3),
+      );
+    }
+    // Fallback: text-heuristic boundary.
+    final p = surface.positionForGlobal(point);
+    if (p == null) return null;
+    final di = _orderIndex(p.documentId);
+    if (di < 0) return null;
+    final (s, e) = wordRangeIn(_blockTextAt(di, p.blockIndex), p.offset);
+    return MarkdownSelection(
+      base: p.copyWith(offset: s),
+      extent: p.copyWith(offset: e),
+    );
+  }
+
+  /// The ordered selection of the whole block at a global point, without
+  /// applying it.
+  MarkdownSelection? blockSelectionAt(Offset globalPosition) {
+    final p = positionForGlobal(globalPosition);
+    if (p == null) return null;
+    final di = _orderIndex(p.documentId);
+    if (di < 0) return null;
+    final text = _blockTextAt(di, p.blockIndex);
+    return MarkdownSelection(
+      base: p.copyWith(offset: 0),
+      extent: p.copyWith(offset: text.length),
+    );
+  }
+
+  /// Selects the word at a global point (double-click / long-press). Returns
+  /// the ordered anchor selection it applied, or null if the point misses.
+  MarkdownSelection? selectWordAtGlobal(Offset globalPosition) {
+    final sel = wordSelectionAt(globalPosition);
+    if (sel != null) selection = sel;
+    return sel;
+  }
+
+  /// Selects the whole block (paragraph/line) at a global point (triple-click).
+  /// Returns the ordered anchor selection it applied, or null if it misses.
+  MarkdownSelection? selectBlockAtGlobal(Offset globalPosition) {
+    final sel = blockSelectionAt(globalPosition);
+    if (sel != null) selection = sel;
+    return sel;
+  }
+
+  /// Extends a word/block-granular drag: grows the selection from the fixed
+  /// [anchor] (an ordered word/block range) to include the word (or block) at
+  /// [globalPosition], so double/triple-click-drag snaps to whole units.
+  void extendSelectionGranular(
+    MarkdownSelection anchor,
+    Offset globalPosition, {
+    required bool word,
+  }) {
+    final target = word
+        ? wordSelectionAt(globalPosition)
+        : blockSelectionAt(globalPosition);
+    if (target == null) return;
+    // anchor and target are each ordered (base <= extent). Keep the fixed
+    // anchor edge as the base and put the moving edge in extent.
+    if (_compare(target.base, anchor.base) < 0) {
+      selection = MarkdownSelection(base: anchor.extent, extent: target.base);
+    } else if (_compare(target.extent, anchor.extent) > 0) {
+      selection = MarkdownSelection(base: anchor.base, extent: target.extent);
+    } else {
+      selection = MarkdownSelection(base: anchor.base, extent: anchor.extent);
+    }
   }
 
   // --- keyboard extension --------------------------------------------------

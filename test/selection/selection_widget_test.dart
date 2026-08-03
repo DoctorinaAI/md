@@ -1,5 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,6 +11,17 @@ Future<void> _mouseDrag(WidgetTester tester, Offset from, Offset to) async {
   await g.moveTo(to);
   await tester.pump(const Duration(milliseconds: 200));
   await g.up();
+  await tester.pumpAndSettle();
+}
+
+/// Taps [times] times in quick succession at [pos] (a mouse click, then a
+/// double- or triple-click when times > 1).
+Future<void> _clicks(WidgetTester tester, Offset pos, int times) async {
+  for (var i = 0; i < times; i++) {
+    final g = await tester.startGesture(pos, kind: PointerDeviceKind.mouse);
+    await g.up();
+    if (i < times - 1) await tester.pump(const Duration(milliseconds: 40));
+  }
   await tester.pumpAndSettle();
 }
 
@@ -340,6 +353,277 @@ void main() {
 
       expect(controller.getText(), 'Intro line\nA\tB\n1\t2\nOutro line');
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('selection gestures', () {
+    Future<Offset> pumpParagraph(
+      WidgetTester tester,
+      MarkdownSelectionController controller,
+    ) async {
+      await tester.pumpWidget(_wrap(
+        controller,
+        const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 400, child: _Doc('d')),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      return tester.getTopLeft(find.byType(MarkdownWidget));
+    }
+
+    testWidgets('double-click selects the word under the pointer',
+        (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+              id: 'd', model: Markdown.fromString('Hello selectable world')),
+        ]);
+      final tl = await pumpParagraph(tester, controller);
+
+      await _clicks(tester, tl + const Offset(8, 8), 2);
+      expect(controller.getText(), 'Hello');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('double-click keeps intra-word punctuation (apostrophe)',
+        (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+              id: 'd', model: Markdown.fromString("can't stop here")),
+        ]);
+      final tl = await pumpParagraph(tester, controller);
+
+      await _clicks(tester, tl + const Offset(8, 8), 2);
+      // The platform word segmentation keeps the apostrophe inside the word,
+      // unlike the plain punctuation-splitting heuristic.
+      expect(controller.getText(), "can't");
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('touch double-tap selects a word and shows the toolbar',
+        (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+              id: 'd', model: Markdown.fromString('Hello selectable world')),
+        ]);
+      final tl = await pumpParagraph(tester, controller);
+
+      final pos = tl + const Offset(8, 8);
+      await tester.tapAt(pos); // default gesture kind is touch
+      await tester.pump(const Duration(milliseconds: 40));
+      await tester.tapAt(pos);
+      await tester.pumpAndSettle();
+
+      expect(controller.getText(), 'Hello');
+      final state = tester.state<MarkdownSelectionScopeState>(
+          find.byType(MarkdownSelectionScope));
+      expect(state.toolbarIsVisible, isTrue,
+          reason: 'a mobile double-tap pops the selection toolbar');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('triple-click selects the whole block', (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+              id: 'd', model: Markdown.fromString('Hello selectable world')),
+        ]);
+      final tl = await pumpParagraph(tester, controller);
+
+      await _clicks(tester, tl + const Offset(8, 8), 3);
+      expect(controller.getText(), 'Hello selectable world');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('single click clears an existing selection', (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+              id: 'd', model: Markdown.fromString('Hello selectable world')),
+        ]);
+      final tl = await pumpParagraph(tester, controller);
+
+      await _clicks(tester, tl + const Offset(8, 8), 2);
+      expect(controller.getText(), isNotEmpty);
+
+      await _clicks(tester, tl + const Offset(8, 8), 1);
+      expect(controller.getText(), isEmpty,
+          reason: 'a single click collapses the selection');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('shift-click extends the selection', (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+              id: 'd', model: Markdown.fromString('Hello selectable world')),
+        ]);
+      final tl = await pumpParagraph(tester, controller);
+
+      // Place a caret near the start, then Shift-click further along.
+      await _clicks(tester, tl + const Offset(4, 8), 1);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await _clicks(tester, tl + const Offset(60, 8), 1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+
+      expect(controller.getText(), isNotEmpty,
+          reason: 'shift-click should grow a selection from the caret');
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('selection highlight', () {
+    testWidgets('paints over an opaque code-block background', (tester) async {
+      // Regression: the highlight used to draw BENEATH the block picture, so a
+      // code fence's opaque background hid it. It now draws on top.
+      final md = Markdown.fromString('```\ncode\n```');
+      final controller = MarkdownSelectionController()
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: MarkdownSelectionScope(
+            controller: controller,
+            selectionColor: const Color(0x80FF0000), // translucent red
+            child: const Align(
+              alignment: Alignment.topLeft,
+              child: RepaintBoundary(
+                key: Key('capture'),
+                child: SizedBox(width: 400, child: _Doc('d')),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Select the whole code block.
+      final len = markdownBlockRenderedText(md.blocks.first).length;
+      controller.selection = MarkdownSelection(
+        base: const MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 0),
+        extent: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: len),
+      );
+      await tester.pumpAndSettle();
+
+      // Sample a pixel over the first code glyph (block padding is 8px).
+      // `toByteData` drives the engine, so it must run under `runAsync`.
+      late final int r, g, b;
+      await tester.runAsync(() async {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+            find.byKey(const Key('capture')));
+        final image = boundary.toImageSync();
+        final width = image.width;
+        final data = await image.toByteData();
+        image.dispose();
+        const x = 12, y = 12;
+        final i = (y * width + x) * 4;
+        r = data!.getUint8(i);
+        g = data.getUint8(i + 1);
+        b = data.getUint8(i + 2);
+      });
+
+      expect(r, greaterThan(g + 20),
+          reason: 'the red highlight must tint the code background');
+      expect(r, greaterThan(b + 20));
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('selection cursor', () {
+    testWidgets('selectable content shows the text (I-beam) cursor',
+        (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+              id: 'd', model: Markdown.fromString('Selectable text here')),
+        ]);
+      await tester.pumpWidget(_wrap(
+        controller,
+        const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 400, child: _Doc('d')),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final gesture =
+          await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      await gesture.moveTo(tester.getCenter(find.byType(MarkdownWidget)));
+      await tester.pumpAndSettle();
+
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.text,
+      );
+    });
+
+    testWidgets('an actionable link shows the click (hand) cursor',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: MarkdownTheme(
+            data: MarkdownThemeData(
+              textStyle: const TextStyle(fontSize: 14),
+              onLinkTap: (_, __) {},
+            ),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 400,
+                child: MarkdownWidget(
+                    markdown:
+                        Markdown.fromString('[click me](https://example.com)')),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final gesture =
+          await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      // Hover over the link glyphs (near the start of the line).
+      await gesture.moveTo(
+          tester.getTopLeft(find.byType(MarkdownWidget)) + const Offset(8, 8));
+      await tester.pumpAndSettle();
+
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.click,
+      );
+    });
+
+    testWidgets('inert content keeps the default cursor', (tester) async {
+      final md = Markdown.fromString('Not selectable');
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(width: 400, child: MarkdownWidget(markdown: md)),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final gesture =
+          await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      await gesture.moveTo(tester.getCenter(find.byType(MarkdownWidget)));
+      await tester.pumpAndSettle();
+
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.basic,
+      );
     });
   });
 }

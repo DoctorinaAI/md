@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show MouseTrackerAnnotation;
 import 'package:meta/meta.dart' as meta show internal;
 
 import '../markdown.dart';
@@ -14,12 +15,12 @@ import '../selection.dart';
 import '../theme.dart';
 import 'markdown_painter.dart';
 
-/// Default color used to paint the selection highlight beneath the glyphs.
+/// Default color used to paint the selection highlight over the glyphs.
 const Color _kSelectionColor = Color(0x552196F3);
 
 @meta.internal
 class MarkdownRenderObject extends RenderBox
-    implements MarkdownSelectionSurface {
+    implements MarkdownSelectionSurface, MouseTrackerAnnotation {
   MarkdownRenderObject({
     required Markdown markdown,
     required MarkdownThemeData theme,
@@ -107,6 +108,14 @@ class MarkdownRenderObject extends RenderBox
   }
 
   @override
+  (int, int, int)? wordBoundaryForGlobal(Offset globalPosition) {
+    if (_documentId == null) return null;
+    final wb = _painter.wordBoundaryForLocal(globalToLocal(globalPosition));
+    if (wb == null) return null;
+    return (wb.$1, wb.$2.start, wb.$2.end);
+  }
+
+  @override
   List<Rect> globalSelectionRects() {
     final local = localSelectionRects();
     if (local.isEmpty) return const <Rect>[];
@@ -148,6 +157,30 @@ class MarkdownRenderObject extends RenderBox
   void repaintSelection() {
     if (!_disposed && attached) markNeedsPaint();
   }
+
+  // --- MouseTrackerAnnotation (I-beam cursor over selectable text) ---
+
+  /// Whether the pointer is currently hovering an actionable link (updated in
+  /// [handleEvent]); drives the click (hand) cursor.
+  bool _hoverLink = false;
+
+  /// Presents the click (hand) cursor over links, the text (I-beam) cursor
+  /// while this document participates in a selection controller (so users see
+  /// the content is selectable), and otherwise defers to what is behind it.
+  @override
+  MouseCursor get cursor {
+    if (_hoverLink) return SystemMouseCursors.click;
+    return _controller != null ? SystemMouseCursors.text : MouseCursor.defer;
+  }
+
+  @override
+  void Function(PointerEnterEvent)? get onEnter => null;
+
+  @override
+  void Function(PointerExitEvent)? get onExit => null;
+
+  @override
+  bool get validForMouseTracker => !_disposed && attached;
 
   /// Current size of the render box.
   @override
@@ -217,6 +250,16 @@ class MarkdownRenderObject extends RenderBox
 
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
+    // Track hover so the cursor can switch to the hand over links. A repaint is
+    // what prompts MouseTracker to re-read [cursor] (same mechanism as
+    // RenderMouseRegion); we only repaint when the link state actually flips.
+    if (event is PointerHoverEvent) {
+      final link = _painter.isLinkAtLocal(event.localPosition);
+      if (link != _hoverLink) {
+        _hoverLink = link;
+        if (!_disposed && attached) markNeedsPaint();
+      }
+    }
     _painter.handleEvent(event);
   }
 
@@ -280,8 +323,13 @@ class MarkdownRenderObject extends RenderBox
       ..translate(offset.dx, offset.dy);
     //..clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    // Paint the selection highlight OUTSIDE the cached content Picture, beneath
-    // the glyphs, so drag/streaming repaints never rebuild the glyph cache.
+    _painter.paint(canvas, size);
+
+    // Paint the selection highlight OUTSIDE the cached content Picture, but ON
+    // TOP of the glyphs, so a translucent highlight stays visible even over
+    // opaque block/inline backgrounds (code fences, `inline code`, ==mark==).
+    // Still outside the Picture, so drag/streaming repaints never rebuild the
+    // glyph cache (the S7 invariant holds).
     final controller = _controller;
     final id = _documentId;
     if (controller != null && id != null) {
@@ -292,8 +340,6 @@ class MarkdownRenderObject extends RenderBox
         _highlightPaint,
       );
     }
-
-    _painter.paint(canvas, size);
 
     canvas.restore();
 

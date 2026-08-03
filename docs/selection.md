@@ -130,11 +130,24 @@ but still exposes the controller), `selectionColor`, `contextMenuBuilder` (null 
 no toolbar), `magnifierConfiguration`, `selectionControls`, `onSelectionChanged`.
 Statics: `MarkdownSelectionScope.of/maybeOf` (→ controller), `stateOf` (→ state).
 
-- **Gestures:** a `PanGestureRecognizer` restricted to
-  mouse/stylus/trackpad with `DragStartBehavior.down` (immediate drag-select on
-  pointer devices); a `LongPressGestureRecognizer` for **touch** (long-press then
-  drag) so a plain touch swipe still scrolls an enclosing `ListView`; a
-  `TapGestureRecognizer` (tap hides toolbar; right-click shows it at the point).
+- **Gestures:** a `TapAndPanGestureRecognizer` restricted to mouse/stylus/trackpad
+  with `DragStartBehavior.down` handles both taps and drags from one recognizer so
+  consecutive-tap counting stays intact — **single** click collapses/clears,
+  **double** selects the word, **triple** selects the block, `Shift`-click extends,
+  and a drag after a double/triple click keeps word/block granularity. On **touch**
+  a `LongPressGestureRecognizer` grabs the whole word then extends by word, and a
+  `DoubleTapGestureRecognizer` selects the word + pops the toolbar (both tap/press
+  based, so a plain swipe still scrolls an enclosing `ListView`). A secondary-only
+  `TapGestureRecognizer` shows the toolbar on right-click; with no primary
+  callbacks it never competes with the tap-and-pan recognizer. Word boundaries
+  come from the mounted painter's `TextPainter.getWordBoundary` (via
+  `MarkdownSelectionSurface.wordBoundaryForGlobal`), with the text-based
+  `wordRangeIn` heuristic as an unmounted-document fallback.
+- **Cursor:** the `MarkdownWidget` render object is a `MouseTrackerAnnotation`; it
+  shows the click (hand) cursor over an actionable link (a span with a tap
+  recognizer, detected on hover via `handleEvent` → `markNeedsPaint` so
+  `MouseTracker` re-reads the cursor), the text (I-beam) cursor while selectable,
+  and otherwise `MouseCursor.defer`.
 - **Keyboard:** an `Actions` map bound to the ambient `DefaultTextEditingShortcuts`
   Intents (installed by `WidgetsApp`/`MaterialApp`): Ctrl/Cmd+C copy, Ctrl/Cmd+A
   select-all, Shift+arrows extend (char/word/line/doc), Esc clear. Extension

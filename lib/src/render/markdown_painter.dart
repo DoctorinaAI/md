@@ -164,6 +164,36 @@ class MarkdownPainter {
     return (_sourceIndices[idx], offset);
   }
 
+  /// Maps a content-local [local] point to the word range at it, as
+  /// `(sourceBlockIndex, TextRange)`, or null if the hit block is not
+  /// selectable. Uses the platform word segmentation of the underlying painter.
+  (int, TextRange)? wordBoundaryForLocal(Offset local) {
+    if (_blockPainters.isEmpty) return null;
+    final idx = _blockIndexForDy(local.dy);
+    final painter = _blockPainters[idx];
+    if (painter is! SelectableBlockPainter) return null;
+    final blockLocal = Offset(local.dx, local.dy - _blockOffsets[idx]);
+    final range = painter.wordBoundaryForLocal(blockLocal);
+    final len = painter.renderedText.length;
+    return (
+      _sourceIndices[idx],
+      TextRange(
+        start: range.start.clamp(0, len),
+        end: range.end.clamp(0, len),
+      ),
+    );
+  }
+
+  /// Whether an actionable link sits under a content-local [local] point.
+  bool isLinkAtLocal(Offset local) {
+    if (_blockPainters.isEmpty) return false;
+    final idx = _blockIndexForDy(local.dy);
+    final painter = _blockPainters[idx];
+    if (painter is! SelectableBlockPainter) return false;
+    final blockLocal = Offset(local.dx, local.dy - _blockOffsets[idx]);
+    return painter.isLinkAtLocal(blockLocal);
+  }
+
   /// Paints the selection highlight of every selectable block, using [rangeOf]
   /// to look up the selected rendered range for a source block index.
   void paintHighlight(

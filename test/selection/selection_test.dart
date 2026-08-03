@@ -164,4 +164,37 @@ void main() {
       expect(n, 2);
     });
   });
+
+  group('word boundaries (double-click / long-press)', () {
+    (int, int) word(String text, int offset) =>
+        MarkdownSelectionController.wordRangeIn(text, offset);
+
+    test('empty text yields an empty range', () {
+      expect(word('', 0), (0, 0));
+    });
+
+    test('caret inside a word grabs the whole word', () {
+      expect(word('Hello world', 2), (0, 5));
+      expect(word('Hello world', 8), (6, 11));
+    });
+
+    test('caret at a word edge prefers the adjacent word', () {
+      expect(word('Hello world', 5), (0, 5)); // end of "Hello"
+      expect(word('Hello world', 6), (6, 11)); // start of "world"
+      expect(word('Hello world', 11), (6, 11)); // very end
+    });
+
+    test('underscore and digits are part of a word', () {
+      expect(word('foo_bar2 baz', 1), (0, 8));
+    });
+
+    test('non-ASCII letters stay in the word', () {
+      expect(word('café crème', 1), (0, 4));
+    });
+
+    test('punctuation forms its own run', () {
+      // "a===b": clicking on the punctuation run selects just the "===".
+      expect(word('a===b', 2), (1, 4));
+    });
+  });
 }

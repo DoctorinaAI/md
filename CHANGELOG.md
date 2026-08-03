@@ -41,10 +41,27 @@
   `localSelectionRects`, `setSelectionHandleLayers`, `repaintSelection`, and
   `MarkdownSelectionController.selectionHandleEndpoints` /
   `MarkdownHandleEndpoints`.
+- **ADDED**: Word- and block-granular selection gestures. Double-click/tap
+  selects the word under the pointer, triple-click/tap selects the whole block,
+  a single click collapses (clears) the selection, and `Shift`-click extends it.
+  Dragging after a double/triple click keeps word/block granularity; a touch
+  long-press grabs the whole word (then extends by word), and a touch
+  double-tap selects the word and pops the toolbar. Word boundaries use the
+  platform word segmentation (`TextPainter.getWordBoundary`), so double-click
+  keeps intra-word punctuation like apostrophes (`can't`). New controller ops:
+  `selectWordAtGlobal`, `selectBlockAtGlobal`, `wordSelectionAt`,
+  `blockSelectionAt`, `extendSelectionGranular`, and `wordRangeIn`; new surface
+  geometry `MarkdownSelectionSurface.wordBoundaryForGlobal`.
+- **ADDED**: Mouse cursor feedback — a `MarkdownWidget` shows the click (hand)
+  cursor over actionable links, the text (I-beam) cursor while it participates
+  in a selection controller, and otherwise the default cursor.
 - **CHANGED**: `MarkdownWidget`'s render object now draws the selection
   highlight outside the cached content `Picture` and becomes a repaint boundary
   when selectable, so selection/drag repaints do not rebuild the glyph cache.
-  The highlight color is now customizable via the controller / scope.
+  The highlight color is now customizable via the controller / scope. The
+  highlight is painted on top of (rather than beneath) the glyphs, so a
+  translucent selection stays visible over opaque backgrounds — code fences,
+  `inline code`, and `==marked==` spans.
 - **EXAMPLE**: Reworked the demo tabs — a longer, richer chat (tables, code,
   nested/task lists, alerts, math, token-by-token streaming with a typing
   indicator, Select-all/Clear) and a Selection tab that spans every block type.

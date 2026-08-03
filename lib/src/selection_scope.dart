@@ -139,7 +139,14 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
   SelectionOverlay? _selectionOverlay;
   FocusNode? _internalFocusNode;
   Offset? _lastSecondaryTapDown;
+  Offset? _lastDoubleTapDown;
   MarkdownSelection? _lastSelection;
+
+  // Multi-tap / granular selection state. [_granularity] is 1 = character,
+  // 2 = word, 3 = block; [_granularAnchor] is the ordered word/block range a
+  // word/block-granular drag grows from.
+  int _granularity = 1;
+  MarkdownSelection? _granularAnchor;
 
   FocusNode get _focusNode =>
       widget.focusNode ??
@@ -469,17 +476,77 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
 
   // --- gestures ------------------------------------------------------------
 
-  void _onDragDown(Offset globalPosition) {
+  /// Anchors a fresh selection at [global] with the given consecutive
+  /// [tapCount]: 1 collapses a caret (character granularity), 2 selects the
+  /// word, 3+ selects the whole block. Stores the granular anchor for a drag.
+  void _beginSelection(Offset global, int tapCount) {
+    _granularity = tapCount <= 1 ? 1 : (tapCount == 2 ? 2 : 3);
+    switch (_granularity) {
+      case 2:
+        _granularAnchor = controller.selectWordAtGlobal(global);
+      case 3:
+        _granularAnchor = controller.selectBlockAtGlobal(global);
+      default:
+        controller.startAtGlobal(global);
+        _granularAnchor = null;
+    }
+  }
+
+  /// Extends the active selection to [global] at the current granularity.
+  void _updateSelection(Offset global) {
+    final anchor = _granularAnchor;
+    if (_granularity == 1 || anchor == null) {
+      controller.extendToGlobal(global);
+    } else {
+      controller.extendSelectionGranular(anchor, global,
+          word: _granularity == 2);
+    }
+  }
+
+  /// Whether a Shift-click should extend (rather than replace) the selection.
+  bool get _shiftHeld => HardwareKeyboard.instance.isShiftPressed;
+
+  void _handleTapDown(TapDragDownDetails d) {
     _focusNode.requestFocus();
     hideToolbar();
-    controller.startAtGlobal(globalPosition);
+  }
+
+  void _handleTapUp(TapDragUpDetails d) {
+    // Shift-click extends the existing selection to the tapped point.
+    if (_shiftHeld &&
+        d.consecutiveTapCount <= 1 &&
+        controller.selection != null) {
+      _granularity = 1;
+      _granularAnchor = null;
+      controller.extendToGlobal(d.globalPosition);
+      return;
+    }
+    _beginSelection(d.globalPosition, d.consecutiveTapCount);
+  }
+
+  void _handleDragStart(TapDragStartDetails d) {
+    _focusNode.requestFocus();
+    hideToolbar();
+    if (_shiftHeld &&
+        d.consecutiveTapCount <= 1 &&
+        controller.selection != null) {
+      _granularity = 1;
+      _granularAnchor = null;
+      controller.extendToGlobal(d.globalPosition);
+      return;
+    }
+    _beginSelection(d.globalPosition, d.consecutiveTapCount);
   }
 
   Map<Type, GestureRecognizerFactory> get _gestures =>
       <Type, GestureRecognizerFactory>{
-        PanGestureRecognizer:
-            GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
-          () => PanGestureRecognizer(
+        // Mouse / stylus / trackpad: taps (single clears, double selects a
+        // word, triple a block) and drags, with word/block-granular drags and
+        // Shift-click extension — all from one recognizer so consecutive-tap
+        // counting stays intact.
+        TapAndPanGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<TapAndPanGestureRecognizer>(
+          () => TapAndPanGestureRecognizer(
             supportedDevices: const <PointerDeviceKind>{
               PointerDeviceKind.mouse,
               PointerDeviceKind.stylus,
@@ -489,23 +556,53 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
           ),
           (recognizer) => recognizer
             ..dragStartBehavior = DragStartBehavior.down
-            ..onStart = ((d) => _onDragDown(d.globalPosition))
-            ..onUpdate = ((d) => controller.extendToGlobal(d.globalPosition)),
+            ..onTapDown = _handleTapDown
+            ..onTapUp = _handleTapUp
+            ..onDragStart = _handleDragStart
+            ..onDragUpdate = ((d) => _updateSelection(d.globalPosition)),
         ),
+        // Touch: a double-tap selects the word under the finger and pops the
+        // toolbar (the familiar mobile gesture). Tap-based, so it never steals
+        // a scroll drag from an enclosing list.
+        DoubleTapGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<DoubleTapGestureRecognizer>(
+          () => DoubleTapGestureRecognizer(
+            supportedDevices: const <PointerDeviceKind>{
+              PointerDeviceKind.touch
+            },
+          ),
+          (recognizer) => recognizer
+            ..onDoubleTapDown = ((d) => _lastDoubleTapDown = d.globalPosition)
+            ..onDoubleTap = (() {
+              final pos = _lastDoubleTapDown;
+              if (pos == null) return;
+              _focusNode.requestFocus();
+              controller.selectWordAtGlobal(pos);
+              showToolbar();
+            }),
+        ),
+        // Touch: long-press selects the word under the finger, then drags
+        // extend by word (a plain swipe still scrolls an enclosing list).
         LongPressGestureRecognizer:
             GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
           () => LongPressGestureRecognizer(),
           (recognizer) => recognizer
-            ..onLongPressStart = ((d) => _onDragDown(d.globalPosition))
+            ..onLongPressStart = ((d) {
+              _focusNode.requestFocus();
+              hideToolbar();
+              _beginSelection(d.globalPosition, 2);
+            })
             ..onLongPressMoveUpdate =
-                ((d) => controller.extendToGlobal(d.globalPosition))
+                ((d) => _updateSelection(d.globalPosition))
             ..onLongPressEnd = ((_) => showToolbar()),
         ),
+        // Secondary-only: right-click opens the context toolbar. With no
+        // primary callbacks this recognizer ignores primary taps, so it never
+        // competes with the TapAndPan recognizer above.
         TapGestureRecognizer:
             GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
           () => TapGestureRecognizer(),
           (recognizer) => recognizer
-            ..onTapDown = ((_) => hideToolbar())
             ..onSecondaryTapDown =
                 ((d) => _lastSecondaryTapDown = d.globalPosition)
             ..onSecondaryTapUp = ((d) {

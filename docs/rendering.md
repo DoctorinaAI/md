@@ -211,9 +211,11 @@ $Spacer`). Internal (`@meta.internal`, only via `src/render.dart`):
 
 - Glyphs cached in a `ui.Picture` keyed by size; reused on repaint; nulled only on
   `update`/`invalidateLayout`.
-- **Selection highlight is painted before/outside that cache**
-  (`MarkdownRenderObject.paint` calls `_painter.paintHighlight(...)` then
-  `_painter.paint(...)`), so drags/streaming never rebuild the glyph cache. Color =
+- **Selection highlight is painted outside that cache, on top of the glyphs**
+  (`MarkdownRenderObject.paint` calls `_painter.paint(...)` then
+  `_painter.paintHighlight(...)`), so drags/streaming never rebuild the glyph
+  cache, and a translucent highlight stays visible over opaque block/inline
+  backgrounds (code fences, `inline code`, `==mark==`). Color =
   `controller.selectionColor ?? _kSelectionColor` (`0x552196F3`).
 - `isRepaintBoundary => controller != null`; `alwaysNeedsCompositing => false`.
 - Handle `LeaderLayer`s are pushed in `paint` (only when a scope supplied
