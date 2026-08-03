@@ -111,6 +111,52 @@ void main() => group('Inline parsing', () {
           expect(_spans('a ~~ b').every((s) => s.style.isEmpty), isTrue);
           expect(_spans('a == b').every((s) => s.style.isEmpty), isTrue);
         });
+
+        test('double marker with a space-flanked closer stays literal', () {
+          // The closing `**` is preceded by a space, so it is not
+          // right-flanking and cannot close: the whole run is literal. The
+          // inner `*` of the run must not degrade into a stray italic.
+          expect(_visible('a **bold ** x'), 'a **bold ** x');
+          expect(_spans('a **bold ** x').every((s) => s.style.isEmpty), isTrue);
+        });
+
+        test('double marker with a closer after a soft break stays literal',
+            () {
+          // Same rule across a soft line break: the closing `**` follows a
+          // newline (whitespace), so it cannot close and stays literal.
+          expect(_visible('a **bold\n** x'), 'a **bold\n** x');
+          expect(
+              _spans('a **bold\n** x').every((s) => s.style.isEmpty), isTrue);
+        });
+
+        test('double underline with a space-flanked closer stays literal', () {
+          expect(_visible('a __bold __ x'), 'a __bold __ x');
+          expect(_spans('a __bold __ x').every((s) => s.style.isEmpty), isTrue);
+        });
+      });
+
+      group('Double markers still emphasize when properly flanked', () {
+        // Regression guards: the fix for space-flanked closers must not break
+        // legitimate double/triple/nested emphasis.
+        test('triple *** is bold + italic', () {
+          final spans = _spans('***both***');
+          expect(spans.single.text, 'both');
+          expect(spans.single.style.contains(MD$Style.bold), isTrue);
+          expect(spans.single.style.contains(MD$Style.italic), isTrue);
+        });
+
+        test('italic nested inside bold', () {
+          final spans = _spans('**b *bi* b**');
+          expect(_styleOf(spans, 'bi').contains(MD$Style.bold), isTrue);
+          expect(_styleOf(spans, 'bi').contains(MD$Style.italic), isTrue);
+          expect(_styleOf(spans, 'b '), MD$Style.bold);
+        });
+
+        test('bold spanning a soft line break is closed', () {
+          final spans = _spans('x **a\nb** y');
+          expect(_styleOf(spans, 'a\nb'), MD$Style.bold);
+          expect(_visible('x **a\nb** y'), 'x a\nb y');
+        });
       });
 
       group('Intraword underscores (snake_case)', () {

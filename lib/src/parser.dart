@@ -787,6 +787,14 @@ bool _hasClosingBacktick(List<int> codes, int length, int from) {
 /// [markerLen]) exists at or after [from]. A closer must be right-flanking
 /// (preceded by a non-space); underscore closers must also be at a word
 /// boundary. Escaped characters are skipped.
+///
+/// Right-flanking is a property of the whole delimiter *run*, not the
+/// individual marker character: the deciding character is the one immediately
+/// before the run, skipping consecutive same-marker delimiters. We therefore
+/// only accept a closer at the run boundary (`codes[j - 1] != ch`). A run
+/// whose boundary is not right-flanking cannot close from any of its inner
+/// delimiters either, so e.g. `a **bold ** x` (the closing `**` follows a
+/// space) stays literal instead of degrading into a lopsided italic.
 bool _hasEmphasisCloser(
     List<int> codes, int length, int from, int ch, int markerLen) {
   for (var j = from; j < length; j++) {
@@ -797,10 +805,11 @@ bool _hasEmphasisCloser(
     if (codes[j] != ch) continue;
     if (markerLen == 2) {
       if (j + 1 < length && codes[j + 1] == ch) {
-        if (j > 0 && !_isInlineSpace(codes[j - 1])) return true;
+        if (j > 0 && !_isInlineSpace(codes[j - 1]) && codes[j - 1] != ch)
+          return true;
         j++; // Consume the delimiter pair.
       }
-    } else if (j > 0 && !_isInlineSpace(codes[j - 1])) {
+    } else if (j > 0 && !_isInlineSpace(codes[j - 1]) && codes[j - 1] != ch) {
       if (ch != 0x5F /* _ */) return true;
       // Underscore: also require a word boundary after the closer.
       final after = j + 1;
