@@ -19,8 +19,7 @@ import 'theme.dart';
 const Color _kSelectionColor = Color(0x552196F3);
 
 @meta.internal
-class MarkdownRenderObject extends RenderBox
-    implements MarkdownSelectionSurface {
+class MarkdownRenderObject extends RenderBox implements MarkdownSelectionSurface {
   MarkdownRenderObject({
     required Markdown markdown,
     required MarkdownThemeData theme,
@@ -131,8 +130,7 @@ class MarkdownRenderObject extends RenderBox
     Offset? endLocal,
   }) {
     var changed = false;
-    if (!identical(startLink, _startHandleLink) ||
-        startLocal != _startHandleLocal) {
+    if (!identical(startLink, _startHandleLink) || startLocal != _startHandleLocal) {
       _startHandleLink = startLink;
       _startHandleLocal = startLocal;
       changed = true;
@@ -186,8 +184,7 @@ class MarkdownRenderObject extends RenderBox
   @override
   void performLayout() {
     // Set the size of the render box to match the painter's size.
-    size =
-        constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
+    size = constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
   }
 
   @override
@@ -255,8 +252,7 @@ class MarkdownRenderObject extends RenderBox
   @override
   @protected
   void detach() {
-    PaintingBinding.instance.systemFonts
-        .removeListener(_handleSystemFontsChange);
+    PaintingBinding.instance.systemFonts.removeListener(_handleSystemFontsChange);
     _controller?.detachSurface(this);
     super.detach();
   }
@@ -273,8 +269,7 @@ class MarkdownRenderObject extends RenderBox
   @override
   @protected
   void paint(PaintingContext context, Offset offset) {
-    if (_painter.isEmpty)
-      return; // If the markdown is empty, do not paint anything.
+    if (_painter.isEmpty) return; // If the markdown is empty, do not paint anything.
 
     final canvas = context.canvas
       ..save()
@@ -423,8 +418,7 @@ class MarkdownPainter {
     for (var i = 0; i < blocks.length; i++) {
       final block = blocks[i];
       if (filter != null && !filter(block)) continue;
-      painters
-          .add(builder(block, _theme) ?? _defaultBlockBuilder(block, _theme));
+      painters.add(builder(block, _theme) ?? _defaultBlockBuilder(block, _theme));
       sources.add(i);
     }
     _blockPainters = painters;
@@ -508,8 +502,7 @@ class MarkdownPainter {
     required Markdown markdown,
     required MarkdownThemeData theme,
   }) {
-    if (identical(_markdown, markdown) && identical(_theme, theme))
-      return false;
+    if (identical(_markdown, markdown) && identical(_theme, theme)) return false;
     _lastSize = null;
     _lastPicture = null;
     _markdown = markdown;
@@ -957,8 +950,7 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
       }
     }
     final fragment = best!;
-    final inner =
-        fragment.painter.getPositionForOffset(local - fragment.origin).offset;
+    final inner = fragment.painter.getPositionForOffset(local - fragment.origin).offset;
     return fragment.textStart + inner.clamp(0, fragment.length);
   }
 
@@ -966,8 +958,8 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
   List<Rect> boxesForRange(int start, int end) {
     final out = <Rect>[];
     for (final fragment in fragments) {
-      final localStart = start.clamp(fragment.textStart, fragment.textEnd) -
-          fragment.textStart;
+      final localStart =
+          start.clamp(fragment.textStart, fragment.textEnd) - fragment.textStart;
       final localEnd =
           end.clamp(fragment.textStart, fragment.textEnd) - fragment.textStart;
       if (localEnd <= localStart) continue;
@@ -1190,8 +1182,8 @@ class BlockPainter$Quote
           textScaler: theme.textScaler,
         ),
         linePaint = Paint()
-          ..color = theme.dividerColor ??
-              const Color(0x7F7F7F7F) // Gray color for the line.
+          ..color =
+              theme.dividerColor ?? const Color(0x7F7F7F7F) // Gray color for the line.
           ..isAntiAlias = false
           ..strokeWidth = 4.0
           ..style = PaintingStyle.fill;
@@ -1443,10 +1435,8 @@ class _ListItemMetrics {
   final TextPainter contentPainter;
   final Offset offset;
 
-  late final double height =
-      math.max(bulletPainter.height, contentPainter.height);
-  late final Size size =
-      Size(bulletPainter.width + contentPainter.width, height);
+  late final double height = math.max(bulletPainter.height, contentPainter.height);
+  late final Size size = Size(bulletPainter.width + contentPainter.width, height);
 
   void dispose() {
     bulletPainter.dispose();
@@ -1492,8 +1482,7 @@ class BlockPainter$List
 
   InlineSpan? _getSpanForPosition(Offset localPosition) {
     for (final metrics in _painters) {
-      final contentOffset =
-          metrics.offset + Offset(metrics.bulletPainter.width, 0);
+      final contentOffset = metrics.offset + Offset(metrics.bulletPainter.width, 0);
       final contentRect = contentOffset & metrics.contentPainter.size;
       if (contentRect.contains(localPosition)) {
         final painterPosition = localPosition - contentOffset;
@@ -1516,8 +1505,7 @@ class BlockPainter$List
     if (_lastSpan == null) return; // No span was hit on tap down.
     final newSpan = _getSpanForPosition(event.localPosition);
     if (newSpan != null && _lastSpan == newSpan) {
-      if (newSpan
-          case TextSpan(recognizer: final TapGestureRecognizer recognizer)) {
+      if (newSpan case TextSpan(recognizer: final TapGestureRecognizer recognizer)) {
         recognizer.onTap?.call();
       }
     }
@@ -1567,8 +1555,7 @@ class BlockPainter$List
         _painters.add(metrics);
 
         currentHeight += metrics.height;
-        maxContentWidth =
-            math.max(maxContentWidth, indent + metrics.size.width);
+        maxContentWidth = math.max(maxContentWidth, indent + metrics.size.width);
 
         if (item.children.isNotEmpty) {
           layoutItems(item.children, level + 1);
@@ -1602,8 +1589,7 @@ class BlockPainter$List
       final bulletOffset = metrics.offset + Offset(0, offset);
       metrics.bulletPainter.paint(canvas, bulletOffset);
 
-      final contentOffset =
-          bulletOffset + Offset(metrics.bulletPainter.width, 0);
+      final contentOffset = bulletOffset + Offset(metrics.bulletPainter.width, 0);
       metrics.contentPainter.paint(canvas, contentOffset);
     }
   }
@@ -1813,8 +1799,7 @@ class BlockPainter$Table
         _rowBackgroundPaint = Paint()
           ..style = PaintingStyle.fill
           ..isAntiAlias = false
-          ..color =
-              theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235);
+          ..color = theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235);
 
   /// Padding for table cells.
   static const double padding = 8.0;
@@ -1830,9 +1815,8 @@ class BlockPainter$Table
 
   /// Resolves the alignment for column [c], defaulting to
   /// [MD$TableColumnAlign.none] when unspecified.
-  MD$TableColumnAlign _columnAlign(int c) => c >= 0 && c < alignments.length
-      ? alignments[c]
-      : MD$TableColumnAlign.none;
+  MD$TableColumnAlign _columnAlign(int c) =>
+      c >= 0 && c < alignments.length ? alignments[c] : MD$TableColumnAlign.none;
 
   /// The horizontal offset of a cell's text within its column, honoring the
   /// column alignment (falling back to centered headers / left-aligned data).
@@ -1898,8 +1882,7 @@ class BlockPainter$Table
   }
 
   TextSpan? _getSpanForOffset(Offset position) {
-    final rowHeights =
-        List.generate(_cellPainters.length, (r) => _rowHeights[r]);
+    final rowHeights = List.generate(_cellPainters.length, (r) => _rowHeights[r]);
 
     double currentY = 0.0;
 
@@ -1920,11 +1903,10 @@ class BlockPainter$Table
           if (position.dx >= currentX && position.dx < currentX + columnWidth) {
             // In this cell.
             final verticalPadding = (rowHeight - painter.height) / 2;
-            final horizontalPadding =
-                _cellHorizontalPadding(r, c, painter.width);
+            final horizontalPadding = _cellHorizontalPadding(r, c, painter.width);
 
-            final painterOffset = Offset(
-                currentX + horizontalPadding, currentY + verticalPadding);
+            final painterOffset =
+                Offset(currentX + horizontalPadding, currentY + verticalPadding);
             final localPosition = position - painterOffset;
 
             // Check if inside the actual painted text area.
@@ -1974,18 +1956,15 @@ class BlockPainter$Table
           return TextPainter(textDirection: theme.textDirection);
         }
         final cell = row.cells[c];
-        final style = (r == 0)
-            ? theme.textStyle.copyWith(fontWeight: FontWeight.bold)
-            : null;
+        final style =
+            (r == 0) ? theme.textStyle.copyWith(fontWeight: FontWeight.bold) : null;
         final textPainter = TextPainter(
-          text: _paragraphFromMarkdownSpans(
-              spans: cell, theme: theme, textStyle: style),
+          text: _paragraphFromMarkdownSpans(spans: cell, theme: theme, textStyle: style),
           textAlign: switch (_columnAlign(c)) {
             MD$TableColumnAlign.left => TextAlign.left,
             MD$TableColumnAlign.center => TextAlign.center,
             MD$TableColumnAlign.right => TextAlign.right,
-            MD$TableColumnAlign.none =>
-              (r == 0) ? TextAlign.center : TextAlign.start,
+            MD$TableColumnAlign.none => (r == 0) ? TextAlign.center : TextAlign.start,
           },
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
@@ -1993,21 +1972,18 @@ class BlockPainter$Table
 
         // Calculate natural width
         textPainter.layout(maxWidth: double.infinity);
-        naturalWidths[c] =
-            math.max(naturalWidths[c], textPainter.width + padding * 2);
+        naturalWidths[c] = math.max(naturalWidths[c], textPainter.width + padding * 2);
 
         // Calculate min width (longest word)
         final cellText = cell.map((s) => s.text).join();
         final words = cellText.split(RegExp(r'\s+'));
         if (words.isNotEmpty) {
-          final longestWord =
-              words.reduce((a, b) => a.length > b.length ? a : b);
+          final longestWord = words.reduce((a, b) => a.length > b.length ? a : b);
           final wordPainter = TextPainter(
             text: TextSpan(text: longestWord, style: style),
             textDirection: theme.textDirection,
           )..layout();
-          minWidths[c] =
-              math.max(minWidths[c], wordPainter.width + padding * 2);
+          minWidths[c] = math.max(minWidths[c], wordPainter.width + padding * 2);
           wordPainter.dispose();
         }
 
@@ -2083,8 +2059,7 @@ class BlockPainter$Table
           final painter = _cellPainters[r][c];
           final verticalPadding = (_rowHeights[r] - painter.height) / 2;
           final horizontalPadding = _cellHorizontalPadding(r, c, painter.width);
-          final origin =
-              Offset(colLeft + horizontalPadding, rowTop + verticalPadding);
+          final origin = Offset(colLeft + horizontalPadding, rowTop + verticalPadding);
           frags.add(SelectableFragment(painter, origin, text.length));
           text.write(painter.plainText);
         }
@@ -2102,8 +2077,7 @@ class BlockPainter$Table
     if (columns < 1) return;
 
     double currentY = offset;
-    final rowHeights =
-        List.generate(_cellPainters.length, (r) => _rowHeights[r]);
+    final rowHeights = List.generate(_cellPainters.length, (r) => _rowHeights[r]);
 
     for (int r = 0; r < _cellPainters.length; r++) {
       double currentX = 0;

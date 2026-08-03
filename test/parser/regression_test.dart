@@ -115,8 +115,7 @@ void main() {
       expect(_text(para.spans), '_italic_ at the start'.replaceAll('_', ''));
       expect(
         para.spans,
-        contains(
-            isA<MD$Span>().having((s) => s.style, 'style', MD$Style.italic)),
+        contains(isA<MD$Span>().having((s) => s.style, 'style', MD$Style.italic)),
       );
     });
 
@@ -176,8 +175,8 @@ void main() {
     });
 
     test('image carries the src key and image style', () {
-      final span = _spans('![alt](https://x.io/i.png)')
-          .firstWhere((s) => s.extra != null);
+      final span =
+          _spans('![alt](https://x.io/i.png)').firstWhere((s) => s.extra != null);
       expect(span.style.contains(MD$Style.image), isTrue);
       expect(span.extra?['src'], 'https://x.io/i.png');
     });
@@ -226,8 +225,8 @@ void main() {
     });
 
     test('currency is unchanged', () {
-      expect(_text(_spans(r'It costs $5 and $10 today.')),
-          r'It costs $5 and $10 today.');
+      expect(
+          _text(_spans(r'It costs $5 and $10 today.')), r'It costs $5 and $10 today.');
     });
 
     test(r'escaped dollar \$ becomes a literal dollar', () {
@@ -236,8 +235,7 @@ void main() {
   });
 
   group('Link & emphasis edge cases', () {
-    MD$Span linkOf(String input) =>
-        _spans(input).firstWhere((s) => s.extra != null);
+    MD$Span linkOf(String input) => _spans(input).firstWhere((s) => s.extra != null);
 
     test('unterminated angle-bracket url keeps the rest as url', () {
       expect(linkOf('[t](<https://x.io)').extra?['url'], 'https://x.io');

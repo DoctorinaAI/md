@@ -146,8 +146,7 @@ void main() {
     expect(box.paintCount, greaterThan(paintsAfterFirst));
   });
 
-  testWidgets('S7.2 content or size change DOES rebuild the Picture',
-      (tester) async {
+  testWidgets('S7.2 content or size change DOES rebuild the Picture', (tester) async {
     var text = 'first';
     var rev = 0;
     late StateSetter setOuter;

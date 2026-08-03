@@ -167,8 +167,7 @@ void main() {
     expect(result, 'Item0\nItem1\nItem2');
   });
 
-  testWidgets('S2.4 LIMIT: screen-Y snapshot key collides on reflow',
-      (tester) async {
+  testWidgets('S2.4 LIMIT: screen-Y snapshot key collides on reflow', (tester) async {
     final delegate = MdDelegate();
     final result = await _removeWhileSelected(tester, delegate, removeIndex: 1);
     debugPrint('S2.4 snapshots=${delegate.snapshotCount} '

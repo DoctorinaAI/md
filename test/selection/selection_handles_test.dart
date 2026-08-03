@@ -13,8 +13,7 @@ Future<void> _mouseDrag(WidgetTester tester, Offset from, Offset to) async {
   await tester.pumpAndSettle();
 }
 
-Widget _wrap(MarkdownSelectionController controller, Widget child) =>
-    MaterialApp(
+Widget _wrap(MarkdownSelectionController controller, Widget child) => MaterialApp(
       home: Scaffold(
         body: MarkdownSelectionScope(controller: controller, child: child),
       ),
@@ -34,12 +33,10 @@ class _Doc extends StatelessWidget {
 
 void main() {
   group('selection handles', () {
-    testWidgets('moveSelectionEdgeToGlobal adjusts the moving edge',
-        (tester) async {
+    testWidgets('moveSelectionEdgeToGlobal adjusts the moving edge', (tester) async {
       final md = Markdown.fromString('Hello selectable world');
       final controller = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
 
       await tester.pumpWidget(_wrap(
         controller,
@@ -56,8 +53,7 @@ void main() {
 
       // Pull the end edge back to near the start of the line.
       final tl = tester.getTopLeft(find.byType(MarkdownWidget));
-      controller.moveSelectionEdgeToGlobal(tl + const Offset(40, 8),
-          isStart: false);
+      controller.moveSelectionEdgeToGlobal(tl + const Offset(40, 8), isStart: false);
       await tester.pump();
 
       final text = controller.getText();
@@ -70,8 +66,7 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       final md = Markdown.fromString('Hello selectable world');
       final controller = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
 
       await tester.pumpWidget(_wrap(
         controller,
@@ -84,8 +79,7 @@ void main() {
 
       final tl = tester.getTopLeft(find.byType(MarkdownWidget));
       final br = tester.getBottomRight(find.byType(MarkdownWidget));
-      await _mouseDrag(
-          tester, tl + const Offset(1, 3), br - const Offset(1, 3));
+      await _mouseDrag(tester, tl + const Offset(1, 3), br - const Offset(1, 3));
 
       expect(controller.getText(), isNotEmpty);
       // Two handles are composited to follow the content.
@@ -98,8 +92,7 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       final md = Markdown.fromString('Hello selectable world');
       final controller = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
 
       await tester.pumpWidget(_wrap(
         controller,
@@ -112,8 +105,7 @@ void main() {
 
       final tl = tester.getTopLeft(find.byType(MarkdownWidget));
       final br = tester.getBottomRight(find.byType(MarkdownWidget));
-      await _mouseDrag(
-          tester, tl + const Offset(1, 3), br - const Offset(1, 3));
+      await _mouseDrag(tester, tl + const Offset(1, 3), br - const Offset(1, 3));
 
       expect(controller.getText(), isNotEmpty);
       expect(find.byType(CompositedTransformFollower), findsNothing);

@@ -106,14 +106,12 @@ void main() {
     });
 
     test('text around code is still converted', () {
-      final rendered =
-          _spans(r'$\alpha$ `$\beta$` $\gamma$').map((s) => s.text).join();
+      final rendered = _spans(r'$\alpha$ `$\beta$` $\gamma$').map((s) => s.text).join();
       expect(rendered, r'α $\beta$ γ');
     });
 
     test('fenced code block is never converted', () {
-      final code =
-          _math.convert('```\n\$\\alpha\$\n```').blocks.single as MD$Code;
+      final code = _math.convert('```\n\$\\alpha\$\n```').blocks.single as MD$Code;
       expect(code.text, r'$\alpha$');
     });
   });
@@ -177,8 +175,7 @@ void main() {
       ]) {
         final spans = _spans(input);
         for (var i = 0; i < spans.length; i++) {
-          expect(spans[i].start, lessThanOrEqualTo(spans[i].end),
-              reason: input);
+          expect(spans[i].start, lessThanOrEqualTo(spans[i].end), reason: input);
           if (i > 0) {
             expect(spans[i].start, greaterThanOrEqualTo(spans[i - 1].start),
                 reason: input);

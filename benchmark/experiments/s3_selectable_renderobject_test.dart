@@ -12,7 +12,6 @@
 //
 // Run: flutter test benchmark/experiments/s3_selectable_renderobject_test.dart
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -142,9 +141,8 @@ class MdSelectableRenderBox extends RenderBox with Selectable, SelectionRegistra
         return SelectionResult.end;
       case final SelectWordSelectionEvent e:
         final pos = _positionForLocal(globalToLocal(e.globalPosition));
-        final range = _blocks[pos.block]
-            .painter
-            .getWordBoundary(TextPosition(offset: pos.offset));
+        final range =
+            _blocks[pos.block].painter.getWordBoundary(TextPosition(offset: pos.offset));
         _start = _Pos(pos.block, range.start);
         _end = _Pos(pos.block, range.end);
         _recompute();
@@ -207,9 +205,7 @@ class MdSelectableRenderBox extends RenderBox with Selectable, SelectionRegistra
         startSelectionPoint: _pointFor(_start!, TextSelectionHandleType.left),
         endSelectionPoint: _pointFor(_end!, TextSelectionHandleType.right),
         selectionRects: rects,
-        status: collapsed
-            ? SelectionStatus.collapsed
-            : SelectionStatus.uncollapsed,
+        status: collapsed ? SelectionStatus.collapsed : SelectionStatus.uncollapsed,
         hasContent: true,
       );
     }
@@ -302,8 +298,7 @@ class MdSelectableWidget extends LeafRenderObjectWidget {
 void main() {
   const style = TextStyle(fontSize: 20, color: Color(0xFF000000));
 
-  testWidgets('S3 single selectable box spans blocks with separators',
-      (tester) async {
+  testWidgets('S3 single selectable box spans blocks with separators', (tester) async {
     String? captured;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -330,8 +325,7 @@ void main() {
 
     // Drag-select from the very top-left to the bottom-right (everything).
     final topLeft = tester.getTopLeft(find.byType(MdSelectableWidget));
-    final bottomRight =
-        tester.getBottomRight(find.byType(MdSelectableWidget));
+    final bottomRight = tester.getBottomRight(find.byType(MdSelectableWidget));
     final g = await tester.startGesture(topLeft + const Offset(1, 3),
         kind: PointerDeviceKind.mouse);
     await tester.pump(const Duration(milliseconds: 200));

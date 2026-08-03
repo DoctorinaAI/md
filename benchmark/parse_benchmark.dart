@@ -47,8 +47,7 @@ class Current$Benchmark extends BenchmarkBase {
     super.teardown();
     // Ensure the result is not null after running the benchmark
     // to disable compilation optimizations that might skip the run.
-    if (result == null)
-      throw StateError('Result is null, did you run the benchmark?');
+    if (result == null) throw StateError('Result is null, did you run the benchmark?');
   }
 }
 
@@ -59,9 +58,8 @@ class Google$Benchmark extends BenchmarkBase {
 
   @override
   void run() {
-    result =
-        markdown.Document(extensionSet: markdown.ExtensionSet.gitHubFlavored)
-            .parse(_testSample);
+    result = markdown.Document(extensionSet: markdown.ExtensionSet.gitHubFlavored)
+        .parse(_testSample);
   }
 
   @override
@@ -69,8 +67,7 @@ class Google$Benchmark extends BenchmarkBase {
     super.teardown();
     // Ensure the result is not null after running the benchmark
     // to disable compilation optimizations that might skip the run.
-    if (result == null)
-      throw StateError('Result is null, did you run the benchmark?');
+    if (result == null) throw StateError('Result is null, did you run the benchmark?');
   }
 }
 

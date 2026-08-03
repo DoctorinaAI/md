@@ -64,10 +64,8 @@ class LoremTab extends StatefulWidget {
 
 class _LoremTabState extends State<LoremTab> {
   final MarkdownSelectionGroup _group = MarkdownSelectionGroup();
-  late final MarkdownSelectionController _a =
-      MarkdownSelectionController(group: _group);
-  late final MarkdownSelectionController _b =
-      MarkdownSelectionController(group: _group);
+  late final MarkdownSelectionController _a = MarkdownSelectionController(group: _group);
+  late final MarkdownSelectionController _b = MarkdownSelectionController(group: _group);
   final Markdown _docA = Markdown.fromString(_loremMdA);
   final Markdown _docB = Markdown.fromString(_loremMdB);
 
@@ -79,10 +77,8 @@ class _LoremTabState extends State<LoremTab> {
   @override
   void initState() {
     super.initState();
-    _a.setDocuments(
-        <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'A', model: _docA)]);
-    _b.setDocuments(
-        <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'B', model: _docB)]);
+    _a.setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'A', model: _docA)]);
+    _b.setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'B', model: _docB)]);
     _a.addListener(_onMarkdownSelection);
     _b.addListener(_onMarkdownSelection);
   }
@@ -110,8 +106,7 @@ class _LoremTabState extends State<LoremTab> {
   }
 
   Future<void> _copy() async {
-    final text =
-        _isActive(_a) ? _a.getText() : (_isActive(_b) ? _b.getText() : '');
+    final text = _isActive(_a) ? _a.getText() : (_isActive(_b) ? _b.getText() : '');
     if (text.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
@@ -138,8 +133,8 @@ class _LoremTabState extends State<LoremTab> {
           ContextMenuButtonItem(
             label: 'Copy LOUD',
             onPressed: () {
-              Clipboard.setData(ClipboardData(
-                  text: state.controller.getText().toUpperCase()));
+              Clipboard.setData(
+                  ClipboardData(text: state.controller.getText().toUpperCase()));
               state.hideToolbar();
             },
           ),
@@ -171,8 +166,7 @@ class _LoremTabState extends State<LoremTab> {
                     child: MarkdownWidget(markdown: _docB, documentId: 'B'),
                   ),
                   const Divider(height: 40),
-                  _label(
-                      'Plain SelectableText — resets with the Markdown ones'),
+                  _label('Plain SelectableText — resets with the Markdown ones'),
                   SelectionArea(
                     key: ValueKey<int>(_plainEpoch),
                     onSelectionChanged: (content) {

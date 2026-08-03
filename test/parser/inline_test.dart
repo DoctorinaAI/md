@@ -77,10 +77,8 @@ void main() => group('Inline parsing', () {
           expect(_styleOf(spans, 'You').contains(MD$Style.monospace), isTrue);
           expect(_styleOf(spans, 'You').contains(MD$Style.italic), isTrue);
           expect(_styleOf(spans, 'can').contains(MD$Style.bold), isTrue);
-          expect(
-              _styleOf(spans, 'combine').contains(MD$Style.underline), isTrue);
-          expect(
-              _styleOf(spans, 'them').contains(MD$Style.strikethrough), isTrue);
+          expect(_styleOf(spans, 'combine').contains(MD$Style.underline), isTrue);
+          expect(_styleOf(spans, 'them').contains(MD$Style.strikethrough), isTrue);
         });
       });
 
@@ -142,8 +140,7 @@ void main() => group('Inline parsing', () {
           final spans = _spans('[text](https://example.com)');
           expect(spans.single.style, MD$Style.link);
           expect(spans.single.text, 'text');
-          expect(
-              spans.single.extra, containsPair('url', 'https://example.com'));
+          expect(spans.single.extra, containsPair('url', 'https://example.com'));
         });
 
         test('link with double-quoted title', () {
@@ -164,15 +161,13 @@ void main() => group('Inline parsing', () {
 
         test('url containing balanced parentheses', () {
           final spans = _spans('[a](https://x.com/a_(b)_c)');
-          expect(
-              spans.single.extra, containsPair('url', 'https://x.com/a_(b)_c'));
+          expect(spans.single.extra, containsPair('url', 'https://x.com/a_(b)_c'));
         });
 
         test('image exposes src and image style', () {
           final spans = _spans('![alt](https://x.com/i.png)');
           expect(spans.single.style, MD$Style.image);
-          expect(
-              spans.single.extra, containsPair('src', 'https://x.com/i.png'));
+          expect(spans.single.extra, containsPair('src', 'https://x.com/i.png'));
         });
 
         test('emphasis wrapping a link merges styles', () {

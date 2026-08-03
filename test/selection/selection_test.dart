@@ -83,8 +83,7 @@ void main() {
     test('reconcile: append keeps the anchor verbatim', () {
       final c = two()..selection = full;
       final before = c.getText();
-      c.putDocument(
-          'b', Markdown.fromString('Bravo one\n\nBravo two three\n\nEnd'));
+      c.putDocument('b', Markdown.fromString('Bravo one\n\nBravo two three\n\nEnd'));
       expect(c.selection!.extent.blockIndex, 2);
       expect(c.selection!.extent.offset, 9);
       expect(c.getText(), before);
@@ -92,15 +91,13 @@ void main() {
 
     test('reconcile: content-anchored survives a front-insert', () {
       final c = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'b', model: docB)])
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'b', model: docB)])
         ..selection = const MarkdownSelection(
           base: MarkdownPosition(documentId: 'b', blockIndex: 2, offset: 0),
           extent: MarkdownPosition(documentId: 'b', blockIndex: 2, offset: 9),
         );
       expect(c.getText(), 'Bravo two');
-      c.putDocument(
-          'b', Markdown.fromString('HEADER\n\nBravo one\n\nBravo two'));
+      c.putDocument('b', Markdown.fromString('HEADER\n\nBravo one\n\nBravo two'));
       expect(c.getText(), 'Bravo two'); // relocated by content, not index
     });
 
@@ -108,15 +105,13 @@ void main() {
       final c = MarkdownSelectionController(
         reconciliation: const MarkdownReconciliationPolicy.appendFastPath(),
       )
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'b', model: docB)])
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'b', model: docB)])
         ..selection = const MarkdownSelection(
           base: MarkdownPosition(documentId: 'b', blockIndex: 0, offset: 0),
           extent: MarkdownPosition(documentId: 'b', blockIndex: 0, offset: 9),
         );
       expect(c.getText(), 'Bravo one');
-      c.putDocument(
-          'b', Markdown.fromString('HEADER LINE\n\nBravo one\n\nBravo two'));
+      c.putDocument('b', Markdown.fromString('HEADER LINE\n\nBravo one\n\nBravo two'));
       expect(c.getText(), isNot('Bravo one')); // clamped to new block 0
     });
 
@@ -124,8 +119,7 @@ void main() {
       final c = MarkdownSelectionController(
         reconciliation: const MarkdownReconciliationPolicy.clearOnChange(),
       )
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'b', model: docB)])
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'b', model: docB)])
         ..selection = const MarkdownSelection(
           base: MarkdownPosition(documentId: 'b', blockIndex: 0, offset: 0),
           extent: MarkdownPosition(documentId: 'b', blockIndex: 2, offset: 9),

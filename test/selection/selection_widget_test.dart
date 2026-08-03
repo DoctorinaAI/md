@@ -12,8 +12,7 @@ Future<void> _mouseDrag(WidgetTester tester, Offset from, Offset to) async {
   await tester.pumpAndSettle();
 }
 
-Widget _wrap(MarkdownSelectionController controller, Widget child) =>
-    MaterialApp(
+Widget _wrap(MarkdownSelectionController controller, Widget child) => MaterialApp(
       home: Scaffold(
         body: MarkdownSelectionScope(controller: controller, child: child),
       ),
@@ -24,8 +23,7 @@ void main() {
     testWidgets('drag selects a single paragraph', (tester) async {
       final md = Markdown.fromString('Hello selectable world');
       final controller = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
 
       await tester.pumpWidget(_wrap(
         controller,
@@ -38,8 +36,7 @@ void main() {
 
       final tl = tester.getTopLeft(find.byType(MarkdownWidget));
       final br = tester.getBottomRight(find.byType(MarkdownWidget));
-      await _mouseDrag(
-          tester, tl + const Offset(1, 3), br - const Offset(1, 3));
+      await _mouseDrag(tester, tl + const Offset(1, 3), br - const Offset(1, 3));
 
       expect(controller.getText(), 'Hello selectable world');
       expect(tester.takeException(), isNull);
@@ -82,8 +79,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('cross-widget selection survives ListView disposal',
-        (tester) async {
+    testWidgets('cross-widget selection survives ListView disposal', (tester) async {
       final controller = MarkdownSelectionController()
         ..setDocuments(<MarkdownDocumentRef>[
           for (var i = 0; i < 10; i++)
@@ -112,8 +108,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final p0 = tester.getTopLeft(find.byType(MarkdownWidget).first) +
-          const Offset(1, 3);
+      final p0 =
+          tester.getTopLeft(find.byType(MarkdownWidget).first) + const Offset(1, 3);
       final p1 = tester.getCenter(find.byType(MarkdownWidget).at(1));
       await _mouseDrag(tester, p0, p1);
       final before = controller.getText();
@@ -122,9 +118,7 @@ void main() {
 
       scroll.jumpTo(80.0 * 7); // dispose the first messages
       await tester.pumpAndSettle();
-      expect(
-          find.byWidgetPredicate(
-              (w) => w is MarkdownWidget && w.documentId == 'm0'),
+      expect(find.byWidgetPredicate((w) => w is MarkdownWidget && w.documentId == 'm0'),
           findsNothing);
 
       // Text is derived from the model registry → intact after disposal.
@@ -133,17 +127,14 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('selecting in one controller clears the other (group)',
-        (tester) async {
+    testWidgets('selecting in one controller clears the other (group)', (tester) async {
       final group = MarkdownSelectionGroup();
       final a = Markdown.fromString('Alpha body text');
       final b = Markdown.fromString('Bravo body text');
       final ca = MarkdownSelectionController(group: group)
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'a', model: a)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'a', model: a)]);
       final cb = MarkdownSelectionController(group: group)
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'b', model: b)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'b', model: b)]);
 
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -165,8 +156,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Select in controller B first.
-      final bw = find
-          .byWidgetPredicate((w) => w is MarkdownWidget && w.documentId == 'b');
+      final bw =
+          find.byWidgetPredicate((w) => w is MarkdownWidget && w.documentId == 'b');
       await _mouseDrag(
         tester,
         tester.getTopLeft(bw) + const Offset(1, 3),
@@ -175,25 +166,22 @@ void main() {
       expect(cb.getText(), isNotEmpty);
 
       // Now select in controller A — B must be cleared.
-      final aw = find
-          .byWidgetPredicate((w) => w is MarkdownWidget && w.documentId == 'a');
+      final aw =
+          find.byWidgetPredicate((w) => w is MarkdownWidget && w.documentId == 'a');
       await _mouseDrag(
         tester,
         tester.getTopLeft(aw) + const Offset(1, 3),
         tester.getBottomRight(aw) - const Offset(1, 3),
       );
       expect(ca.getText(), isNotEmpty);
-      expect(cb.selection, isNull,
-          reason: 'group cleared the other controller');
+      expect(cb.selection, isNull, reason: 'group cleared the other controller');
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('MarkdownWidget without documentId stays inert',
-        (tester) async {
+    testWidgets('MarkdownWidget without documentId stays inert', (tester) async {
       final md = Markdown.fromString('Not selectable here');
       final controller = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'x', model: md)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'x', model: md)]);
       await tester.pumpWidget(_wrap(
         controller,
         SizedBox(width: 400, child: MarkdownWidget(markdown: md)),
@@ -202,8 +190,7 @@ void main() {
 
       final tl = tester.getTopLeft(find.byType(MarkdownWidget));
       final br = tester.getBottomRight(find.byType(MarkdownWidget));
-      await _mouseDrag(
-          tester, tl + const Offset(1, 3), br - const Offset(1, 3));
+      await _mouseDrag(tester, tl + const Offset(1, 3), br - const Offset(1, 3));
 
       expect(controller.getText(), '', reason: 'no documentId => inert');
       expect(tester.takeException(), isNull);
@@ -228,16 +215,12 @@ void main() {
       expect(controller.getText(), '');
     });
 
-    testWidgets('drag past an empty document still selects a real one',
-        (tester) async {
+    testWidgets('drag past an empty document still selects a real one', (tester) async {
       final controller = MarkdownSelectionController()
         ..setDocuments(<MarkdownDocumentRef>[
-          const MarkdownDocumentRef(
-              id: 'empty', model: Markdown.empty(), order: 0),
+          const MarkdownDocumentRef(id: 'empty', model: Markdown.empty(), order: 0),
           MarkdownDocumentRef(
-              id: 'real',
-              model: Markdown.fromString('Real content here'),
-              order: 1),
+              id: 'real', model: Markdown.fromString('Real content here'), order: 1),
         ]);
       await tester.pumpWidget(_wrap(
         controller,
@@ -254,8 +237,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final realWidget = find.byWidgetPredicate(
-          (w) => w is MarkdownWidget && w.documentId == 'real');
+      final realWidget =
+          find.byWidgetPredicate((w) => w is MarkdownWidget && w.documentId == 'real');
       await _mouseDrag(
         tester,
         tester.getTopLeft(realWidget) + const Offset(1, 3),
@@ -266,12 +249,10 @@ void main() {
     });
 
     testWidgets('drag selects the cells of a table', (tester) async {
-      final md =
-          Markdown.fromString('| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |');
+      final md = Markdown.fromString('| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |');
       final table = md.blocks.firstWhere((b) => b.type == 'table');
       final controller = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
 
       await tester.pumpWidget(_wrap(
         controller,
@@ -284,8 +265,7 @@ void main() {
 
       final tl = tester.getTopLeft(find.byType(MarkdownWidget));
       final br = tester.getBottomRight(find.byType(MarkdownWidget));
-      await _mouseDrag(
-          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+      await _mouseDrag(tester, tl + const Offset(2, 2), br - const Offset(2, 2));
 
       expect(controller.getText(), markdownBlockRenderedText(table));
       expect(controller.getText(), 'A\tB\n1\t2\n3\t4');
@@ -295,8 +275,7 @@ void main() {
     testWidgets('drag selects the items of a list', (tester) async {
       final md = Markdown.fromString('- alpha\n- beta\n- gamma');
       final controller = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
 
       await tester.pumpWidget(_wrap(
         controller,
@@ -309,20 +288,17 @@ void main() {
 
       final tl = tester.getTopLeft(find.byType(MarkdownWidget));
       final br = tester.getBottomRight(find.byType(MarkdownWidget));
-      await _mouseDrag(
-          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+      await _mouseDrag(tester, tl + const Offset(2, 2), br - const Offset(2, 2));
 
       expect(controller.getText(), 'alpha\nbeta\ngamma');
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('selection spanning a table includes its cells',
-        (tester) async {
+    testWidgets('selection spanning a table includes its cells', (tester) async {
       final md = Markdown.fromString(
           'Intro line\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nOutro line');
       final controller = MarkdownSelectionController()
-        ..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+        ..setDocuments(<MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
 
       await tester.pumpWidget(_wrap(
         controller,
@@ -335,8 +311,7 @@ void main() {
 
       final tl = tester.getTopLeft(find.byType(MarkdownWidget));
       final br = tester.getBottomRight(find.byType(MarkdownWidget));
-      await _mouseDrag(
-          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+      await _mouseDrag(tester, tl + const Offset(2, 2), br - const Offset(2, 2));
 
       expect(controller.getText(), 'Intro line\nA\tB\n1\t2\nOutro line');
       expect(tester.takeException(), isNull);

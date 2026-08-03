@@ -9,12 +9,9 @@ void main() => group('MarkdownThemeData', () {
       group('Alert colors', () {
         test('defaults to the GitHub palette', () {
           final theme = base();
-          expect(
-              theme.alertColorFor(MD$AlertType.note), const Color(0xFF0969DA));
-          expect(theme.alertColorFor(MD$AlertType.warning),
-              const Color(0xFF9A6700));
-          expect(theme.alertColorFor(MD$AlertType.caution),
-              const Color(0xFFCF222E));
+          expect(theme.alertColorFor(MD$AlertType.note), const Color(0xFF0969DA));
+          expect(theme.alertColorFor(MD$AlertType.warning), const Color(0xFF9A6700));
+          expect(theme.alertColorFor(MD$AlertType.caution), const Color(0xFFCF222E));
         });
 
         test('respects overrides while keeping defaults for the rest', () {
@@ -24,11 +21,9 @@ void main() => group('MarkdownThemeData', () {
               MD$AlertType.note: Color(0xFF123456),
             },
           );
-          expect(
-              theme.alertColorFor(MD$AlertType.note), const Color(0xFF123456));
+          expect(theme.alertColorFor(MD$AlertType.note), const Color(0xFF123456));
           // Unspecified types still use the default palette.
-          expect(
-              theme.alertColorFor(MD$AlertType.tip), const Color(0xFF1A7F37));
+          expect(theme.alertColorFor(MD$AlertType.tip), const Color(0xFF1A7F37));
         });
       });
 
@@ -110,8 +105,7 @@ void main() => group('MarkdownThemeData', () {
           ),
         );
         expect(derived.linkStyle?.color, Colors.purple);
-        expect(
-            derived.alertColorFor(MD$AlertType.note), const Color(0xFF0969DA));
+        expect(derived.alertColorFor(MD$AlertType.note), const Color(0xFF0969DA));
       });
 
       group('headingStyleFor', () {
@@ -202,8 +196,7 @@ void main() => group('MarkdownThemeData', () {
         test('updateShouldNotify compares data identity', () {
           final a = MarkdownTheme(data: base(), child: const SizedBox());
           final same = MarkdownTheme(data: a.data, child: const SizedBox());
-          final different =
-              MarkdownTheme(data: base(), child: const SizedBox());
+          final different = MarkdownTheme(data: base(), child: const SizedBox());
           expect(a.updateShouldNotify(same), isFalse);
           expect(a.updateShouldNotify(different), isTrue);
         });

@@ -139,8 +139,8 @@ void main() {
         '[styled](https://example.com)',
         theme: MarkdownThemeData(
           textStyle: const TextStyle(fontSize: 14),
-          linkStyle: const TextStyle(
-              color: Colors.red, decoration: TextDecoration.underline),
+          linkStyle:
+              const TextStyle(color: Colors.red, decoration: TextDecoration.underline),
         ),
       );
       expect(tester.takeException(), isNull);

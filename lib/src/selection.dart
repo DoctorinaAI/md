@@ -121,9 +121,7 @@ final class MarkdownSelection {
 
   @override
   bool operator ==(Object other) =>
-      other is MarkdownSelection &&
-      other.base == base &&
-      other.extent == extent;
+      other is MarkdownSelection && other.base == base && other.extent == extent;
 
   @override
   int get hashCode => Object.hash(base, extent);
@@ -136,8 +134,7 @@ final class MarkdownSelection {
 @immutable
 final class MarkdownDocumentRef {
   /// Creates a reference binding a stable [id] to its immutable [model].
-  const MarkdownDocumentRef(
-      {required this.id, required this.model, this.order});
+  const MarkdownDocumentRef({required this.id, required this.model, this.order});
 
   /// Stable id of the document (e.g. a chat message id).
   final Object id;
@@ -267,13 +264,11 @@ final class MarkdownPlainTextFormatter implements MarkdownSelectionFormatter {
 abstract interface class MarkdownReconciliationPolicy {
   /// Append-only fast path, else clamp indices/offsets into the new bounds.
   /// Cheapest; correct for streaming appends, drifts on front/mid inserts.
-  const factory MarkdownReconciliationPolicy.appendFastPath() =
-      _AppendFastPathPolicy;
+  const factory MarkdownReconciliationPolicy.appendFastPath() = _AppendFastPathPolicy;
 
   /// Append fast path, then relocate by matching block rendered text, else
   /// clamp. The default — robust to inserts/reorders without a model id.
-  const factory MarkdownReconciliationPolicy.contentAnchored() =
-      _ContentAnchoredPolicy;
+  const factory MarkdownReconciliationPolicy.contentAnchored() = _ContentAnchoredPolicy;
 
   /// Drop the selection whenever the anchor's document changes at all.
   const factory MarkdownReconciliationPolicy.clearOnChange() = _ClearPolicy;
@@ -288,8 +283,7 @@ abstract interface class MarkdownReconciliationPolicy {
 
 MarkdownPosition _clampInto(MarkdownPosition anchor, Markdown model) {
   if (model.blocks.isEmpty) {
-    return MarkdownPosition(
-        documentId: anchor.documentId, blockIndex: 0, offset: 0);
+    return MarkdownPosition(documentId: anchor.documentId, blockIndex: 0, offset: 0);
   }
   final bi = anchor.blockIndex.clamp(0, model.blocks.length - 1);
   final len = markdownBlockRenderedText(model.blocks[bi]).length;
@@ -301,8 +295,7 @@ MarkdownPosition _clampInto(MarkdownPosition anchor, Markdown model) {
 }
 
 bool _appendPrefixKeeps(MarkdownPosition anchor, Markdown o, Markdown n) {
-  if (anchor.blockIndex >= o.blocks.length ||
-      anchor.blockIndex >= n.blocks.length) {
+  if (anchor.blockIndex >= o.blocks.length || anchor.blockIndex >= n.blocks.length) {
     return false;
   }
   for (var i = 0; i < anchor.blockIndex; i++) {
@@ -369,8 +362,7 @@ class _ContentAnchoredPolicy implements MarkdownReconciliationPolicy {
 class _ClearPolicy implements MarkdownReconciliationPolicy {
   const _ClearPolicy();
   @override
-  MarkdownPosition? remap(MarkdownPosition anchor, Markdown o, Markdown n) =>
-      null;
+  MarkdownPosition? remap(MarkdownPosition anchor, Markdown o, Markdown n) => null;
 }
 
 /// A mounted document's geometry bridge — the controller's window onto a live
@@ -465,8 +457,8 @@ class MarkdownSelectionController extends ChangeNotifier {
     MarkdownReconciliationPolicy? reconciliation,
     MarkdownSelectionFormatter formatter = const MarkdownPlainTextFormatter(),
     MarkdownSelectionGroup? group,
-  })  : reconciliation = reconciliation ??
-            const MarkdownReconciliationPolicy.contentAnchored(),
+  })  : reconciliation =
+            reconciliation ?? const MarkdownReconciliationPolicy.contentAnchored(),
         _formatter = formatter,
         _group = group {
     group?._add(this);
@@ -540,8 +532,7 @@ class MarkdownSelectionController extends ChangeNotifier {
     _docs
       ..clear()
       ..addAll(<_DocEntry>[
-        for (final (i, d) in docs.indexed)
-          _DocEntry(d.id, d.model, d.order ?? i),
+        for (final (i, d) in docs.indexed) _DocEntry(d.id, d.model, d.order ?? i),
       ]);
     _sort();
     _validateSelection();
@@ -576,8 +567,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   void removeDocument(Object id) {
     _docs.removeWhere((e) => e.id == id);
     final sel = _selection;
-    if (sel != null &&
-        (sel.base.documentId == id || sel.extent.documentId == id)) {
+    if (sel != null && (sel.base.documentId == id || sel.extent.documentId == id)) {
       _selection = null;
     }
     notifyListeners();
@@ -604,8 +594,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   void _validateSelection() {
     final sel = _selection;
     if (sel == null) return;
-    if (_orderIndex(sel.base.documentId) < 0 ||
-        _orderIndex(sel.extent.documentId) < 0) {
+    if (_orderIndex(sel.base.documentId) < 0 || _orderIndex(sel.extent.documentId) < 0) {
       _selection = null;
       return;
     }
@@ -666,10 +655,8 @@ class MarkdownSelectionController extends ChangeNotifier {
     final maxX = bounds.right - 0.01;
     final maxY = bounds.bottom - 0.01;
     final clamped = Offset(
-      globalPosition.dx
-          .clamp(bounds.left, maxX < bounds.left ? bounds.left : maxX),
-      globalPosition.dy
-          .clamp(bounds.top, maxY < bounds.top ? bounds.top : maxY),
+      globalPosition.dx.clamp(bounds.left, maxX < bounds.left ? bounds.left : maxX),
+      globalPosition.dy.clamp(bounds.top, maxY < bounds.top ? bounds.top : maxY),
     );
     return nearest.positionForGlobal(clamped);
   }
@@ -881,15 +868,13 @@ class MarkdownSelectionController extends ChangeNotifier {
   MarkdownSelectedContent selectedContent() {
     final sel = _selection;
     if (sel == null) {
-      return const MarkdownSelectedContent(
-          documents: <MarkdownSelectedDocument>[]);
+      return const MarkdownSelectedContent(documents: <MarkdownSelectedDocument>[]);
     }
     final (a, b) = _ordered(sel);
     final startDoc = _orderIndex(a.documentId);
     final endDoc = _orderIndex(b.documentId);
     if (startDoc < 0 || endDoc < 0) {
-      return const MarkdownSelectedContent(
-          documents: <MarkdownSelectedDocument>[]);
+      return const MarkdownSelectedContent(documents: <MarkdownSelectedDocument>[]);
     }
     final out = <MarkdownSelectedDocument>[];
     for (var d = startDoc; d <= endDoc; d++) {
@@ -901,9 +886,8 @@ class MarkdownSelectionController extends ChangeNotifier {
       for (var bi = fromBlock; bi <= toBlock && bi < blocks.length; bi++) {
         if (bi < 0) continue;
         final text = markdownBlockRenderedText(blocks[bi]);
-        final from = (d == startDoc && bi == a.blockIndex)
-            ? a.offset.clamp(0, text.length)
-            : 0;
+        final from =
+            (d == startDoc && bi == a.blockIndex) ? a.offset.clamp(0, text.length) : 0;
         final to = (d == endDoc && bi == b.blockIndex)
             ? b.offset.clamp(0, text.length)
             : text.length;
@@ -936,8 +920,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   int _compare(MarkdownPosition a, MarkdownPosition b) {
     final ai = _orderIndex(a.documentId), bi = _orderIndex(b.documentId);
     if (ai != bi) return ai.compareTo(bi);
-    if (a.blockIndex != b.blockIndex)
-      return a.blockIndex.compareTo(b.blockIndex);
+    if (a.blockIndex != b.blockIndex) return a.blockIndex.compareTo(b.blockIndex);
     return a.offset.compareTo(b.offset);
   }
 
@@ -1025,8 +1008,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   MarkdownPosition _stepLineBreak(MarkdownPosition p, {required bool forward}) {
     final di = _orderIndex(p.documentId);
     if (di < 0) return p;
-    return p.copyWith(
-        offset: forward ? _blockTextAt(di, p.blockIndex).length : 0);
+    return p.copyWith(offset: forward ? _blockTextAt(di, p.blockIndex).length : 0);
   }
 
   MarkdownPosition _documentBoundary({required bool forward}) {
@@ -1038,8 +1020,7 @@ class MarkdownSelectionController extends ChangeNotifier {
           blockIndex: bi < 0 ? 0 : bi,
           offset: bi < 0 ? 0 : _blockTextAt(di, bi).length);
     }
-    return MarkdownPosition(
-        documentId: _docs.first.id, blockIndex: 0, offset: 0);
+    return MarkdownPosition(documentId: _docs.first.id, blockIndex: 0, offset: 0);
   }
 }
 
@@ -1049,13 +1030,11 @@ class MarkdownSelectionController extends ChangeNotifier {
 /// are cleared. Call [clearExternal] when a non-Markdown selectable (e.g. a
 /// plain `SelectableText` / `SelectionArea`) begins its own selection.
 class MarkdownSelectionGroup {
-  final Set<MarkdownSelectionController> _members =
-      <MarkdownSelectionController>{};
+  final Set<MarkdownSelectionController> _members = <MarkdownSelectionController>{};
 
   void _add(MarkdownSelectionController controller) => _members.add(controller);
 
-  void _remove(MarkdownSelectionController controller) =>
-      _members.remove(controller);
+  void _remove(MarkdownSelectionController controller) => _members.remove(controller);
 
   void _claim(MarkdownSelectionController owner) {
     for (final member in _members) {

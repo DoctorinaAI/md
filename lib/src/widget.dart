@@ -40,8 +40,7 @@ class MarkdownWidget extends LeafRenderObjectWidget {
       MarkdownThemeData(
         textStyle: DefaultTextStyle.of(context).style,
         textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
-        textScaler:
-            MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
+        textScaler: MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
       );
 
   MarkdownSelectionController? _resolveController(BuildContext context) =>

@@ -61,8 +61,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// space/tab or the end of the line (so `#hashtag` and 7+ `#` are not
   /// headings). Group 2 captures the heading text; a trailing run of `#`
   /// characters is stripped separately.
-  static final RegExp _headingPattern =
-      RegExp(r'^(#{1,6})(?:[ \t]+(.*?))?[ \t]*$');
+  static final RegExp _headingPattern = RegExp(r'^(#{1,6})(?:[ \t]+(.*?))?[ \t]*$');
 
   /// Matches an optional ATX closing sequence of `#` characters.
   static final RegExp _headingClosingPattern = RegExp(r'[ \t]+#+$');
@@ -75,14 +74,12 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// every candidate line (once to open a list, then once per line to find its
   /// end). The returned [text] still includes leading whitespace, matching the
   /// old capture group; callers trim it as before.
-  static ({int indent, String marker, String text})? _parseListLine(
-      String line) {
+  static ({int indent, String marker, String text})? _parseListLine(String line) {
     final len = line.length;
     // Leading indent: at most 8 spaces or tabs.
     var i = 0;
-    while (i < len &&
-        i < 8 &&
-        (line.codeUnitAt(i) == 0x20 || line.codeUnitAt(i) == 0x09)) {
+    while (
+        i < len && i < 8 && (line.codeUnitAt(i) == 0x20 || line.codeUnitAt(i) == 0x09)) {
       i++;
     }
     if (i >= len) return null;
@@ -129,9 +126,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// A regular expression pattern to match GitHub alert markers,
   /// e.g. `[!NOTE]`, `[!WARNING]`. Matched case-insensitively against the
   /// first line of a blockquote.
-  static final RegExp _alertPattern = RegExp(
-      r'^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]$',
-      caseSensitive: false);
+  static final RegExp _alertPattern =
+      RegExp(r'^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]$', caseSensitive: false);
 
   /// A regular expression pattern to match a GitHub task-list checkbox at the
   /// start of a list item, e.g. `[ ] todo`, `[x] done`, `[X] done`.
@@ -188,8 +184,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
 
     // Resolve the inline-math replacement table once; `null` disables math and
     // keeps `_parseInlineSpans` from touching it at all.
-    final math =
-        inlineMath ? (mathReplacements ?? kMarkdownMathCommands) : null;
+    final math = inlineMath ? (mathReplacements ?? kMarkdownMathCommands) : null;
 
     final paragraph = StringBuffer(); // To accumulate lines for paragraphs
 
@@ -245,12 +240,9 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         }
         final level = match.group(1)!.length;
         // Strip an optional closing sequence of `#` (e.g. "## Heading ##").
-        final text =
-            (match.group(2) ?? '').replaceFirst(_headingClosingPattern, '');
+        final text = (match.group(2) ?? '').replaceFirst(_headingClosingPattern, '');
         pushBlock(MD$Heading(
-            level: level,
-            text: text,
-            spans: _parseInlineSpans(text, math: math)));
+            level: level, text: text, spans: _parseInlineSpans(text, math: math)));
         continue;
       } else if (c0 == 0x3E /* > */) {
         // Parse quotes and GitHub-style alerts.
@@ -263,9 +255,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
 
         // A blockquote whose first line is `[!TYPE]` becomes an alert block.
         final alertMatch = _alertPattern.firstMatch(quoteLines.first);
-        final alertType = alertMatch != null
-            ? MD$AlertType.tryParse(alertMatch.group(1)!)
-            : null;
+        final alertType =
+            alertMatch != null ? MD$AlertType.tryParse(alertMatch.group(1)!) : null;
         if (alertType != null) {
           // The alert body is everything after the marker line.
           final body = quoteLines.skip(1).join('\n').trim();
@@ -314,8 +305,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
           continue;
         }
         final firstTask = _parseTask(first.text.trim());
-        final list =
-            <({int intent, String marker, String text, bool? checked})>[
+        final list = <({int intent, String marker, String text, bool? checked})>[
           (
             intent: 0,
             marker: first.marker,
@@ -357,8 +347,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
               final children = traverse(indent: item.intent);
               if (items.isNotEmpty) {
                 // If we have a parent item, add children to it
-                items.last = items.last.copyWith(
-                    children: List<MD$ListItem>.unmodifiable(children));
+                items.last = items.last
+                    .copyWith(children: List<MD$ListItem>.unmodifiable(children));
               } else {
                 // If this is the first item, just add children
                 items.add(MD$ListItem(
@@ -787,8 +777,7 @@ bool _hasClosingBacktick(List<int> codes, int length, int from) {
 /// [markerLen]) exists at or after [from]. A closer must be right-flanking
 /// (preceded by a non-space); underscore closers must also be at a word
 /// boundary. Escaped characters are skipped.
-bool _hasEmphasisCloser(
-    List<int> codes, int length, int from, int ch, int markerLen) {
+bool _hasEmphasisCloser(List<int> codes, int length, int from, int ch, int markerLen) {
   for (var j = from; j < length; j++) {
     if (codes[j] == 0x5C /* \ */) {
       j++; // Skip the escaped character.
@@ -828,8 +817,7 @@ bool _emphasisValid(
     if (i == 0 || _isInlineSpace(codes[i - 1])) return false;
     // Underscore cannot close inside a word.
     final after = i + markerLen;
-    if (ch == 0x5F /* _ */ && after < length && _isWordChar(codes[after]))
-      return false;
+    if (ch == 0x5F /* _ */ && after < length && _isWordChar(codes[after])) return false;
     return true;
   }
 }
@@ -997,12 +985,10 @@ List<MD$Span> _parseInlineSpans(String text, {Map<String, String>? math}) {
           var segmentStart = start;
           for (var e = 0; e < excluded.length; e++) {
             final idx = excluded[e];
-            if (idx > segmentStart)
-              buffer.write(text.substring(segmentStart, idx));
+            if (idx > segmentStart) buffer.write(text.substring(segmentStart, idx));
             segmentStart = idx + 1;
           }
-          if (segmentStart < end)
-            buffer.write(text.substring(segmentStart, end));
+          if (segmentStart < end) buffer.write(text.substring(segmentStart, end));
           spans.add(
             MD$Span(
               start: start,

@@ -228,8 +228,7 @@ void main() {
     // across m0..m1 by hit-testing their mounted surfaces — exactly what the
     // scope gesture layer does on a real drag.
     final p0 = tester.getTopLeft(find.byType(MdMessage).first) + const Offset(1, 3);
-    final m1 = find.byWidgetPredicate(
-        (w) => w is MdMessage && w.docId == 'm1');
+    final m1 = find.byWidgetPredicate((w) => w is MdMessage && w.docId == 'm1');
     final p1 = tester.getBottomRight(m1) - const Offset(1, 3);
     controller.startAt(p0);
     controller.extendTo(p1);
@@ -242,8 +241,8 @@ void main() {
     // Scroll so m0 is disposed.
     scroll.jumpTo(80.0 * 6);
     await tester.pumpAndSettle();
-    expect(find.byWidgetPredicate((w) => w is MdMessage && w.docId == 'm0'),
-        findsNothing);
+    expect(
+        find.byWidgetPredicate((w) => w is MdMessage && w.docId == 'm0'), findsNothing);
     expect(controller.mountedDocIds, isNot(contains('m0')),
         reason: 'm0 surface unregistered on disposal');
 

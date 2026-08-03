@@ -74,8 +74,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       h6Style: h6Style ?? theme.textTheme.titleSmall,
       quoteStyle: quoteStyle ??
           theme.textTheme.bodyMedium?.copyWith(
-              color:
-                  theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.75)),
+              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.75)),
       linkColor: linkColor ?? theme.colorScheme.primary,
       linkStyle: linkStyle,
       surfaceColor: surfaceColor ?? theme.colorScheme.surfaceContainerHigh,
@@ -150,8 +149,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   final Map<MD$AlertType, Color>? alertColors;
 
   /// The default GitHub-style accent color for each alert type (light theme).
-  static const Map<MD$AlertType, Color> _defaultAlertColors =
-      <MD$AlertType, Color>{
+  static const Map<MD$AlertType, Color> _defaultAlertColors = <MD$AlertType, Color>{
     MD$AlertType.note: Color(0xFF0969DA), // blue
     MD$AlertType.tip: Color(0xFF1A7F37), // green
     MD$AlertType.important: Color(0xFF8250DF), // purple
@@ -247,11 +245,9 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
               var s when s.contains(MD$Style.highlight) => FontWeight.bold,
               _ => null,
             },
-            fontStyle:
-                style.contains(MD$Style.italic) ? FontStyle.italic : null,
+            fontStyle: style.contains(MD$Style.italic) ? FontStyle.italic : null,
             decoration: switch (style) {
-              var s when s.contains(MD$Style.underline) =>
-                TextDecoration.underline,
+              var s when s.contains(MD$Style.underline) => TextDecoration.underline,
               var s when s.contains(MD$Style.strikethrough) =>
                 TextDecoration.lineThrough,
               _ => null,
@@ -262,10 +258,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
               _ => null,
             },
             backgroundColor: switch (style) {
-              var s when s.contains(MD$Style.highlight) =>
-                highlightBackgroundColor,
-              var s when s.contains(MD$Style.monospace) =>
-                monospaceBackgroundColor,
+              var s when s.contains(MD$Style.highlight) => highlightBackgroundColor,
+              var s when s.contains(MD$Style.monospace) => monospaceBackgroundColor,
               _ => null,
             },
           );
@@ -335,10 +329,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     if (identical(this, other)) return this;
 
     return MarkdownThemeData(
-      textDirection:
-          t < 0.5 ? textDirection : other?.textDirection ?? TextDirection.ltr,
-      textScaler:
-          t < 0.5 ? textScaler : other?.textScaler ?? TextScaler.noScaling,
+      textDirection: t < 0.5 ? textDirection : other?.textDirection ?? TextDirection.ltr,
+      textScaler: t < 0.5 ? textScaler : other?.textScaler ?? TextScaler.noScaling,
       textStyle: TextStyle.lerp(textStyle, other?.textStyle, t)!,
       h1Style: TextStyle.lerp(h1Style, other?.h1Style, t),
       h2Style: TextStyle.lerp(h2Style, other?.h2Style, t),
@@ -350,10 +342,10 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       linkColor: Color.lerp(linkColor, other?.linkColor, t),
       linkStyle: TextStyle.lerp(linkStyle, other?.linkStyle, t),
       surfaceColor: Color.lerp(surfaceColor, other?.surfaceColor, t),
-      highlightBackgroundColor: Color.lerp(
-          highlightBackgroundColor, other?.highlightBackgroundColor, t),
-      monospaceBackgroundColor: Color.lerp(
-          monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
+      highlightBackgroundColor:
+          Color.lerp(highlightBackgroundColor, other?.highlightBackgroundColor, t),
+      monospaceBackgroundColor:
+          Color.lerp(monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
       dividerColor: Color.lerp(dividerColor, other?.dividerColor, t),
       alertColors: t < 0.5 ? alertColors : other?.alertColors,
       blockFilter: t < 0.5 ? blockFilter : other?.blockFilter,
@@ -381,11 +373,9 @@ class MarkdownTheme extends InheritedWidget {
   /// The state from the closest instance of this class
   /// that encloses the given context, if any.
   /// e.g. `Theme.maybeOf(context)`.
-  static MarkdownThemeData? maybeOf(BuildContext context,
-          {bool listen = true}) =>
-      listen
-          ? context.dependOnInheritedWidgetOfExactType<MarkdownTheme>()?.data
-          : context.getInheritedWidgetOfExactType<MarkdownTheme>()?.data;
+  static MarkdownThemeData? maybeOf(BuildContext context, {bool listen = true}) => listen
+      ? context.dependOnInheritedWidgetOfExactType<MarkdownTheme>()?.data
+      : context.getInheritedWidgetOfExactType<MarkdownTheme>()?.data;
 
   static Never _notFoundInheritedWidgetOfExactType() => throw ArgumentError(
         'Out of scope, not found inherited widget '

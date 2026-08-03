@@ -29,8 +29,7 @@ String renderedBlockText(MD$Block b) => b.map(
       quote: (q) => q.spans.map((s) => s.text).join(),
       alert: (a) => a.spans.map((s) => s.text).join(),
       code: (c) => c.text,
-      list: (l) =>
-          l.items.map((i) => i.spans.map((s) => s.text).join()).join('\n'),
+      list: (l) => l.items.map((i) => i.spans.map((s) => s.text).join()).join('\n'),
       table: (t) => <String>[
         t.header.cells.map((c) => c.map((s) => s.text).join()).join('\t'),
         for (final r in t.rows)
@@ -68,8 +67,7 @@ MdPos reconcile(MdPos anchor, Markdown oldM, Markdown newM) {
   bool prefixUnchanged() {
     if (anchor.block >= newB.length) return false;
     for (var i = 0; i < anchor.block; i++) {
-      if (i >= newB.length ||
-          renderedBlockText(oldB[i]) != renderedBlockText(newB[i])) {
+      if (i >= newB.length || renderedBlockText(oldB[i]) != renderedBlockText(newB[i])) {
         return false;
       }
     }
@@ -135,8 +133,8 @@ class MdController extends ChangeNotifier {
         if (text.isEmpty) continue; // skip structural blocks (spacer/divider)
         final from = (d == startDoc && bi == a.block) ? a.offset : 0;
         final to = (d == endDoc && bi == b.block) ? b.offset : text.length;
-        blockChunks.add(text.substring(
-            from.clamp(0, text.length), to.clamp(0, text.length)));
+        blockChunks
+            .add(text.substring(from.clamp(0, text.length), to.clamp(0, text.length)));
       }
       docChunks.add(blockChunks.join(blockSep));
     }
@@ -149,24 +147,21 @@ class MdController extends ChangeNotifier {
 int compareScreenOrder(Rect a, Rect b, TextDirection dir) {
   const threshold = 4.0;
   if ((a.top - b.top).abs() > threshold) return a.top.compareTo(b.top);
-  return dir == TextDirection.rtl
-      ? b.left.compareTo(a.left)
-      : a.left.compareTo(b.left);
+  return dir == TextDirection.rtl ? b.left.compareTo(a.left) : a.left.compareTo(b.left);
 }
 
 void main() {
   final docA = Markdown.fromString('Alpha one\n\nAlpha two');
   final docB = Markdown.fromString('Bravo one\n\nBravo two');
 
-  MdController freshController() => MdController()
-    ..docs.addAll(<MdDoc>[MdDoc('a', docA), MdDoc('b', docB)]);
+  MdController freshController() =>
+      MdController()..docs.addAll(<MdDoc>[MdDoc('a', docA), MdDoc('b', docB)]);
 
   // Block indices: 0 = paragraph, 1 = spacer (blank line), 2 = paragraph.
   test('T1 cross-document extraction with separators', () {
     final c = freshController();
     c.selection = const MdSel(MdPos('a', 0, 0), MdPos('b', 2, 9));
-    expect(c.getPlainText(),
-        'Alpha one\nAlpha two\n\nBravo one\nBravo two');
+    expect(c.getPlainText(), 'Alpha one\nAlpha two\n\nBravo one\nBravo two');
 
     c.selection = const MdSel(MdPos('a', 2, 6), MdPos('b', 0, 5));
     expect(c.getPlainText(), 'two\n\nBravo'); // 'Alpha two'[6:]='two'
@@ -195,9 +190,7 @@ void main() {
             itemCount: c.docs.length,
             itemBuilder: (_, i) => SizedBox(
               height: 80,
-              child: Text(c.docs[i].model.blocks
-                  .map(renderedBlockText)
-                  .join()),
+              child: Text(c.docs[i].model.blocks.map(renderedBlockText).join()),
             ),
           ),
         ),
@@ -221,8 +214,8 @@ void main() {
     final base = c.getPlainText();
 
     // (a) Append-only streaming: grow the last block + add a new block.
-    c.updateDocument('b', Markdown.fromString(
-        'Bravo one\n\nBravo two three\n\nBravo appended'));
+    c.updateDocument(
+        'b', Markdown.fromString('Bravo one\n\nBravo two three\n\nBravo appended'));
     // block 2 grew as a prefix ("Bravo two" -> "Bravo two three"), so the fast
     // path keeps the anchor; the originally-selected text is unchanged.
     expect(c.selection!.extent.block, 2);
@@ -235,8 +228,8 @@ void main() {
     final c2 = freshController();
     c2.selection = const MdSel(MdPos('b', 0, 0), MdPos('b', 0, 9));
     final beforeInsert = c2.getPlainText(); // "Bravo one"
-    c2.updateDocument('b', Markdown.fromString(
-        'INSERTED HEADER\n\nBravo one\n\nBravo two'));
+    c2.updateDocument(
+        'b', Markdown.fromString('INSERTED HEADER\n\nBravo one\n\nBravo two'));
     final afterInsert = c2.getPlainText();
     expect(beforeInsert, 'Bravo one');
     expect(afterInsert, isNot('Bravo one'),

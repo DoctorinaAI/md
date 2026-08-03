@@ -5,8 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:md_example/main.dart';
 
 void main() {
-  testWidgets('all tabs build and selection drags do not crash',
-      (tester) async {
+  testWidgets('all tabs build and selection drags do not crash', (tester) async {
     await tester.pumpWidget(ThemeModel(
       notifier: ValueNotifier<ThemeMode>(ThemeMode.light),
       child: const App(),
@@ -21,8 +20,7 @@ void main() {
     await tester.tap(find.text('Selection'));
     await tester.pumpAndSettle();
     final md = find.byType(MarkdownWidget).first;
-    final g = await tester.startGesture(
-        tester.getTopLeft(md) + const Offset(2, 4),
+    final g = await tester.startGesture(tester.getTopLeft(md) + const Offset(2, 4),
         kind: PointerDeviceKind.mouse);
     await tester.pump(const Duration(milliseconds: 150));
     await g.moveTo(tester.getCenter(md));

@@ -73,8 +73,8 @@ class _GoogleBenchmark extends BenchmarkBase {
   List<gmd.Node>? _result;
 
   @override
-  void run() => _result =
-      gmd.Document(extensionSet: gmd.ExtensionSet.gitHubFlavored).parse(input);
+  void run() =>
+      _result = gmd.Document(extensionSet: gmd.ExtensionSet.gitHubFlavored).parse(input);
 
   @override
   void teardown() {

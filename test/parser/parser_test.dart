@@ -358,8 +358,7 @@ void main() => group('Parse', () {
                           allOf(
                             isA<Map<String, Object?>>(),
                             isNotEmpty,
-                            containsPair(
-                                'url', 'https://example.com/image.jpg'),
+                            containsPair('url', 'https://example.com/image.jpg'),
                           ),
                         ),
                   ),
@@ -406,8 +405,7 @@ void main() => group('Parse', () {
           final codeSpan = spans[i];
           expect(codeSpan.text, expectedText);
           expect(codeSpan.style, MD$Style.monospace,
-              reason:
-                  'Span for "$expectedText" should only have monospace style');
+              reason: 'Span for "$expectedText" should only have monospace style');
         }
       });
 
