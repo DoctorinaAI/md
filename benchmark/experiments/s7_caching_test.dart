@@ -12,7 +12,6 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class CachingBox extends RenderBox {
@@ -201,8 +200,8 @@ void main() {
     setOuter(() => selA = const Rect.fromLTWH(0, 0, 40, 18));
     await tester.pump();
 
-    debugPrint('S7.3 A paints ${aPaints}->${a.paintCount}, '
-        'B paints ${bPaints}->${b.paintCount}');
+    debugPrint('S7.3 A paints $aPaints->${a.paintCount}, '
+        'B paints $bPaints->${b.paintCount}');
     expect(a.paintCount, greaterThan(aPaints), reason: 'A repainted');
     expect(b.paintCount, bPaints, reason: 'B did NOT repaint (isolated)');
   });

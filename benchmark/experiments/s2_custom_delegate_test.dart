@@ -17,7 +17,6 @@
 //
 // Throwaway spike; outside lib/ and test/.
 // Run: flutter test benchmark/experiments/s2_custom_delegate_test.dart
-import 'dart:ui' show Offset;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';

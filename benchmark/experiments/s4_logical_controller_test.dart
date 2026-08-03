@@ -18,7 +18,6 @@
 // Uses the REAL flutter_md model. Throwaway spike; outside lib/ and test/.
 // Run: flutter test benchmark/experiments/s4_logical_controller_test.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -237,12 +236,12 @@ void main() {
   });
 
   test('T4 SCREEN ORDER: vertical, then horizontal with RTL flip', () {
-    final vTop = const Rect.fromLTWH(0, 0, 100, 40);
-    final vBot = const Rect.fromLTWH(0, 60, 100, 40);
+    const vTop = Rect.fromLTWH(0, 0, 100, 40);
+    const vBot = Rect.fromLTWH(0, 60, 100, 40);
     expect(compareScreenOrder(vTop, vBot, TextDirection.ltr) < 0, isTrue);
 
-    final left = const Rect.fromLTWH(0, 0, 100, 40);
-    final right = const Rect.fromLTWH(120, 1, 100, 40); // same row (±threshold)
+    const left = Rect.fromLTWH(0, 0, 100, 40);
+    const right = Rect.fromLTWH(120, 1, 100, 40); // same row (±threshold)
     expect(compareScreenOrder(left, right, TextDirection.ltr) < 0, isTrue,
         reason: 'LTR: left comes first');
     expect(compareScreenOrder(left, right, TextDirection.rtl) > 0, isTrue,
