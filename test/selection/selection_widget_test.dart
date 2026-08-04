@@ -516,8 +516,8 @@ void main() {
         addTearDown(() => tester.binding.defaultBinaryMessenger
             .setMockMethodCallHandler(SystemChannels.platform, null));
 
-        await tester.pumpWidget(_wrap(
-            controller, const SizedBox(width: 400, child: _Doc('d'))));
+        await tester.pumpWidget(
+            _wrap(controller, const SizedBox(width: 400, child: _Doc('d'))));
         await tester.pumpAndSettle();
 
         final state = tester.state<MarkdownSelectionScopeState>(
@@ -551,8 +551,8 @@ void main() {
             extent: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 7),
           );
 
-        await tester.pumpWidget(_wrap(
-            controller, const SizedBox(width: 400, child: _Doc('d'))));
+        await tester.pumpWidget(
+            _wrap(controller, const SizedBox(width: 400, child: _Doc('d'))));
         await tester.pumpAndSettle();
         expect(controller.getText(), 'One two');
 

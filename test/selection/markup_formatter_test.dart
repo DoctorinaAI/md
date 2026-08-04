@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Full-block selection of a single-document source, formatted as Markdown.
 String _markup(String source,
-        [MarkdownMarkupFormatter formatter = const MarkdownMarkupFormatter()]) {
+    [MarkdownMarkupFormatter formatter = const MarkdownMarkupFormatter()]) {
   final c = MarkdownSelectionController()
     ..setDocuments(<MarkdownDocumentRef>[
       MarkdownDocumentRef(id: 'doc', model: Markdown.fromString(source)),
@@ -135,10 +135,9 @@ void main() {
         ]);
       final len = markdownBlockRenderedText(model.blocks.first).length;
       c.selection = MarkdownSelection(
-        base: const MarkdownPosition(
-            documentId: 'doc', blockIndex: 0, offset: 0),
-        extent:
-            MarkdownPosition(documentId: 'doc', blockIndex: 0, offset: len),
+        base:
+            const MarkdownPosition(documentId: 'doc', blockIndex: 0, offset: 0),
+        extent: MarkdownPosition(documentId: 'doc', blockIndex: 0, offset: len),
       );
       expect(c.getText(const MarkdownMarkupFormatter()), '- a\n- b');
     });
@@ -171,8 +170,8 @@ void main() {
 
     test('implements the MarkdownSelectionFormatter interface', () {
       const MarkdownSelectionFormatter formatter = MarkdownMarkupFormatter();
-      const content = MarkdownSelectedContent(
-          documents: <MarkdownSelectedDocument>[]);
+      const content =
+          MarkdownSelectedContent(documents: <MarkdownSelectedDocument>[]);
       expect(formatter.format(content), isEmpty);
     });
 
