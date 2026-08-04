@@ -115,7 +115,6 @@ void main() {
           height: 200,
           child: ListView.builder(
             controller: scroll,
-            cacheExtent: 0,
             itemCount: 10,
             itemBuilder: (_, i) => SizedBox(
               height: 80,
