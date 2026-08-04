@@ -191,3 +191,14 @@ Typical pattern: keep models in a list, feed them to the controller, and give ea
   avoid disposing the overlay mid-gesture).
 - `MarkdownSelectedBlock.sourceRange` is documented as best-effort but is currently
   always null.
+- `MarkdownThemeData.blockFilter` drops whole blocks at render time, but selection
+  **extraction is model-based** and does not see that filtering. A selection spanning
+  *across* a dropped block therefore copies the hidden block's text even though the
+  block is never highlighted on screen. Avoid `blockFilter` when selection is enabled
+  (same guidance as `spanFilter`, which shifts the painter's offset space).
+- Keyboard **word** navigation indexes the block's rendered text by UTF-16 code unit,
+  so it may split a surrogate pair (an emoji / other non-BMP character). Accepted v1
+  limitation.
+- Documents are ordered by their `order` key via `List.sort`, which is **not stable**,
+  so documents sharing an identical `order` have unspecified relative order. Supply
+  unique `order` values (e.g. the message index).

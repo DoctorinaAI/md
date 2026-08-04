@@ -8,3 +8,5 @@ coverage/
 credentials.json
 *.exe
 benchmark_compare/
+benchmark/experiments/
+example/lib/experiments/

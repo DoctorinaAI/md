@@ -171,9 +171,10 @@ Any of `---`, `***`, or `___` (optionally spaced, e.g. `- - -`) produce a rule:
 
 ```markdown
 ---
----
 
----
+***
+
+___
 ```
 
 ## 🚀 Quick Start
@@ -266,7 +267,7 @@ final MarkdownSelectedContent structured = controller.selectedContent();
 ```dart
 MarkdownSelectionScope(
   controller: controller,
-  selectionColor: Colors.amber.withOpacity(0.3),
+  selectionColor: Colors.amber.withValues(alpha: 0.3),
   onSelectionChanged: (sel) => debugPrint('selection: $sel'),
   contextMenuBuilder: (context, state) => AdaptiveTextSelectionToolbar.buttonItems(
     anchors: state.contextMenuAnchors,

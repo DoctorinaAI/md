@@ -46,6 +46,12 @@ abstract interface class BlockPainter {
 /// shifts the painter's offset space relative to the (unfiltered) model, so the
 /// on-screen highlight stays correct but copied text may be misaligned. Avoid
 /// dropping text-bearing spans when selection is enabled.
+///
+/// Caveat: a [MarkdownThemeData.blockFilter] that drops whole blocks is never
+/// highlighted on screen, but a selection spanning *across* a dropped block
+/// still copies that hidden block's text — selection extraction is model-based
+/// and does not see render-time block filtering. Avoid `blockFilter` when
+/// selection is enabled.
 abstract interface class SelectableBlockPainter implements BlockPainter {
   /// The block's rendered plain text.
   String get renderedText;
@@ -244,10 +250,7 @@ mixin ParagraphGestureHandler {
   InlineSpan? hitTestInlineSpanWithPointerEvent(
       PointerEvent event, TextPainter painter) {
     final pos = painter.getPositionForOffset(event.localPosition);
-    //final int index = pos.offset;
     final span = painter.text?.getSpanForPosition(pos);
-    //final plainText = span?.toPlainText();
-    //print('[${pos.offset}] $plainText');
     return span;
   }
 }

@@ -25,6 +25,7 @@ runs:
         sparse-checkout: |
           lib/
           test/
+          example/
           analysis_options.yaml
           pubspec.yaml
           README.md

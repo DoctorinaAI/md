@@ -604,6 +604,9 @@ class MarkdownSelectionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Documents are ordered by their `order` key. `List.sort` is not stable, so
+  // documents sharing an identical `order` have unspecified relative order —
+  // callers should supply unique `order` values (e.g. the message index).
   void _sort() {
     _docs.sort((a, b) => a.order.compareTo(b.order));
     _reindex();
@@ -766,6 +769,10 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// preferring an adjacent word character so clicking a word's edge grabs it.
   ///
   /// Exposed for testing; mirrors what double-click / long-press select.
+  ///
+  /// Limitation (v1): the block's rendered text is indexed by UTF-16 code unit,
+  /// so word segmentation may split a surrogate pair (e.g. an emoji or other
+  /// non-BMP character). Accepted for v1.
   @visibleForTesting
   static (int, int) wordRangeIn(String text, int offset) {
     final len = text.length;
@@ -1175,6 +1182,9 @@ class MarkdownSelectionController extends ChangeNotifier {
             offset: _blockTextAt(adj.$1, adj.$2).length);
   }
 
+  // Limitation (v1): stepping indexes the block's rendered text by UTF-16 code
+  // unit, so keyboard word navigation may land inside a surrogate pair (e.g. an
+  // emoji or other non-BMP character). Accepted for v1.
   MarkdownPosition _stepWord(MarkdownPosition p, {required bool forward}) {
     final di = _orderIndex(p.documentId);
     if (di < 0) return p;

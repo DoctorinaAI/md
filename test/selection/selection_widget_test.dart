@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -455,7 +456,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('shift-click extends the selection', (tester) async {
+    testWidgets('shift-click grows the selection toward the clicked point',
+        (tester) async {
       final controller = MarkdownSelectionController()
         ..setDocuments(<MarkdownDocumentRef>[
           MarkdownDocumentRef(
@@ -463,15 +465,115 @@ void main() {
         ]);
       final tl = await pumpParagraph(tester, controller);
 
-      // Place a caret near the start, then Shift-click further along.
-      await _clicks(tester, tl + const Offset(4, 8), 1);
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-      await _clicks(tester, tl + const Offset(60, 8), 1);
-      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      // Caret at the very start of the line.
+      await _clicks(tester, tl + const Offset(1, 8), 1);
+      expect(controller.getText(), isEmpty, reason: 'a single click collapses');
 
-      expect(controller.getText(), isNotEmpty,
-          reason: 'shift-click should grow a selection from the caret');
+      // Shift-click into the middle grows a ranged selection from the caret.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await _clicks(tester, tl + const Offset(120, 8), 1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      final mid = controller.getText();
+      expect(mid, isNotEmpty);
+      expect('Hello selectable world'.startsWith(mid), isTrue,
+          reason: 'the selection is a prefix anchored at the start caret');
+      expect(mid.length, lessThan('Hello selectable world'.length));
+
+      // Shift-click past the line end grows it to the whole line.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await _clicks(tester, tl + const Offset(399, 8), 1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      final grown = controller.getText();
+      expect(grown, 'Hello selectable world');
+      expect(grown.length, greaterThan(mid.length),
+          reason: 'clicking further right extends the selection');
+      expect(grown.startsWith(mid), isTrue);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('selection toolbar buttons', () {
+    testWidgets('tapping Copy in the toolbar copies the selection',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      // Reset via try/finally (not addTearDown): the framework's foundation-var
+      // invariant check runs before user tearDowns in this Flutter version.
+      try {
+        final md = Markdown.fromString('One two\n\nThree four');
+        final controller = MarkdownSelectionController()
+          ..setDocuments(
+              <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
+          ..selectAll();
+
+        final data = <MethodCall>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async {
+            if (call.method == 'Clipboard.setData') data.add(call);
+            return null;
+          },
+        );
+        addTearDown(() => tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null));
+
+        await tester.pumpWidget(_wrap(
+            controller, const SizedBox(width: 400, child: _Doc('d'))));
+        await tester.pumpAndSettle();
+
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
+        state.showToolbar();
+        await tester.pumpAndSettle();
+        expect(find.text('Copy'), findsOneWidget);
+
+        // Tap the real toolbar button end-to-end.
+        await tester.tap(find.text('Copy'));
+        await tester.pumpAndSettle();
+
+        expect(data, isNotEmpty);
+        expect(data.first.arguments['text'], 'One two\nThree four');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('tapping Select all in the toolbar selects every document',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      try {
+        final md = Markdown.fromString('One two\n\nThree four');
+        final controller = MarkdownSelectionController()
+          ..setDocuments(
+              <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)])
+          // Start with only the first paragraph selected.
+          ..selection = const MarkdownSelection(
+            base: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 0),
+            extent: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 7),
+          );
+
+        await tester.pumpWidget(_wrap(
+            controller, const SizedBox(width: 400, child: _Doc('d'))));
+        await tester.pumpAndSettle();
+        expect(controller.getText(), 'One two');
+
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
+        state.showToolbar();
+        await tester.pumpAndSettle();
+        expect(find.text('Select all'), findsOneWidget);
+
+        await tester.tap(find.text('Select all'));
+        await tester.pumpAndSettle();
+
+        expect(controller.getText(), 'One two\nThree four',
+            reason: 'select all now spans both paragraphs');
+        final sel = controller.selection!;
+        expect(sel.base.offset, 0);
+        expect(sel.extent.blockIndex, 2);
+        expect(sel.extent.offset, 10);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   });
 

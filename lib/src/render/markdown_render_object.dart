@@ -211,6 +211,10 @@ class MarkdownRenderObject extends RenderBox
     _size = super.size;
   }
 
+  // Measuring the content requires laying out the block [TextPainter]s, so this
+  // delegates to `_painter.layout(...)` which populates the painter's cached
+  // layout as a side effect (not a "pure" dry layout). [performLayout] re-runs
+  // the same layout, so the cached state is always finalized before [paint].
   @override
   Size computeDryLayout(BoxConstraints constraints) =>
       constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
@@ -220,12 +224,6 @@ class MarkdownRenderObject extends RenderBox
     // Set the size of the render box to match the painter's size.
     size =
         constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
-  }
-
-  @override
-  // ignore: unnecessary_overrides
-  void performResize() {
-    size = computeDryLayout(constraints);
   }
 
   @override

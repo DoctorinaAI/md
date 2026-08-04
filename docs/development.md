@@ -50,8 +50,9 @@ Parser scenarios live in `benchmark/scenarios.dart` (`prose, inline, links, list
 table, code, quotes, escapes, currency, pathological, mixed`). `compare.dart` uses
 warmup + auto-calibrated iterations + min-of-batches for low-noise deltas.
 
-Selection spikes S1–S7 (`benchmark/experiments/`, findings in `FINDINGS.md`) are
-throwaway and not in CI.
+Selection spikes S1–S5 and S7 (`benchmark/experiments/`, findings in
+`FINDINGS.md`) are throwaway and not in CI; S6 lives at
+`example/lib/experiments/s6_platforms.dart`.
 
 ## CI pipeline (`.github/workflows/`)
 
@@ -131,5 +132,6 @@ example/                      md_example app: lib/main.dart (Editor/Selection/Ch
 AGENTS.md  docs/              this documentation set
 ```
 
-`build/`, `coverage/`, `.dart_tool/` are gitignored; `.baseline.txt` is
-uncommitted (the render baseline `.render_baseline.txt` is committed).
+`build/`, `coverage/`, `.dart_tool/` are gitignored; both benchmark baselines
+(`.baseline.txt` and `.render_baseline.txt`) are gitignored and uncommitted —
+they are machine-specific and generated locally.
