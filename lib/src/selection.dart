@@ -261,6 +261,96 @@ final class MarkdownPlainTextFormatter implements MarkdownSelectionFormatter {
   }
 }
 
+/// A formatter that reconstructs Markdown-flavored text from a selection,
+/// preserving structure that [MarkdownPlainTextFormatter] flattens away:
+/// heading levels (`#`), blockquote and alert prefixes (`>`), fenced code
+/// (```` ``` ````), nested list markers with task checkboxes, and pipe tables.
+///
+/// Fidelity is best-effort. A block is re-rendered from its model only when the
+/// selection covers it **in full**; a partially selected boundary block falls
+/// back to its plain sliced [MarkdownSelectedBlock.text], so the copied output
+/// never leaks text from outside the selection (at the cost of losing markup on
+/// just those edge blocks). This matches the common case — selecting whole
+/// lists, sections, or messages — while staying safe on ragged edges.
+@immutable
+final class MarkdownMarkupFormatter implements MarkdownSelectionFormatter {
+  /// Creates a Markdown-reconstructing formatter.
+  const MarkdownMarkupFormatter({
+    this.blockSeparator = '\n\n',
+    this.documentSeparator = '\n\n',
+    this.listIndent = '  ',
+  });
+
+  /// Inserted between blocks within a document (a blank line by default, the
+  /// idiomatic Markdown block separator).
+  final String blockSeparator;
+
+  /// Inserted between documents.
+  final String documentSeparator;
+
+  /// Whitespace prepended per nesting level of a list. Two spaces by default.
+  final String listIndent;
+
+  @override
+  String format(MarkdownSelectedContent content) {
+    final docs = <String>[];
+    for (final doc in content.documents) {
+      final blocks = <String>[];
+      for (final block in doc.blocks) {
+        final rendered = _block(block);
+        if (rendered.isNotEmpty) blocks.add(rendered);
+      }
+      if (blocks.isNotEmpty) docs.add(blocks.join(blockSeparator));
+    }
+    return docs.join(documentSeparator);
+  }
+
+  String _block(MarkdownSelectedBlock seg) {
+    // Only reconstruct rich markup when the whole block is selected; a partial
+    // boundary block falls back to its plain sliced text so we never emit text
+    // outside the selection.
+    final full = markdownBlockRenderedText(seg.block);
+    final whole =
+        seg.renderedRange.start <= 0 && seg.renderedRange.end >= full.length;
+    if (!whole) return seg.text;
+    return seg.block.map<String>(
+      paragraph: (p) => _spans(p.spans),
+      heading: (h) => '${'#' * h.level.clamp(1, 6)} ${_spans(h.spans)}',
+      quote: (q) => _prefixLines(_spans(q.spans), '> '),
+      alert: (a) =>
+          '> [!${a.alert.marker}]\n${_prefixLines(_spans(a.spans), '> ')}',
+      code: (c) => '```${c.language ?? ''}\n${c.text}\n```',
+      list: (l) => _list(l.items, 0),
+      table: _table,
+      divider: (_) => '---',
+      spacer: (_) => '',
+    );
+  }
+
+  String _list(List<MD$ListItem> items, int depth) {
+    final out = <String>[];
+    for (final item in items) {
+      final box = item.isTask ? (item.checked! ? '[x] ' : '[ ] ') : '';
+      out.add('${listIndent * depth}${item.marker} $box${_spans(item.spans)}');
+      if (item.children.isNotEmpty) out.add(_list(item.children, depth + 1));
+    }
+    return out.join('\n');
+  }
+
+  String _table(MD$Table t) {
+    String row(MD$TableRow r) => '| ${r.cells.map(_spans).join(' | ')} |';
+    final cols = t.header.cells.length;
+    return <String>[
+      row(t.header),
+      '| ${List<String>.filled(cols, '---').join(' | ')} |',
+      for (final r in t.rows) row(r),
+    ].join('\n');
+  }
+
+  String _prefixLines(String text, String prefix) =>
+      text.split('\n').map((line) => '$prefix$line').join('\n');
+}
+
 /// Decides how a selection anchor is remapped when a document's model is
 /// replaced (e.g. streaming). Returning null drops the anchor (collapsing the
 /// selection). No stable block id is required — remapping is content-based.

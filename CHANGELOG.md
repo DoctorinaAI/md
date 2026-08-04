@@ -12,9 +12,17 @@
   `MarkdownSelectionScope`, `MarkdownSelectionGroup`, `MarkdownPosition`,
   `MarkdownSelection`, `MarkdownDocumentRef`, `MarkdownSelectedContent`
   (+ document/block), `MarkdownSelectionFormatter` /
-  `MarkdownPlainTextFormatter`, `MarkdownReconciliationPolicy`,
-  `MarkdownSelectionSurface`, `markdownBlockRenderedText`, and
+  `MarkdownPlainTextFormatter` / `MarkdownMarkupFormatter`,
+  `MarkdownReconciliationPolicy`, `MarkdownSelectionSurface`,
+  `markdownBlockRenderedText`, and
   `SelectableBlockPainter` / `SelectableTextBlock`.
+- **ADDED**: `MarkdownMarkupFormatter`, a built-in "Copy as Markdown" formatter.
+  Pass it to `getText()` (or set `controller.formatter`) to reconstruct Markdown
+  structure on copy — heading `#`s, nested list markers with task checkboxes,
+  blockquote/alert `>` prefixes, fenced code and pipe tables — for blocks the
+  selection covers in full; partially-selected boundary blocks fall back to the
+  plain sliced text so nothing outside the selection is emitted. The default
+  copy behaviour is unchanged (`MarkdownPlainTextFormatter`).
 - **ADDED**: `MarkdownWidget` gains optional `documentId` and `controller`
   parameters (resolved from the ambient scope). Backward compatible: a widget
   with no `documentId` is inert.

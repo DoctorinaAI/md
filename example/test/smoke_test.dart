@@ -31,6 +31,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
+    // The live Plain-vs-Markdown preview appears once something is selected.
+    expect(find.text('Plain (default)'), findsOneWidget);
+    // "Copy as Markdown" shows as both the preview panel title and the button.
+    expect(find.text('Copy as Markdown'), findsWidgets);
+
     // Chat tab builds and the Copy button is present.
     await tester.tap(find.text('Chat'));
     await tester.pumpAndSettle();

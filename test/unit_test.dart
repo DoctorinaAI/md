@@ -9,6 +9,7 @@ import 'parser/inline_test.dart' as inline_test;
 import 'parser/math_test.dart' as math_test;
 import 'parser/parser_test.dart' as parser_test;
 import 'parser/regression_test.dart' as regression_test;
+import 'selection/markup_formatter_test.dart' as markup_formatter_test;
 import 'selection/selection_handles_test.dart' as selection_handles_test;
 import 'selection/selection_keyboard_test.dart' as selection_keyboard_test;
 import 'selection/selection_test.dart' as selection_test;
@@ -29,6 +30,7 @@ void main() => group('Unit', () {
       nodes_test.main();
       theme_test.main();
       selection_test.main();
+      markup_formatter_test.main();
       selection_widget_test.main();
       selection_keyboard_test.main();
       selection_handles_test.main();

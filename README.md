@@ -229,6 +229,7 @@ MarkdownSelectionScope(
 
 // Any time — even for messages scrolled off-screen:
 final String text = controller.getText();                 // default formatter
+final String md = controller.getText(const MarkdownMarkupFormatter()); // as Markdown
 final MarkdownSelectedContent structured = controller.selectedContent();
 ```
 
@@ -236,9 +237,13 @@ final MarkdownSelectedContent structured = controller.selectedContent();
   lists and tables — a drag can start or end inside a list item or table cell,
   and copied text preserves the list `\n` / table `\t` separators.
 - **Get the text your way.** `getText()` uses the default
-  `MarkdownPlainTextFormatter` (configurable block/document separators); pass a
-  custom `MarkdownSelectionFormatter` for e.g. "Copy as Markdown".
-  `selectedContent()` returns the structured per-document / per-block result.
+  `MarkdownPlainTextFormatter` (configurable block/document separators). For
+  richer output pass the built-in `MarkdownMarkupFormatter` ("Copy as
+  Markdown"): it re-emits heading `#`s, nested list markers with task
+  checkboxes, blockquote/alert `>` prefixes, fenced code and pipe tables for
+  fully-selected blocks (partially-selected edges fall back to plain text). Or
+  implement your own `MarkdownSelectionFormatter`. `selectedContent()` returns
+  the structured per-document / per-block result each formatter consumes.
 - **Streaming stays anchored.** Call `controller.putDocument(id, newModel)` when
   a message grows; the default `MarkdownReconciliationPolicy.contentAnchored`
   keeps the selection (append fast-path, else relocate by content, else clamp).
