@@ -277,8 +277,7 @@ void main() => group('StreamingMarkdownParser', () {
           final acc = StringBuffer();
           for (var i = 0; i < chunks.length; i++) {
             acc.write(chunks[i]);
-            expect(
-                _sig(results[i]), _sig(Markdown.fromString(acc.toString())));
+            expect(_sig(results[i]), _sig(Markdown.fromString(acc.toString())));
           }
         });
 

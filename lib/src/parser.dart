@@ -1228,9 +1228,8 @@ class StreamingMarkdownParser {
     if (chunk.isNotEmpty) {
       _tail = _tail.isEmpty ? chunk : '$_tail$chunk';
       _freezeCompletedPrefix();
-      _tailBlocks = _tail.isEmpty
-          ? const <MD$Block>[]
-          : _decoder.convert(_tail).blocks;
+      _tailBlocks =
+          _tail.isEmpty ? const <MD$Block>[] : _decoder.convert(_tail).blocks;
     }
     return current;
   }
@@ -1294,7 +1293,8 @@ int _safeCutOffset(String tail) {
   final len = tail.length;
   var cut = 0;
   var inFence = false;
-  var fence = 0; // active fence marker code unit (0x60 ``` / 0x7E ~~~), 0 = none
+  var fence =
+      0; // active fence marker code unit (0x60 ``` / 0x7E ~~~), 0 = none
   var prevBlank = false; // the previous *complete* line was blank
   var havePrev = false; // there is a previous complete line
   var start = 0;
@@ -1307,10 +1307,7 @@ int _safeCutOffset(String tail) {
 
     // Evaluate a cut at this line's start, using the fence/blank state that
     // holds *before* this line is folded in.
-    if (havePrev &&
-        prevBlank &&
-        !inFence &&
-        !_segIsBlank(tail, start, i)) {
+    if (havePrev && prevBlank && !inFence && !_segIsBlank(tail, start, i)) {
       cut = start;
     }
 
