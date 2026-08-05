@@ -7,6 +7,12 @@ build/
 coverage/
 credentials.json
 *.exe
+benchmark/
 benchmark_compare/
-benchmark/experiments/
 example/lib/experiments/
+example/android/
+example/ios/
+example/windows/
+example/macos/
+example/linux/
+docs/
