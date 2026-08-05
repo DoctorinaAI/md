@@ -16,6 +16,8 @@ A high-performance, lightweight Markdown parser and renderer specifically design
 - **🔗 Interactive Elements**: Clickable links with customizable tap handlers
 - **✂️ Text Selection**: Cross-block and cross-widget (chat) selection via a
   controller that survives list disposal and streaming updates
+- **🌊 Streaming Parser**: `StreamingMarkdownParser` parses LLM token output
+  incrementally — completed blocks are frozen, only the live tail re-parses
 - **🌐 Cross Platform**: Works on all Flutter-supported platforms
 - **📝 GitHub Flavored**: Alerts (`> [!NOTE]`), task lists (`- [x]`), tables with
   column alignment, thematic breaks, strikethrough, and more
@@ -171,10 +173,9 @@ Any of `---`, `***`, or `___` (optionally spaced, e.g. `- - -`) produce a rule:
 
 ```markdown
 ---
+---
 
-***
-
-___
+---
 ```
 
 ## 🚀 Quick Start
@@ -290,6 +291,52 @@ MarkdownSelectionScope(
 ```
 
 See the runnable **Selection** and **Chat** tabs in `example/`.
+
+## 🌊 Streaming (LLM output)
+
+LLM replies arrive token by token. Re-parsing the whole accumulated buffer on
+every token is `O(N²)` and janks long messages. `StreamingMarkdownParser` keeps
+the accumulated source and only re-parses the still-growing **tail**: once a
+block is provably complete (terminated by a blank line, and not inside an open
+code fence) it is _frozen_ and never parsed again.
+
+```dart
+final parser = StreamingMarkdownParser();
+
+llmTokenStream.listen((token) {
+  final Markdown md = parser.add(token); // cheap, incremental
+  setState(() => _message = md);
+});
+```
+
+Or transform a `Stream<String>` directly — each event emits the grown document:
+
+```dart
+llmTokenStream
+    .toMarkdown() // Stream<String> → Stream<Markdown>
+    .listen((md) => setState(() => _message = md));
+```
+
+- **Exact, never approximate.** The result of `add()` / `current` is always
+  identical, block for block, to `Markdown.fromString(everythingReceivedSoFar)`.
+  Blocks whose type still depends on input that hasn't arrived — an unterminated
+  code fence, a table header still missing its delimiter row, a list that may
+  continue — stay in the live tail and are re-evaluated, so they never freeze
+  into the wrong shape.
+- **Same options as batch.** Pass a configured decoder to match
+  `Markdown.fromString`:
+  `StreamingMarkdownParser(decoder: const MarkdownDecoder(inlineMath: true))`
+  (or `.toMarkdown(decoder: ...)`).
+- **Fast.** Replaying a whole message token-by-token is **3–14× faster** than
+  the full-reparse approach, and the gap grows with message length
+  (`benchmark/streaming_benchmark.dart`).
+- **Reusable.** `parser.reset()` clears state for the next message;
+  `parser.source` is the raw text accumulated so far, `parser.current` the
+  parsed model without adding anything.
+
+Pair it with selection: feed each grown model to `controller.putDocument(id, md)`
+and the active selection stays anchored as the message streams in (see the
+**Chat** tab in `example/`).
 
 ## 🎨 Customization
 

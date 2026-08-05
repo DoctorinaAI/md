@@ -13,8 +13,10 @@ import 'package:flutter_md/flutter_md.dart';
 /// The conversation is intentionally long and varied — headings, tables, code,
 /// nested and task lists, block quotes, GitHub alerts and inline math — to
 /// exercise selection across every block type. The "Stream" button appends a
-/// new assistant reply and grows it token-by-token to show that streaming
-/// updates keep any active selection anchored (content-based reconciliation).
+/// new assistant reply and grows it token-by-token via a
+/// [StreamingMarkdownParser], so completed blocks are parsed once and only the
+/// live tail is re-parsed as tokens arrive — while any active selection stays
+/// anchored (content-based reconciliation).
 class ChatTab extends StatefulWidget {
   /// Creates the chat demo tab.
   const ChatTab({super.key});
@@ -31,7 +33,11 @@ class _ChatTabState extends State<ChatTab> {
   Timer? _streamTimer;
   List<String> _streamTokens = const <String>[];
   int _streamCursor = 0;
-  String _streamBuffer = '';
+
+  /// Incremental parser for the reply currently streaming in. Reused (via
+  /// [StreamingMarkdownParser.reset]) for each new streamed message so closed
+  /// blocks are never re-parsed.
+  final StreamingMarkdownParser _streamParser = StreamingMarkdownParser();
 
   bool get _isStreaming => _streamTimer != null;
 
@@ -80,7 +86,7 @@ class _ChatTabState extends State<ChatTab> {
     final id = 'stream-${DateTime.now().microsecondsSinceEpoch}';
     _streamTokens = _streamAnswer.split(' ');
     _streamCursor = 0;
-    _streamBuffer = '';
+    _streamParser.reset();
     setState(() => _messages.add(_Msg(id, false, const Markdown.empty())));
     _controller.putDocument(id, const Markdown.empty(),
         order: _messages.length - 1);
@@ -95,8 +101,10 @@ class _ChatTabState extends State<ChatTab> {
       return;
     }
     final token = _streamTokens[_streamCursor++];
-    _streamBuffer = _streamBuffer.isEmpty ? token : '$_streamBuffer $token';
-    final grown = Markdown.fromString(_streamBuffer);
+    // Feed only the newly-arrived delta; the parser reuses the already-parsed
+    // prefix and re-parses just the live tail — no full re-parse per token.
+    final delta = _streamParser.source.isEmpty ? token : ' $token';
+    final grown = _streamParser.add(delta);
     final idx = _messages.indexWhere((m) => m.id == id);
     if (idx < 0) {
       _stopStream();
@@ -365,11 +373,24 @@ class _Msg {
 }
 
 /// The answer streamed in token-by-token when the "Stream" button is pressed.
-const String _streamAnswer =
-    'Absolutely — here is a streamed reply. Because the selection is anchored '
-    'on the **immutable model**, it stays put while these words arrive one '
-    'at a time, and the parser re-runs on every token. Try selecting an '
-    'earlier message first, then press Stream and watch the highlight hold.';
+///
+/// It is deliberately multi-block (blank-line separated) so the
+/// [StreamingMarkdownParser] can *freeze* each completed block: once a blank
+/// line proves a paragraph or list is done, it is never re-parsed again — only
+/// the final, still-growing block is.
+const String _streamAnswer = 'Absolutely — here is a streamed reply.\n'
+    '\n'
+    'Because the selection is anchored on the **immutable model**, it stays '
+    'put while these words arrive one at a time.\n'
+    '\n'
+    'And this reply is parsed **incrementally**:\n'
+    '\n'
+    '- completed blocks are parsed once, then frozen\n'
+    '- only the live tail re-parses on each token\n'
+    '- so long messages stay cheap to grow\n'
+    '\n'
+    'Try selecting an earlier message first, then press Stream and watch the '
+    'highlight hold while these blocks stream in.';
 
 List<_Msg> _seed() {
   final data = <(bool, String)>[

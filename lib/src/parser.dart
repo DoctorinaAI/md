@@ -1148,3 +1148,232 @@ List<MD$Span> _parseInlineSpans(String text, {Map<String, String>? math}) {
   // For now, it returns an empty list as a placeholder.
   return spans;
 }
+
+// =============================================================================
+// Streaming (incremental) parser
+// =============================================================================
+
+/// {@template streaming_markdown_parser}
+/// Incremental Markdown parser for streaming sources such as LLM token output.
+///
+/// A plain [MarkdownDecoder] re-parses the whole document on every call, so
+/// feeding it an `N`-line message one token at a time costs `O(N²)`. This
+/// parser keeps the accumulated source and only re-parses the still-growing
+/// *tail* of the document: once a run of blocks is provably complete —
+/// terminated by a blank line and not sitting inside an open code fence — it is
+/// *frozen* and never parsed again.
+///
+/// The result of [add] / [current] is always identical, block for block, to
+/// `Markdown.fromString(everythingAddedSoFar)` (using the same [decoder]) — the
+/// incremental path is a pure performance optimization, never a behavioral one.
+/// Blocks whose type still depends on input that has not arrived yet — an
+/// unterminated code fence, a table header still missing its delimiter row, a
+/// list or block quote that might continue — deliberately stay in the live tail
+/// and are re-evaluated on every [add], so they never freeze into the wrong
+/// shape.
+///
+/// ```dart
+/// final parser = StreamingMarkdownParser();
+/// llmTokenStream.listen((token) {
+///   final markdown = parser.add(token); // cheap, incremental
+///   setState(() => _message = markdown);
+/// });
+/// ```
+///
+/// For a [Stream] of chunks, prefer the [MarkdownStreamParsing.toMarkdown]
+/// extension, which wires an instance of this class into a transform.
+///
+/// The parser is stateful and single-conversation: call [reset] to reuse the
+/// instance for a new document.
+/// {@endtemplate}
+class StreamingMarkdownParser {
+  /// Creates a streaming parser.
+  ///
+  /// [decoder] performs the actual parsing of each tail; pass a configured
+  /// [MarkdownDecoder] (e.g. `MarkdownDecoder(inlineMath: true)`) to match the
+  /// options you would use with [Markdown.fromString]. Defaults to a plain
+  /// [MarkdownDecoder].
+  /// {@macro streaming_markdown_parser}
+  StreamingMarkdownParser({MarkdownDecoder decoder = const MarkdownDecoder()})
+      : _decoder = decoder;
+
+  /// The decoder used to (re)parse frozen prefixes and the live tail.
+  final MarkdownDecoder _decoder;
+
+  /// Source of the frozen prefix (`== ` everything up to [_stableOffset]). Kept
+  /// as a materialized string so [current] can expose the full source without
+  /// re-joining lines; only grows when a prefix is frozen.
+  String _frozen = '';
+
+  /// The still-mutable remainder of the source (everything after the frozen
+  /// prefix). Re-parsed on every [add].
+  String _tail = '';
+
+  /// Blocks parsed from [_frozen]. Never re-parsed once appended.
+  final List<MD$Block> _stableBlocks = <MD$Block>[];
+
+  /// Blocks parsed from the current [_tail]. Rebuilt on every [add].
+  List<MD$Block> _tailBlocks = const <MD$Block>[];
+
+  /// The full Markdown source accumulated so far.
+  String get source => _tail.isEmpty ? _frozen : '$_frozen$_tail';
+
+  /// Number of blocks already frozen (exposed for diagnostics / benchmarks).
+  int get stableBlockCount => _stableBlocks.length;
+
+  /// Appends a chunk of streamed Markdown text and returns the updated
+  /// [Markdown]. The chunk may end mid-line; the partial line is buffered and
+  /// completed by later chunks.
+  Markdown add(String chunk) {
+    if (chunk.isNotEmpty) {
+      _tail = _tail.isEmpty ? chunk : '$_tail$chunk';
+      _freezeCompletedPrefix();
+      _tailBlocks = _tail.isEmpty
+          ? const <MD$Block>[]
+          : _decoder.convert(_tail).blocks;
+    }
+    return current;
+  }
+
+  /// The current parsed [Markdown] (frozen prefix + live tail) without adding
+  /// anything. Equivalent, block for block, to `Markdown.fromString(source)`.
+  Markdown get current => _build();
+
+  /// Freezes any newly-completed leading blocks so they are never re-parsed.
+  ///
+  /// Finds the largest safe boundary in [_tail] (via [_safeCutOffset]),
+  /// converts the prefix up to it once, moves it into [_frozen] /
+  /// [_stableBlocks], and leaves the remainder as the live tail.
+  void _freezeCompletedPrefix() {
+    final cut = _safeCutOffset(_tail);
+    if (cut <= 0) return;
+    final prefix = _tail.substring(0, cut);
+    // Safe by construction: [cut] sits at a hard block boundary outside any
+    // open fence, so converting the prefix in isolation yields exactly the
+    // blocks it would contribute to a full-document parse.
+    _stableBlocks.addAll(_decoder.convert(prefix).blocks);
+    _frozen = _frozen.isEmpty ? prefix : '$_frozen$prefix';
+    _tail = _tail.substring(cut);
+  }
+
+  /// Resets the parser to its initial empty state so the instance can be reused
+  /// for a new document.
+  void reset() {
+    _frozen = '';
+    _tail = '';
+    _stableBlocks.clear();
+    _tailBlocks = const <MD$Block>[];
+  }
+
+  /// Builds the combined [Markdown] view (frozen prefix + live tail).
+  Markdown _build() {
+    final src = source;
+    if (src.isEmpty) return const Markdown.empty();
+    final blocks = <MD$Block>[..._stableBlocks, ..._tailBlocks];
+    return Markdown(
+      markdown: src,
+      blocks: List<MD$Block>.unmodifiable(blocks),
+    );
+  }
+}
+
+/// Returns the offset within [tail] at which the still-mutable remainder of the
+/// document begins: everything before it forms complete blocks that no future
+/// input can change and may be frozen. Returns `0` when nothing new can be
+/// frozen yet.
+///
+/// A cut is placed at the start of a **complete, non-blank line whose preceding
+/// complete line is blank**, provided that position is not inside an open code
+/// fence. Because this block grammar has no lazy continuation across a blank
+/// line (a blank line terminates paragraphs, quotes, lists and tables, and only
+/// an open code fence swallows blanks), such a position is a hard boundary:
+/// parsing the prefix and the suffix separately yields exactly the same blocks
+/// as parsing the whole. The last such boundary in [tail] is returned so as
+/// much as possible is frozen.
+int _safeCutOffset(String tail) {
+  final len = tail.length;
+  var cut = 0;
+  var inFence = false;
+  var fence = 0; // active fence marker code unit (0x60 ``` / 0x7E ~~~), 0 = none
+  var prevBlank = false; // the previous *complete* line was blank
+  var havePrev = false; // there is a previous complete line
+  var start = 0;
+
+  for (var i = 0; i <= len; i++) {
+    // A line ends at each '\n' and at end-of-string. The final segment
+    // (i == len) is the still-growing pending line and is never itself frozen.
+    if (i != len && tail.codeUnitAt(i) != 0x0A /* \n */) continue;
+    final complete = i < len;
+
+    // Evaluate a cut at this line's start, using the fence/blank state that
+    // holds *before* this line is folded in.
+    if (havePrev &&
+        prevBlank &&
+        !inFence &&
+        !_segIsBlank(tail, start, i)) {
+      cut = start;
+    }
+
+    if (complete) {
+      final marker = _fenceMarker(tail, start, i);
+      if (!inFence) {
+        if (marker != 0) {
+          inFence = true;
+          fence = marker;
+        }
+      } else if (marker == fence) {
+        inFence = false;
+        fence = 0;
+      }
+      prevBlank = _segIsBlank(tail, start, i);
+      havePrev = true;
+      start = i + 1;
+    }
+  }
+  return cut;
+}
+
+/// Whether the line segment `s[start..end)` is blank — only spaces, tabs, or a
+/// trailing carriage return (so CRLF blank lines are recognized). Mirrors
+/// [MarkdownDecoder]'s blank-line rule for the streaming boundary scan.
+bool _segIsBlank(String s, int start, int end) {
+  for (var k = start; k < end; k++) {
+    final c = s.codeUnitAt(k);
+    if (c != 0x20 /* space */ && c != 0x09 /* tab */ && c != 0x0D /* CR */) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Returns the fence marker code unit (0x60 for ```` ``` ````, 0x7E for `~~~`)
+/// when `s[start..end)` opens or closes a fenced code block, else `0`. Matches
+/// the `startsWith('```') || startsWith('~~~')` test in [MarkdownDecoder].
+int _fenceMarker(String s, int start, int end) {
+  if (end - start < 3) return 0;
+  final c = s.codeUnitAt(start);
+  if (c != 0x60 /* ` */ && c != 0x7E /* ~ */) return 0;
+  return (s.codeUnitAt(start + 1) == c && s.codeUnitAt(start + 2) == c) ? c : 0;
+}
+
+/// Incremental Markdown parsing for a stream of text chunks.
+extension MarkdownStreamParsing on Stream<String> {
+  /// Parses this stream of Markdown text chunks incrementally, emitting the
+  /// growing [Markdown] after each chunk.
+  ///
+  /// A single [StreamingMarkdownParser] is threaded through the stream, so
+  /// closed blocks are parsed once and only the live tail is re-parsed as
+  /// tokens arrive. Pass a configured [decoder] (e.g. for `inlineMath`) to
+  /// match [Markdown.fromString]. The last emitted value equals
+  /// `Markdown.fromString(concatenationOfAllChunks)`.
+  ///
+  /// ```dart
+  /// llmTokenStream.toMarkdown().listen((md) => setState(() => _message = md));
+  /// ```
+  Stream<Markdown> toMarkdown({
+    MarkdownDecoder decoder = const MarkdownDecoder(),
+  }) {
+    final parser = StreamingMarkdownParser(decoder: decoder);
+    return map(parser.add);
+  }
+}

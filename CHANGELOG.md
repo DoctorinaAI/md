@@ -16,6 +16,17 @@
   `MarkdownReconciliationPolicy`, `MarkdownSelectionSurface`,
   `markdownBlockRenderedText`, and
   `SelectableBlockPainter` / `SelectableTextBlock`.
+- **ADDED**: `StreamingMarkdownParser`, an incremental parser for streaming
+  sources such as LLM token output. It freezes completed blocks (a block ends at
+  a blank line, outside any open code fence) so only the still-growing tail is
+  re-parsed as tokens arrive — turning the `O(N²)` cost of re-parsing the whole
+  buffer on every token into roughly `O(tail)` (3–14× faster on a full message
+  stream in `benchmark/streaming_benchmark.dart`). `parser.add(chunk)` returns
+  the growing `Markdown`, always identical block-for-block to
+  `Markdown.fromString(everythingSoFar)`, and a `Stream<String>.toMarkdown()`
+  extension wires it into a stream transform. Pass a configured `MarkdownDecoder`
+  (e.g. `inlineMath: true`) to match `Markdown.fromString`. The batch
+  `MarkdownDecoder` hot path is byte-for-byte unchanged.
 - **ADDED**: `MarkdownMarkupFormatter`, a built-in "Copy as Markdown" formatter.
   Pass it to `getText()` (or set `controller.formatter`) to reconstruct Markdown
   structure on copy — heading `#`s, nested list markers with task checkboxes,

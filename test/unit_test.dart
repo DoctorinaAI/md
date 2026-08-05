@@ -9,6 +9,7 @@ import 'parser/inline_test.dart' as inline_test;
 import 'parser/math_test.dart' as math_test;
 import 'parser/parser_test.dart' as parser_test;
 import 'parser/regression_test.dart' as regression_test;
+import 'parser/streaming_test.dart' as streaming_test;
 import 'selection/markup_formatter_test.dart' as markup_formatter_test;
 import 'selection/selection_handles_test.dart' as selection_handles_test;
 import 'selection/selection_keyboard_test.dart' as selection_keyboard_test;
@@ -26,6 +27,7 @@ void main() => group('Unit', () {
       edge_cases_test.main();
       math_test.main();
       regression_test.main();
+      streaming_test.main();
       golden_test.main();
       nodes_test.main();
       theme_test.main();
