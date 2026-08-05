@@ -104,6 +104,14 @@ jobs:
         run: |
           flutter test --coverage --concurrency=40 test/unit_test.dart
 
+      - name: 🧪 Run example tests
+        id: run-example-tests
+        timeout-minutes: 5
+        working-directory: example
+        run: |
+          flutter pub get
+          flutter test
+
 #      - name: 📊 Upload coverage to Codecov
 #        id: upload-coverage
 #        timeout-minutes: 2

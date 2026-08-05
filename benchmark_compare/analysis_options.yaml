@@ -1,0 +1,8 @@
+# Inherit the repo's analysis rules, but relax two that are noise for a
+# throwaway benchmark package full of public constants and wide table strings.
+include: ../analysis_options.yaml
+
+linter:
+  rules:
+    public_member_api_docs: false
+    lines_longer_than_80_chars: false

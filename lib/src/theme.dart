@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'package:flutter/material.dart';
 
 import '../flutter_md.dart';
+import 'highlight/engine.dart';
 
 /// {@template markdown_theme_data}
 /// Theme data for Markdown widgets.
@@ -32,6 +33,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.spanFilter,
     this.builder,
     this.onLinkTap,
+    this.highlighter,
   })  : _headingStyles = List<TextStyle?>.filled(8, null),
         _textStyles = HashMap<int, TextStyle>();
 
@@ -59,6 +61,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     bool Function(MD$Span span)? spanFilter,
     BlockPainter? Function(MD$Block block, MarkdownThemeData theme)? builder,
     void Function(String title, String url)? onLinkTap,
+    SyntaxHighlighter? highlighter,
   }) {
     return MarkdownThemeData(
       textStyle: textStyle ??
@@ -89,6 +92,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       spanFilter: spanFilter,
       builder: builder,
       onLinkTap: onLinkTap,
+      highlighter: highlighter,
     );
   }
 
@@ -192,6 +196,13 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// A callback function that is called when a link is tapped.
   /// It receives the link title and URL as parameters.
   final void Function(String title, String url)? onLinkTap;
+
+  /// An optional syntax highlighter for fenced code blocks. When `null`, code
+  /// is painted as plain monospace text.
+  ///
+  /// See `package:flutter_md/highlight.dart` and [MarkdownHighlighter]. Assign
+  /// the exact set of languages you support so unused grammars tree-shake away.
+  final SyntaxHighlighter? highlighter;
 
   final List<TextStyle?> _headingStyles;
 
@@ -300,6 +311,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     bool Function(MD$Span span)? spanFilter,
     BlockPainter? Function(MD$Block block, MarkdownThemeData theme)? builder,
     void Function(String title, String url)? onLinkTap,
+    SyntaxHighlighter? highlighter,
   }) =>
       MarkdownThemeData(
         textDirection: textDirection ?? this.textDirection,
@@ -325,6 +337,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
         spanFilter: spanFilter ?? this.spanFilter,
         builder: builder ?? this.builder,
         onLinkTap: onLinkTap ?? this.onLinkTap,
+        highlighter: highlighter ?? this.highlighter,
       );
 
   @override
@@ -360,6 +373,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       spanFilter: t < 0.5 ? spanFilter : other?.spanFilter,
       builder: t < 0.5 ? builder : other?.builder,
       onLinkTap: t < 0.5 ? onLinkTap : other?.onLinkTap,
+      highlighter: t < 0.5 ? highlighter : other?.highlighter,
     );
   }
 

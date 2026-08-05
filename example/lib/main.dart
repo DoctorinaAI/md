@@ -5,6 +5,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_md/flutter_md.dart';
 
+import 'tabs/chat_tab.dart';
+import 'tabs/highlight_tab.dart';
+import 'tabs/lorem_tab.dart';
+
 void main() => runZonedGuarded<void>(
       () => runApp(ThemeModel(
           notifier: ValueNotifier<ThemeMode>(ThemeMode.dark),
@@ -86,7 +90,7 @@ class ThemeModel extends InheritedNotifier<ValueNotifier<ThemeMode>> {
 }
 
 /// {@template home_screen}
-/// HomeScreen widget.
+/// HomeScreen widget: a tabbed showcase of the markdown renderer.
 /// {@endtemplate}
 class HomeScreen extends StatefulWidget {
   /// {@macro home_screen}
@@ -99,7 +103,67 @@ class HomeScreen extends StatefulWidget {
 }
 
 /// State for widget HomeScreen.
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs = TabController(length: 4, vsync: this);
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(
+          centerTitle: true,
+          title: const Text('Markdown'),
+          actions: <Widget>[
+            Switch.adaptive(
+              value: ThemeModel.of(context).value == ThemeMode.dark,
+              onChanged: (value) {
+                ThemeModel.of(context).value =
+                    value ? ThemeMode.dark : ThemeMode.light;
+              },
+            ),
+          ],
+          bottom: TabBar(
+            controller: _tabs,
+            tabs: const <Widget>[
+              Tab(text: 'Editor', icon: Icon(Icons.edit)),
+              Tab(text: 'Selection', icon: Icon(Icons.text_fields)),
+              Tab(text: 'Chat', icon: Icon(Icons.chat_bubble_outline)),
+              Tab(text: 'Highlight', icon: Icon(Icons.code)),
+            ],
+          ),
+        ),
+        body: SafeArea(
+          child: TabBarView(
+            controller: _tabs,
+            children: const <Widget>[
+              EditorTab(),
+              LoremTab(),
+              ChatTab(),
+              HighlightTab(),
+            ],
+          ),
+        ),
+      );
+}
+
+/// {@template editor_tab}
+/// A split-pane live Markdown editor (source on one side, render on the other).
+/// {@endtemplate}
+class EditorTab extends StatefulWidget {
+  /// {@macro editor_tab}
+  const EditorTab({super.key});
+
+  @override
+  State<EditorTab> createState() => _EditorTabState();
+}
+
+/// State for widget EditorTab.
+class _EditorTabState extends State<EditorTab> {
   final MultiChildLayoutDelegate _layoutDelegate = _HomeScreenLayoutDelegate();
   final TextEditingController _inputController =
       TextEditingController(text: _markdownExample);
@@ -138,100 +202,84 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-            centerTitle: true,
-            title: const Text('Markdown'),
-            actions: <Widget>[
-              // theme switch widget
-              Switch.adaptive(
-                  value: ThemeModel.of(context).value == ThemeMode.dark,
-                  onChanged: (value) {
-                    ThemeModel.of(context).value =
-                        value ? ThemeMode.dark : ThemeMode.light;
-                  }),
-            ]),
-        body: SafeArea(
-          child: CustomMultiChildLayout(
-            delegate: _layoutDelegate,
-            children: <Widget>[
-              LayoutId(
-                id: 0,
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: <Widget>[
-                        Positioned.fill(
-                          child: TextField(
-                            controller: _inputController,
-                            expands: true,
-                            maxLines: null,
-                            minLines: null,
-                            keyboardType: TextInputType.multiline,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              hintText: '____________________________________\n'
-                                  '______________________________\n'
-                                  '__________________________\n'
-                                  '______________________________\n'
-                                  '____________________________________\n'
-                                  '________________________\n'
-                                  '________________________________________\n'
-                                  '______________________________\n'
-                                  '________________________\n'
-                                  '__________________________________________\n'
-                                  '______________________________\n',
-                            ),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 12.0),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.max,
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                IconButton.filledTonal(
-                                  icon: const Icon(
-                                    Icons.refresh,
-                                  ),
-                                  onPressed: () =>
-                                      _inputController.text = _markdownExample,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              LayoutId(
-                id: 1,
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: Card(
-                    child: SingleChildScrollView(
-                      primary: false,
-                      padding: const EdgeInsets.all(8.0),
-                      child: ValueListenableBuilder(
-                        valueListenable: _outputController,
-                        builder: (context, value, child) => MarkdownWidget(
-                          markdown: value,
+  Widget build(BuildContext context) => CustomMultiChildLayout(
+        delegate: _layoutDelegate,
+        children: <Widget>[
+          LayoutId(
+            id: 0,
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: TextField(
+                        controller: _inputController,
+                        expands: true,
+                        maxLines: null,
+                        minLines: null,
+                        keyboardType: TextInputType.multiline,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: '____________________________________\n'
+                              '______________________________\n'
+                              '__________________________\n'
+                              '______________________________\n'
+                              '____________________________________\n'
+                              '________________________\n'
+                              '________________________________________\n'
+                              '______________________________\n'
+                              '________________________\n'
+                              '__________________________________________\n'
+                              '______________________________\n',
                         ),
                       ),
                     ),
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.max,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            IconButton.filledTonal(
+                              icon: const Icon(
+                                Icons.refresh,
+                              ),
+                              onPressed: () =>
+                                  _inputController.text = _markdownExample,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          LayoutId(
+            id: 1,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Card(
+                child: SingleChildScrollView(
+                  primary: false,
+                  padding: const EdgeInsets.all(8.0),
+                  child: ValueListenableBuilder(
+                    valueListenable: _outputController,
+                    builder: (context, value, child) => MarkdownWidget(
+                      markdown: value,
+                    ),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       );
 }
 

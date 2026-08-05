@@ -1,0 +1,50 @@
+# Head-to-head benchmark package: flutter_md vs flutter_markdown vs gpt_markdown.
+#
+# This is a standalone, non-published package that lives inside the repo purely
+# to compare parsing and rendering performance across the three libraries. It is
+# excluded from `flutter_md` publishing via the root `.pubignore`.
+#
+#   flutter pub get
+#   dart run benchmark/parser_benchmark.dart          # parser (benchmark_harness)
+#   flutter test test/render_benchmark_test.dart      # rendering (widget tests)
+name: md_benchmark_compare
+description: "Head-to-head parse & render benchmarks: flutter_md vs flutter_markdown vs gpt_markdown."
+
+publish_to: "none"
+
+version: 0.0.1
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.29.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The library under test — path dependency on the repo root.
+  flutter_md:
+    path: ../
+
+  # The two libraries we compare against.
+  flutter_markdown: ^0.7.7+1 # discontinued; the last published release
+  gpt_markdown: ^1.1.8
+
+  # The parser engine that flutter_markdown uses under the hood. We benchmark it
+  # directly so the parser comparison is apples-to-apples (flutter_markdown does
+  # no parsing of its own — it delegates to this package).
+  markdown: ^7.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  benchmark_harness: ^2.3.1
+  flutter_lints: ">=5.0.0 <7.0.0"
+  # Real profile-mode frame timing (flutter drive + TimelineSummary).
+  integration_test:
+    sdk: flutter
+  flutter_driver:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
