@@ -23,10 +23,9 @@ render objects.
 **Why anchor to the model:** text is derived from an app-supplied registry of
 immutable `Markdown` models, so `getText()`/`selectedContent()` work even when a
 widget is unmounted. A selection may span documents whose widgets a `ListView` has
-disposed; only mounted docs contribute *geometry*, while *all* in-range docs
-contribute *text*. Flutter's `SelectableRegion`/custom delegates were rejected in
-spikes (they glue without separators and drop disposed items) — see
-`benchmark/experiments/FINDINGS.md`.
+disposed; only mounted docs contribute _geometry_, while _all_ in-range docs
+contribute _text_. Flutter's `SelectableRegion`/custom delegates were rejected in
+spikes (they glue without separators and drop disposed items).
 
 ## Document registry
 
@@ -96,7 +95,7 @@ independent of what's mounted (empty slices skipped).
 
 - `MarkdownSelectedDocument { documentId, List<MarkdownSelectedBlock> blocks }`
 - `MarkdownSelectedBlock { int blockIndex, String type, String text, TextRange
-  renderedRange, TextRange? sourceRange /* currently always null */, MD$Block block }`
+renderedRange, TextRange? sourceRange /* currently always null */, MD$Block block }`
 
 `getText([formatter])` = `(formatter ?? controller.formatter).format(selectedContent())`.
 
@@ -178,7 +177,7 @@ Typical pattern: keep models in a list, feed them to the controller, and give ea
 
 - `selectionColor` setter repaints surfaces directly and must **not**
   `notifyListeners` — it's applied during build (`didChangeDependencies`), where
-  notifying would trigger `setState`. (The `formatter` setter *does* notify.)
+  notifying would trigger `setState`. (The `formatter` setter _does_ notify.)
 - Alert **title** is not selectable (body only).
 - Keyboard word/line extension is **block-approximate** (a whitespace scan / jump
   to block start-end within the linearized text, not visual lines). Only
@@ -193,7 +192,7 @@ Typical pattern: keep models in a list, feed them to the controller, and give ea
   always null.
 - `MarkdownThemeData.blockFilter` drops whole blocks at render time, but selection
   **extraction is model-based** and does not see that filtering. A selection spanning
-  *across* a dropped block therefore copies the hidden block's text even though the
+  _across_ a dropped block therefore copies the hidden block's text even though the
   block is never highlighted on screen. Avoid `blockFilter` when selection is enabled
   (same guidance as `spanFilter`, which shifts the painter's offset space).
 - Keyboard **word** navigation indexes the block's rendered text by UTF-16 code unit,

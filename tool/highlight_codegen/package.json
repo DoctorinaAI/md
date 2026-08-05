@@ -1,0 +1,7 @@
+{
+  "name": "prism_codegen",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "dependencies": { "prismjs": "1.30.0" }
+}

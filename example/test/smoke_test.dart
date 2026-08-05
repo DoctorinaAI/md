@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:md_example/main.dart';
+import 'package:md_example/tabs/highlight_tab.dart';
 
 void main() {
   testWidgets('all tabs build and selection drags do not crash',
@@ -40,6 +41,13 @@ void main() {
     await tester.tap(find.text('Chat'));
     await tester.pumpAndSettle();
     expect(find.text('Copy'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    // Highlight tab: every showcased language renders without crashing.
+    await tester.tap(find.text('Highlight'));
+    await tester.pumpAndSettle();
+    expect(find.byType(HighlightTab), findsOneWidget);
+    expect(find.byType(MarkdownWidget), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

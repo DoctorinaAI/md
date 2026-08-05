@@ -55,8 +55,7 @@ renderedOffset)` over an app-supplied registry of immutable `Markdown` models,
 not over render objects. Text extraction reads the models directly and works even
 when nothing is mounted; only mounted surfaces contribute geometry (highlight
 rects, handles). This is the core design decision; the alternatives (Flutter's
-`SelectableRegion`, a custom selection delegate) were ruled out in spikes
-(`benchmark/experiments/FINDINGS.md`).
+`SelectableRegion`, a custom selection delegate).
 
 ## Load-bearing invariants
 
@@ -66,8 +65,8 @@ These are cross-cutting; each subsystem doc repeats the ones it owns.
   it is reused on every repaint and only nulled by `update`/`invalidateLayout`
   (model/theme change or system-font change). Repaints from selection or scroll
   must not invalidate it.
-- **Highlight outside the cache.** The selection highlight is drawn *before* and
-  *outside* the cached `Picture`, so drags/streaming repaint only the highlight.
+- **Highlight outside the cache.** The selection highlight is drawn _before_ and
+  _outside_ the cached `Picture`, so drags/streaming repaint only the highlight.
   `MarkdownRenderObject.isRepaintBoundary` is true whenever a controller is
   attached, isolating those repaints.
 - **Offset-space agreement.** A `SelectableBlockPainter`'s `renderedText` and

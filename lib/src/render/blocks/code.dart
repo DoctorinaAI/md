@@ -22,24 +22,45 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
     required String text,
     required String? language,
     required this.theme,
-  }) : painter = TextPainter(
-          text: TextSpan(
-            text: text,
-            style: theme.textStyle.copyWith(
-              fontFamily: 'monospace',
-              fontSize: theme.textStyle.fontSize ?? kDefaultFontSize,
-            ),
-          ),
+  })  : _background = theme.highlighter?.backgroundFor(language) ??
+            theme.surfaceColor ??
+            const Color.fromARGB(255, 235, 235, 235),
+        painter = TextPainter(
+          text: _buildSpan(text, language, theme),
           textAlign: TextAlign.start,
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
         );
+
+  /// Builds the code span: plain monospace text, or, when the theme carries a
+  /// [MarkdownThemeData.highlighter], a tree of colored token spans whose
+  /// concatenated text still equals [text] (so selection stays aligned).
+  static TextSpan _buildSpan(
+    String text,
+    String? language,
+    MarkdownThemeData theme,
+  ) {
+    final baseStyle = theme.textStyle.copyWith(
+      fontFamily: 'monospace',
+      fontSize: theme.textStyle.fontSize ?? kDefaultFontSize,
+    );
+    final highlighter = theme.highlighter;
+    if (highlighter == null) return TextSpan(text: text, style: baseStyle);
+    final effectiveBase = highlighter.baseStyleFor(language, baseStyle);
+    return TextSpan(
+      style: effectiveBase,
+      children: highlighter.highlight(text, language, effectiveBase),
+    );
+  }
 
   /// Padding around the code text, inside its rounded background.
   static const double padding = 8.0;
 
   /// The theme used to style the code block.
   final MarkdownThemeData theme;
+
+  /// Background color of the code block surface.
+  final Color _background;
 
   /// The text painter that owns the code's glyphs.
   final TextPainter painter;
@@ -81,7 +102,7 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
         const Radius.circular(padding),
       ),
       Paint()
-        ..color = theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235)
+        ..color = _background
         ..isAntiAlias = false
         ..style = PaintingStyle.fill,
     );

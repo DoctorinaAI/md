@@ -16,3 +16,7 @@ example/windows/
 example/macos/
 example/linux/
 docs/
+# Prism codegen tooling — not part of the published package. (.pubignore does
+# not inherit .gitignore, so node_modules must be excluded explicitly here.)
+tool/
+node_modules/

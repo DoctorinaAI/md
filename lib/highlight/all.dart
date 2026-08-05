@@ -1,0 +1,239 @@
+// GENERATED CODE — do not modify by hand. Regenerate with tool/highlight_codegen.
+// ignore_for_file: lines_longer_than_80_chars, public_member_api_docs
+// ignore_for_file: prefer_single_quotes, require_trailing_commas, directives_ordering
+
+import '../highlight.dart';
+import 'apacheconf.dart';
+import 'bash.dart';
+import 'batch.dart';
+import 'c.dart';
+import 'clike.dart';
+import 'clojure.dart';
+import 'coffeescript.dart';
+import 'cpp.dart';
+import 'csharp.dart';
+import 'css.dart';
+import 'dart.dart';
+import 'diff.dart';
+import 'docker.dart';
+import 'elixir.dart';
+import 'elm.dart';
+import 'erlang.dart';
+import 'fsharp.dart';
+import 'git.dart';
+import 'go.dart';
+import 'graphql.dart';
+import 'groovy.dart';
+import 'handlebars.dart';
+import 'haskell.dart';
+import 'html.dart';
+import 'http.dart';
+import 'ini.dart';
+import 'java.dart';
+import 'js.dart';
+import 'json.dart';
+import 'json5.dart';
+import 'jsx.dart';
+import 'julia.dart';
+import 'kotlin.dart';
+import 'latex.dart';
+import 'less.dart';
+import 'lua.dart';
+import 'makefile.dart';
+import 'markdown.dart';
+import 'markup_templating.dart';
+import 'nginx.dart';
+import 'objectivec.dart';
+import 'ocaml.dart';
+import 'perl.dart';
+import 'php.dart';
+import 'plain.dart';
+import 'powershell.dart';
+import 'protobuf.dart';
+import 'python.dart';
+import 'r.dart';
+import 'regex.dart';
+import 'ruby.dart';
+import 'rust.dart';
+import 'sass.dart';
+import 'scala.dart';
+import 'scss.dart';
+import 'solidity.dart';
+import 'sql.dart';
+import 'swift.dart';
+import 'toml.dart';
+import 'tsx.dart';
+import 'typescript.dart';
+import 'vim.dart';
+import 'wasm.dart';
+import 'xml.dart';
+import 'yaml.dart';
+export 'apacheconf.dart';
+export 'bash.dart';
+export 'batch.dart';
+export 'c.dart';
+export 'clike.dart';
+export 'clojure.dart';
+export 'coffeescript.dart';
+export 'cpp.dart';
+export 'csharp.dart';
+export 'css.dart';
+export 'dart.dart';
+export 'diff.dart';
+export 'docker.dart';
+export 'elixir.dart';
+export 'elm.dart';
+export 'erlang.dart';
+export 'fsharp.dart';
+export 'git.dart';
+export 'go.dart';
+export 'graphql.dart';
+export 'groovy.dart';
+export 'handlebars.dart';
+export 'haskell.dart';
+export 'html.dart';
+export 'http.dart';
+export 'ini.dart';
+export 'java.dart';
+export 'js.dart';
+export 'json.dart';
+export 'json5.dart';
+export 'jsx.dart';
+export 'julia.dart';
+export 'kotlin.dart';
+export 'latex.dart';
+export 'less.dart';
+export 'lua.dart';
+export 'makefile.dart';
+export 'markdown.dart';
+export 'markup_templating.dart';
+export 'nginx.dart';
+export 'objectivec.dart';
+export 'ocaml.dart';
+export 'perl.dart';
+export 'php.dart';
+export 'plain.dart';
+export 'powershell.dart';
+export 'protobuf.dart';
+export 'python.dart';
+export 'r.dart';
+export 'regex.dart';
+export 'ruby.dart';
+export 'rust.dart';
+export 'sass.dart';
+export 'scala.dart';
+export 'scss.dart';
+export 'solidity.dart';
+export 'sql.dart';
+export 'swift.dart';
+export 'toml.dart';
+export 'tsx.dart';
+export 'typescript.dart';
+export 'vim.dart';
+export 'wasm.dart';
+export 'xml.dart';
+export 'yaml.dart';
+
+/// Every bundled syntax grammar, keyed by language tag and common aliases.
+///
+/// Referencing this map pulls in ALL grammars, so unused languages can no longer
+/// be removed by tree-shaking — use it for demos or tooling. Production code
+/// should assemble a map with only the languages it needs.
+final Map<String, Grammar> allHighlightLanguages = <String, Grammar>{
+  'apacheconf': HighlightApacheconf.grammar,
+  'bash': HighlightBash.grammar,
+  'batch': HighlightBatch.grammar,
+  'c': HighlightC.grammar,
+  'clike': HighlightClike.grammar,
+  'clojure': HighlightClojure.grammar,
+  'coffeescript': HighlightCoffeescript.grammar,
+  'cpp': HighlightCpp.grammar,
+  'csharp': HighlightCsharp.grammar,
+  'css': HighlightCss.grammar,
+  'dart': HighlightDart.grammar,
+  'diff': HighlightDiff.grammar,
+  'docker': HighlightDocker.grammar,
+  'elixir': HighlightElixir.grammar,
+  'elm': HighlightElm.grammar,
+  'erlang': HighlightErlang.grammar,
+  'fsharp': HighlightFsharp.grammar,
+  'git': HighlightGit.grammar,
+  'go': HighlightGo.grammar,
+  'graphql': HighlightGraphql.grammar,
+  'groovy': HighlightGroovy.grammar,
+  'handlebars': HighlightHandlebars.grammar,
+  'haskell': HighlightHaskell.grammar,
+  'html': HighlightHtml.grammar,
+  'http': HighlightHttp.grammar,
+  'ini': HighlightIni.grammar,
+  'java': HighlightJava.grammar,
+  'js': HighlightJs.grammar,
+  'json': HighlightJson.grammar,
+  'json5': HighlightJson5.grammar,
+  'jsx': HighlightJsx.grammar,
+  'julia': HighlightJulia.grammar,
+  'kotlin': HighlightKotlin.grammar,
+  'latex': HighlightLatex.grammar,
+  'less': HighlightLess.grammar,
+  'lua': HighlightLua.grammar,
+  'makefile': HighlightMakefile.grammar,
+  'markdown': HighlightMarkdown.grammar,
+  'markup-templating': HighlightMarkupTemplating.grammar,
+  'nginx': HighlightNginx.grammar,
+  'objectivec': HighlightObjectivec.grammar,
+  'ocaml': HighlightOcaml.grammar,
+  'perl': HighlightPerl.grammar,
+  'php': HighlightPhp.grammar,
+  'plain': HighlightPlain.grammar,
+  'powershell': HighlightPowershell.grammar,
+  'protobuf': HighlightProtobuf.grammar,
+  'python': HighlightPython.grammar,
+  'r': HighlightR.grammar,
+  'regex': HighlightRegex.grammar,
+  'ruby': HighlightRuby.grammar,
+  'rust': HighlightRust.grammar,
+  'sass': HighlightSass.grammar,
+  'scala': HighlightScala.grammar,
+  'scss': HighlightScss.grammar,
+  'solidity': HighlightSolidity.grammar,
+  'sql': HighlightSql.grammar,
+  'swift': HighlightSwift.grammar,
+  'toml': HighlightToml.grammar,
+  'tsx': HighlightTsx.grammar,
+  'typescript': HighlightTypescript.grammar,
+  'vim': HighlightVim.grammar,
+  'wasm': HighlightWasm.grammar,
+  'xml': HighlightXml.grammar,
+  'yaml': HighlightYaml.grammar,
+  'atom': HighlightXml.grammar,
+  'coffee': HighlightCoffeescript.grammar,
+  'context': HighlightLatex.grammar,
+  'cs': HighlightCsharp.grammar,
+  'dockerfile': HighlightDocker.grammar,
+  'dotnet': HighlightCsharp.grammar,
+  'hbs': HighlightHandlebars.grammar,
+  'hs': HighlightHaskell.grammar,
+  'javascript': HighlightJs.grammar,
+  'kt': HighlightKotlin.grammar,
+  'kts': HighlightKotlin.grammar,
+  'markup': HighlightHtml.grammar,
+  'mathml': HighlightHtml.grammar,
+  'md': HighlightMarkdown.grammar,
+  'mustache': HighlightHandlebars.grammar,
+  'objc': HighlightObjectivec.grammar,
+  'plaintext': HighlightPlain.grammar,
+  'py': HighlightPython.grammar,
+  'rb': HighlightRuby.grammar,
+  'rss': HighlightXml.grammar,
+  'sh': HighlightBash.grammar,
+  'shell': HighlightBash.grammar,
+  'sol': HighlightSolidity.grammar,
+  'ssml': HighlightXml.grammar,
+  'svg': HighlightHtml.grammar,
+  'tex': HighlightLatex.grammar,
+  'text': HighlightPlain.grammar,
+  'ts': HighlightTypescript.grammar,
+  'txt': HighlightPlain.grammar,
+  'webmanifest': HighlightJson.grammar,
+  'yml': HighlightYaml.grammar,
+};

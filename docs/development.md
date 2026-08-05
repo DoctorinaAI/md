@@ -50,10 +50,6 @@ Parser scenarios live in `benchmark/scenarios.dart` (`prose, inline, links, list
 table, code, quotes, escapes, currency, pathological, mixed`). `compare.dart` uses
 warmup + auto-calibrated iterations + min-of-batches for low-noise deltas.
 
-Selection spikes S1–S5 and S7 (`benchmark/experiments/`, findings in
-`FINDINGS.md`) are throwaway and not in CI; S6 lives at
-`example/lib/experiments/s6_platforms.dart`.
-
 ## CI pipeline (`.github/workflows/`)
 
 **`checkout.yml`** (name `Checkout`) — runs on push to `main`/`master` and PRs to
@@ -127,7 +123,7 @@ lib/src/
 test/
   parser/ nodes/ selection/ theme/ widget/   (aggregated by test/unit_test.dart)
 benchmark/                    parser + render benchmarks, compare.dart, scenarios.dart,
-                              .render_baseline.txt, experiments/ (spikes + FINDINGS.md)
+                              .render_baseline.txt
 example/                      md_example app: lib/main.dart (Editor/Selection/Chat tabs), lib/tabs/*
 AGENTS.md  docs/              this documentation set
 ```

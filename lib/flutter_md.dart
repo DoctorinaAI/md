@@ -23,6 +23,7 @@ export 'src/render.dart'
         BlockPainter$Table,
         BlockPainter$Divider,
         BlockPainter$Spacer;
+export 'src/highlight/engine.dart' show CodeHighlightTheme, SyntaxHighlighter;
 export 'src/selection.dart';
 export 'src/selection_scope.dart';
 export 'src/theme.dart';
