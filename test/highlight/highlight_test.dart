@@ -4,10 +4,6 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_md/highlight.dart';
 import 'package:flutter_md/highlight/all.dart';
-import 'package:flutter_md/highlight/bash.dart';
-import 'package:flutter_md/highlight/dart.dart';
-import 'package:flutter_md/highlight/json.dart';
-import 'package:flutter_md/highlight/python.dart';
 import 'package:flutter_md/highlight/themes.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -348,9 +344,7 @@ def f(x): return x
       expect(_colorOf(frags, 'foo'), const Color(0xFFFF7B72)); // rest → keyword
     });
 
-    test(
-        'compileHighlightPattern disables an invalid pattern instead of throwing',
-        () {
+    test('compileHighlightPattern: invalid source disables the rule', () {
       final bad = compileHighlightPattern('(unclosed');
       expect(bad.hasMatch('an (unclosed group'), isFalse);
       final good = compileHighlightPattern('abc', caseSensitive: false);
