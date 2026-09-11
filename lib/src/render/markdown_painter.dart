@@ -45,6 +45,9 @@ class MarkdownPainter {
   /// Current markdown entity to render.
   Markdown _markdown;
 
+  /// The markdown model currently painted by this painter.
+  Markdown get markdown => _markdown;
+
   /// Current theme for the markdown widget.
   MarkdownThemeData _theme;
 
@@ -154,14 +157,35 @@ class MarkdownPainter {
   /// Maps a content-local [local] offset to `(sourceBlockIndex, offset)`, or
   /// null if the hit block does not support selection.
   (int, int)? positionForLocal(Offset local) {
+    final hit = positionAndAffinityForLocal(local);
+    return hit == null ? null : (hit.$1, hit.$2);
+  }
+
+  /// Like [positionForLocal] but also returns the soft-wrap [TextAffinity].
+  (int, int, TextAffinity)? positionAndAffinityForLocal(Offset local) {
     if (_blockPainters.isEmpty) return null;
     final idx = _blockIndexForDy(local.dy);
     final painter = _blockPainters[idx];
     if (painter is! SelectableBlockPainter) return null;
     final blockLocal = Offset(local.dx, local.dy - _blockOffsets[idx]);
     final len = painter.renderedText.length;
-    final offset = painter.offsetForLocalPosition(blockLocal).clamp(0, len);
-    return (_sourceIndices[idx], offset);
+    final (offset, affinity) = painter.positionAndAffinityForLocal(blockLocal);
+    return (_sourceIndices[idx], offset.clamp(0, len), affinity);
+  }
+
+  /// Block-local caret rect for a source block [sourceIndex] at [offset] with
+  /// [affinity], shifted into content-local coordinates. Null when the block
+  /// is not painted or not selectable.
+  Rect? caretRectFor(int sourceIndex, int offset, TextAffinity affinity) {
+    for (var i = 0; i < _blockPainters.length; i++) {
+      if (_sourceIndices[i] != sourceIndex) continue;
+      final painter = _blockPainters[i];
+      if (painter is! SelectableBlockPainter) return null;
+      return painter
+          .caretRectFor(offset, affinity)
+          .shift(Offset(0, _blockOffsets[i]));
+    }
+    return null;
   }
 
   /// Maps a content-local [local] point to the word range at it, as
@@ -196,14 +220,23 @@ class MarkdownPainter {
 
   /// Paints the selection highlight of every selectable block, using [rangeOf]
   /// to look up the selected rendered range for a source block index.
+  ///
+  /// When [aboveCachedContentOnly] is true, only blocks that report
+  /// [SelectableBlockPainter.selectionHighlightAboveCachedContent] are painted
+  /// (opaque chrome that would hide an under-content highlight).
   void paintHighlight(
     Canvas canvas,
     TextRange? Function(int sourceIndex) rangeOf,
-    Paint paint,
-  ) {
+    Paint paint, {
+    bool aboveCachedContentOnly = false,
+  }) {
     for (var i = 0; i < _blockPainters.length; i++) {
       final painter = _blockPainters[i];
       if (painter is! SelectableBlockPainter) continue;
+      if (aboveCachedContentOnly !=
+          painter.selectionHighlightAboveCachedContent) {
+        continue;
+      }
       final range = rangeOf(_sourceIndices[i]);
       if (range == null || range.start >= range.end) continue;
       final top = _blockOffsets[i];
@@ -287,6 +320,59 @@ class MarkdownPainter {
     }
     _needsLayout = false; // No need to layout if the markdown is empty.
     return _size = Size(width, height);
+  }
+
+  /// Vertical positions where each visual text line ends, top-down.
+  ///
+  /// Positions are absolute in the laid-out content. Runs sharing a bottom
+  /// edge — cells of a table row, a list bullet and its first line — count as
+  /// one line. Blocks without text (spacer, divider) contribute no line of
+  /// their own; their height still shows in the positions after them.
+  ///
+  /// Only valid after [layout].
+  List<double> textLineBottoms() {
+    if (_isEmpty) return const <double>[];
+    final blocks = _blockPainters;
+    if (_blockOffsets.length != blocks.length) return const <double>[];
+    final bottoms = <double>[];
+    for (var i = 0; i < blocks.length; i++) {
+      final top = _blockOffsets[i];
+      for (final (painter, offset) in _textFragments(blocks[i])) {
+        var bottom = top + offset.dy;
+        for (final line in painter.computeLineMetrics()) {
+          bottom += line.height;
+          bottoms.add(bottom);
+        }
+      }
+    }
+    bottoms.sort();
+    final lines = <double>[];
+    for (final bottom in bottoms) {
+      // Runs of one line round to slightly different bottoms; a cut may only
+      // land where every run on that line has ended.
+      if (lines.isNotEmpty && bottom - lines.last < 1) {
+        lines[lines.length - 1] = bottom;
+        continue;
+      }
+      lines.add(bottom);
+    }
+    return lines;
+  }
+
+  /// Selectable text runs of [block], as `(painter, block-local origin)`.
+  static Iterable<(TextPainter, Offset)> _textFragments(BlockPainter block) {
+    if (block is SelectableTextBlock) {
+      return <(TextPainter, Offset)>[
+        (
+          block.selectionPainter,
+          block.selectionOrigin,
+        )
+      ];
+    }
+    if (block is MultiPainterSelectable) {
+      return block.fragments.map((f) => (f.painter, f.origin));
+    }
+    return const <(TextPainter, Offset)>[];
   }
 
   /// Routes a tap-down / tap-up to the block under the pointer, re-basing the

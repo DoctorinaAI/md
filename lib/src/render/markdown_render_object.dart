@@ -15,7 +15,7 @@ import '../selection.dart';
 import '../theme.dart';
 import 'markdown_painter.dart';
 
-/// Default color used to paint the selection highlight over the glyphs.
+/// Default color used to paint the selection highlight under the glyphs.
 const Color _kSelectionColor = Color(0x552196F3);
 
 @meta.internal
@@ -42,10 +42,20 @@ class MarkdownRenderObject extends RenderBox
 
   // Selection-handle leader layers pushed during paint so native handles
   // (drawn by the scope's SelectionOverlay) follow the content as it scrolls.
+  // [LayerHandle] keeps a single LeaderLayer per link across paints (matches
+  // RenderEditable) so stale leaders cannot linger and double-up chrome.
   LayerLink? _startHandleLink;
   Offset? _startHandleLocal;
   LayerLink? _endHandleLink;
   Offset? _endHandleLocal;
+  final LayerHandle<LeaderLayer> _startHandleLayer = LayerHandle<LeaderLayer>();
+  final LayerHandle<LeaderLayer> _endHandleLayer = LayerHandle<LeaderLayer>();
+
+  /// Whether this surface currently owns a start and/or end handle leader.
+  @visibleForTesting
+  bool get debugHasSelectionHandleLeaders =>
+      (_startHandleLink != null && _startHandleLocal != null) ||
+      (_endHandleLink != null && _endHandleLocal != null);
 
   void _onSelectionChange() {
     if (!_disposed) markNeedsPaint();
@@ -55,9 +65,16 @@ class MarkdownRenderObject extends RenderBox
 
   void _attachController() {
     final controller = _controller;
-    if (controller == null) return;
+    final id = _documentId;
+    if (controller == null || id == null) return;
     controller.addListener(_onSelectionChange);
-    if (attached) controller.attachSurface(this);
+    if (attached) {
+      // Mounted surfaces must exist in the registry so [rangeFor] / ordering
+      // can resolve them. AppMarkdown also putDocuments; this heals races where
+      // the RO attaches before (or without) an app-level registration.
+      controller.putDocument(id, _painter.markdown);
+      controller.attachSurface(this);
+    }
   }
 
   void _detachController() {
@@ -65,6 +82,7 @@ class MarkdownRenderObject extends RenderBox
     if (controller == null) return;
     controller.removeListener(_onSelectionChange);
     controller.detachSurface(this);
+    _clearSelectionHandleLayers();
   }
 
   /// Wires (or rewires) this render object to a selection [controller] under
@@ -95,16 +113,33 @@ class MarkdownRenderObject extends RenderBox
 
   @override
   MarkdownPosition? positionForGlobal(Offset globalPosition) {
+    final hit = hitForGlobal(globalPosition);
+    return hit?.$1;
+  }
+
+  @override
+  (MarkdownPosition, TextAffinity)? hitForGlobal(Offset globalPosition) {
     final id = _documentId;
     if (id == null) return null;
     final local = globalToLocal(globalPosition);
-    final hit = _painter.positionForLocal(local);
+    final hit = _painter.positionAndAffinityForLocal(local);
     if (hit == null) return null;
-    return MarkdownPosition(
-      documentId: id,
-      blockIndex: hit.$1,
-      offset: hit.$2,
+    return (
+      MarkdownPosition(
+        documentId: id,
+        blockIndex: hit.$1,
+        offset: hit.$2,
+      ),
+      hit.$3,
     );
+  }
+
+  @override
+  Rect? caretRectFor(MarkdownPosition position, TextAffinity affinity) {
+    final id = _documentId;
+    if (id == null || position.documentId != id) return null;
+    return _painter.caretRectFor(
+        position.blockIndex, position.offset, affinity);
   }
 
   @override
@@ -150,7 +185,18 @@ class MarkdownRenderObject extends RenderBox
       _endHandleLocal = endLocal;
       changed = true;
     }
-    if (changed && !_disposed && attached) markNeedsPaint();
+    if (!changed || _disposed || !attached) return;
+    markNeedsCompositingBitsUpdate();
+    markNeedsPaint();
+  }
+
+  void _clearSelectionHandleLayers() {
+    _startHandleLink = null;
+    _startHandleLocal = null;
+    _endHandleLink = null;
+    _endHandleLocal = null;
+    _startHandleLayer.layer = null;
+    _endHandleLayer.layer = null;
   }
 
   @override
@@ -191,7 +237,7 @@ class MarkdownRenderObject extends RenderBox
   bool get isRepaintBoundary => _controller != null;
 
   @override
-  bool get alwaysNeedsCompositing => false;
+  bool get alwaysNeedsCompositing => debugHasSelectionHandleLeaders;
 
   @override
   bool get sizedByParent => false;
@@ -273,7 +319,12 @@ class MarkdownRenderObject extends RenderBox
   void attach(PipelineOwner owner) {
     super.attach(owner);
     PaintingBinding.instance.systemFonts.addListener(_handleSystemFontsChange);
-    _controller?.attachSurface(this);
+    final controller = _controller;
+    final id = _documentId;
+    if (controller != null && id != null) {
+      controller.putDocument(id, _painter.markdown);
+      controller.attachSurface(this);
+    }
   }
 
   /// Updates the render object with a new values.
@@ -290,6 +341,11 @@ class MarkdownRenderObject extends RenderBox
       // Mark the render object as needing layout.
       markNeedsLayout();
     }
+    final controller = _controller;
+    final id = _documentId;
+    if (controller != null && id != null) {
+      controller.putDocument(id, markdown);
+    }
   }
 
   @override
@@ -298,6 +354,9 @@ class MarkdownRenderObject extends RenderBox
     PaintingBinding.instance.systemFonts
         .removeListener(_handleSystemFontsChange);
     _controller?.detachSurface(this);
+    // Drop leaders before leaving the tree so a detached surface cannot keep
+    // LayerLinks alive and produce ghost / double handles after remount churn.
+    _clearSelectionHandleLayers();
     super.detach();
   }
 
@@ -306,6 +365,7 @@ class MarkdownRenderObject extends RenderBox
   void dispose() {
     _disposed = true;
     _controller?.removeListener(_onSelectionChange);
+    _clearSelectionHandleLayers();
     super.dispose();
     _painter.dispose();
   }
@@ -321,21 +381,29 @@ class MarkdownRenderObject extends RenderBox
       ..translate(offset.dx, offset.dy);
     //..clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    _painter.paint(canvas, size);
-
-    // Paint the selection highlight OUTSIDE the cached content Picture, but ON
-    // TOP of the glyphs, so a translucent highlight stays visible even over
-    // opaque block/inline backgrounds (code fences, `inline code`, ==mark==).
-    // Still outside the Picture, so drag/streaming repaints never rebuild the
-    // glyph cache (the S7 invariant holds).
+    // Selection highlight stays outside the cached content Picture (S7: drag /
+    // streaming never rebuilds the glyph cache). Paint order matches
+    // SelectableRegion: highlight under glyphs so text stays sharp, then a
+    // second pass above opaque block chrome (code fences, table zebra rows,
+    // inline monospace/highlight) so the tint stays visible there.
     final controller = _controller;
     final id = _documentId;
+    TextRange? rangeOf(int source) => controller != null && id != null
+        ? controller.rangeFor(id, source)
+        : null;
     if (controller != null && id != null) {
       _highlightPaint.color = controller.selectionColor ?? _kSelectionColor;
+      _painter.paintHighlight(canvas, rangeOf, _highlightPaint);
+    }
+
+    _painter.paint(canvas, size);
+
+    if (controller != null && id != null) {
       _painter.paintHighlight(
         canvas,
-        (source) => controller.rangeFor(id, source),
+        rangeOf,
         _highlightPaint,
+        aboveCachedContentOnly: true,
       );
     }
 
@@ -346,20 +414,24 @@ class MarkdownRenderObject extends RenderBox
     final startLink = _startHandleLink;
     final startLocal = _startHandleLocal;
     if (startLink != null && startLocal != null) {
-      context.pushLayer(
-        LeaderLayer(link: startLink, offset: offset + startLocal),
-        _paintNothing,
-        Offset.zero,
+      _startHandleLayer.layer = LeaderLayer(
+        link: startLink,
+        offset: offset + startLocal,
       );
+      context.pushLayer(_startHandleLayer.layer!, _paintNothing, Offset.zero);
+    } else {
+      _startHandleLayer.layer = null;
     }
     final endLink = _endHandleLink;
     final endLocal = _endHandleLocal;
     if (endLink != null && endLocal != null) {
-      context.pushLayer(
-        LeaderLayer(link: endLink, offset: offset + endLocal),
-        _paintNothing,
-        Offset.zero,
+      _endHandleLayer.layer = LeaderLayer(
+        link: endLink,
+        offset: offset + endLocal,
       );
+      context.pushLayer(_endHandleLayer.layer!, _paintNothing, Offset.zero);
+    } else {
+      _endHandleLayer.layer = null;
     }
   }
 }

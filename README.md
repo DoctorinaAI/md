@@ -254,6 +254,9 @@ final MarkdownSelectedContent structured = controller.selectedContent();
 - **Streaming stays anchored.** Call `controller.putDocument(id, newModel)` when
   a message grows; the default `MarkdownReconciliationPolicy.contentAnchored`
   keeps the selection (append fast-path, else relocate by content, else clamp).
+  Prefer unique reading-order `order` values. `removeDocument` waits for surface
+  detach when the body is still mounted; a remount `putDocument` cancels a
+  pending remove.
 - **One selection at a time.** Share a `MarkdownSelectionGroup` between
   controllers so selecting in one clears the others; call `group.clearExternal()`
   when a plain `SelectableText`/`SelectionArea` starts its own selection.
@@ -510,7 +513,7 @@ class _MyWidgetState extends State<MyWidget> {
 ## 📊 Performance
 
 `flutter_md` is built for speed: a single-pass, lookup-table parser (regex-free
-hot path with a plain-text fast path) and a custom render object that lays the
+hot path with a plain text fast path) and a custom render object that lays the
 whole document into one cached `ui.Picture` instead of a deep tree of per-block
 widgets.
 

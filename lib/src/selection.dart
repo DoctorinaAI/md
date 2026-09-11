@@ -1,4 +1,4 @@
-import 'dart:ui' show Color, Offset, Rect, TextRange;
+import 'dart:ui' show Color, Offset, Rect, TextAffinity, TextRange;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart' show LayerLink;
@@ -475,6 +475,13 @@ abstract interface class MarkdownSelectionSurface {
   /// Maps a global point to a logical position, or null if outside any text.
   MarkdownPosition? positionForGlobal(Offset globalPosition);
 
+  /// Like [positionForGlobal] but also returns soft-wrap [TextAffinity].
+  (MarkdownPosition, TextAffinity)? hitForGlobal(Offset globalPosition);
+
+  /// Content-local caret rect for [position] with [affinity], or null when this
+  /// surface does not own that position / cannot place a caret.
+  Rect? caretRectFor(MarkdownPosition position, TextAffinity affinity);
+
   /// The word range at a global point, as `(blockIndex, start, end)` in the
   /// block's rendered-text space, using the platform word segmentation. Null
   /// when the point misses selectable text.
@@ -506,6 +513,11 @@ abstract interface class MarkdownSelectionSurface {
   void repaintSelection();
 }
 
+/// Minimum global distance between directed handle carets. Closer than this
+/// with a real selection span is treated as coincident (peanut) and expanded
+/// onto visible selection extremes.
+const double _kMinHandleCaretSeparation = 2.0;
+
 /// The mounted geometry at the two ends of a selection, for placing handles.
 @immutable
 class MarkdownHandleEndpoints {
@@ -520,7 +532,7 @@ class MarkdownHandleEndpoints {
     required this.endGlobal,
   });
 
-  /// The surface owning the reading-order start edge.
+  /// The surface owning the directed start edge ([MarkdownSelection.base]).
   final MarkdownSelectionSurface startSurface;
 
   /// The local caret rect at the start edge (within [startSurface]).
@@ -529,7 +541,7 @@ class MarkdownHandleEndpoints {
   /// The global caret rect at the start edge.
   final Rect startGlobal;
 
-  /// The surface owning the reading-order end edge.
+  /// The surface owning the directed end edge ([MarkdownSelection.extent]).
   final MarkdownSelectionSurface endSurface;
 
   /// The local caret rect at the end edge (within [endSurface]).
@@ -611,14 +623,100 @@ class MarkdownSelectionController extends ChangeNotifier {
   final Map<Object, MarkdownSelectionSurface> _surfaces =
       <Object, MarkdownSelectionSurface>{};
 
+  /// Ids whose [removeDocument] was deferred because a surface is still
+  /// mounted. Flushed in [detachSurface]; cancelled by a later [putDocument].
+  ///
+  /// Parent [State.dispose] can run while the child's render object is still
+  /// attached, so an eager remove leaves a hittable surface with `di=-1`.
+  final Set<Object> _pendingRemoveIds = <Object>{};
+
   MarkdownSelection? _selection;
 
+  /// Soft-wrap affinity for [MarkdownSelection.base] / `.extent`. Chrome-only —
+  /// not part of model identity or reconciliation.
+  TextAffinity _baseAffinity = TextAffinity.downstream;
+  TextAffinity _extentAffinity = TextAffinity.downstream;
+
+  bool _toolbarWanted = false;
+
+  /// Whether the selection toolbar should stay available across scroll and
+  /// scope remounts. Set by [MarkdownSelectionScopeState.showToolbar], by a
+  /// non-collapsed public [selection] / [selectAll], and cleared by an
+  /// intentional hide or when the selection collapses. Survives list
+  /// virtualization so a remounted scope can restore the menu. Gesture
+  /// updates use [_commitSelection] and do not set this — the scope shows
+  /// the menu on drag end.
+  bool get toolbarWanted => _toolbarWanted;
+  set toolbarWanted(bool value) {
+    if (_toolbarWanted == value) return;
+    _toolbarWanted = value;
+  }
+
+  /// Global caret rect for the mounted [base]/extent endpoint, or null when
+  /// that edge's surface is unmounted. Does not apply handle proxies.
+  Rect? selectionEndpointGlobalRect({required bool base}) {
+    final sel = _selection;
+    if (sel == null || sel.isCollapsed) return null;
+    final pos = base ? sel.base : sel.extent;
+    final affinity = base ? _baseAffinity : _extentAffinity;
+    final surface = _surfaces[pos.documentId];
+    if (surface == null) return null;
+    final local = surface.caretRectFor(pos, affinity);
+    if (local == null) return null;
+    return local.shift(surface.globalBounds.topLeft);
+  }
+
+  /// Whether the mounted (non-proxied) caret for [base] / extent intersects
+  /// [globalRect]. Unmounted endpoints return false — they are not "in view"
+  /// even if handle chrome would proxy them onto visible paint.
+  bool selectionEndpointOverlaps(Rect globalRect, {required bool base}) {
+    final global = selectionEndpointGlobalRect(base: base);
+    if (global == null) return false;
+    return globalRect.inflate(0.5).overlaps(global);
+  }
+
+  /// True when either directed selection endpoint is mounted and overlaps
+  /// [globalRect] (see [selectionEndpointOverlaps]).
+  bool anySelectionEndpointOverlaps(Rect globalRect) =>
+      selectionEndpointOverlaps(globalRect, base: true) ||
+      selectionEndpointOverlaps(globalRect, base: false);
+
   /// The current selection, or null when nothing is selected.
+  ///
+  /// Assigning a non-collapsed range marks [toolbarWanted] so a mounted
+  /// [MarkdownSelectionScope] starts (or restores) the toolbar without a
+  /// gesture. Gesture-driven updates go through [_commitSelection] instead.
   MarkdownSelection? get selection => _selection;
   set selection(MarkdownSelection? value) {
     if (value == _selection) return;
     _selection = value;
-    if (value != null && !value.isCollapsed) _group?._claim(this);
+    if (value == null || value.isCollapsed) {
+      toolbarWanted = false;
+      _baseAffinity = TextAffinity.downstream;
+      _extentAffinity = TextAffinity.downstream;
+    } else {
+      toolbarWanted = true;
+      _group?._claim(this);
+    }
+    notifyListeners();
+  }
+
+  void _commitSelection(
+    MarkdownSelection value, {
+    TextAffinity? baseAffinity,
+    TextAffinity? extentAffinity,
+  }) {
+    if (baseAffinity != null) _baseAffinity = baseAffinity;
+    if (extentAffinity != null) _extentAffinity = extentAffinity;
+    if (value.isCollapsed) toolbarWanted = false;
+    if (value == _selection) {
+      // Affinity-only update (same anchors, different soft-wrap line) still
+      // needs to refresh handle geometry.
+      notifyListeners();
+      return;
+    }
+    _selection = value;
+    if (!value.isCollapsed) _group?._claim(this);
     notifyListeners();
   }
 
@@ -646,6 +744,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// Replaces the whole registry (initial/bulk load), preserving a still-valid
   /// selection by clamping it into the new documents.
   void setDocuments(Iterable<MarkdownDocumentRef> docs) {
+    _pendingRemoveIds.clear();
     _docs
       ..clear()
       ..addAll(<_DocEntry>[
@@ -660,9 +759,12 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// Inserts or updates one document. On a model change the selection is
   /// reconciled via [reconciliation] (this is the streaming entry point).
   void putDocument(Object id, Markdown model, {int? order}) {
+    // A remount / heal cancels a dispose that raced ahead of detach.
+    _pendingRemoveIds.remove(id);
     final idx = _orderIndex(id);
     if (idx < 0) {
-      _docs.add(_DocEntry(id, model, order ?? _docs.length));
+      final assigned = order ?? _docs.length;
+      _docs.add(_DocEntry(id, model, assigned));
       _sort();
       notifyListeners();
       return;
@@ -683,7 +785,19 @@ class MarkdownSelectionController extends ChangeNotifier {
   }
 
   /// Removes a document. If the selection touched it, the selection is dropped.
+  ///
+  /// When a surface for [id] is still mounted, the remove is deferred until
+  /// [detachSurface] so hit-testing cannot outlive the registry entry.
   void removeDocument(Object id) {
+    if (_surfaces.containsKey(id)) {
+      _pendingRemoveIds.add(id);
+      return;
+    }
+    _forceRemoveDocument(id);
+  }
+
+  void _forceRemoveDocument(Object id) {
+    _pendingRemoveIds.remove(id);
     _docs.removeWhere((e) => e.id == id);
     _reindex();
     final sel = _selection;
@@ -745,12 +859,18 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// attach.
   void attachSurface(MarkdownSelectionSurface surface) {
     _surfaces[surface.documentId] = surface;
+    // Do not read globalBounds here — attach runs before layout; localToGlobal
+    // throws "not in the same render tree" / NEEDS-LAYOUT.
   }
 
   /// Unregisters a [surface]. Called on RenderObject detach/dispose.
   void detachSurface(MarkdownSelectionSurface surface) {
-    if (identical(_surfaces[surface.documentId], surface)) {
-      _surfaces.remove(surface.documentId);
+    final id = surface.documentId;
+    if (identical(_surfaces[id], surface)) {
+      _surfaces.remove(id);
+      if (_pendingRemoveIds.contains(id)) {
+        _forceRemoveDocument(id);
+      }
     }
   }
 
@@ -762,16 +882,50 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// When the point is inside a surface it is used directly; otherwise the
   /// vertically-nearest surface is chosen and the point clamped into it, so a
   /// drag through the gaps/edges between widgets still extends the selection.
-  MarkdownPosition? positionForGlobal(Offset globalPosition) {
-    final resolved = _resolveSurfaceAt(globalPosition);
-    return resolved?.$1.positionForGlobal(resolved.$2);
+  MarkdownPosition? positionForGlobal(
+    Offset globalPosition, {
+    bool requireContainment = false,
+  }) {
+    final hit = hitForGlobal(
+      globalPosition,
+      requireContainment: requireContainment,
+    );
+    return hit?.$1;
   }
 
-  /// Resolves the surface a global point belongs to (directly when inside,
-  /// otherwise the vertically-nearest one) together with the point clamped into
-  /// that surface. Shared by [positionForGlobal] and [wordSelectionAt] so a
-  /// gesture through the gaps between widgets still resolves consistently.
-  (MarkdownSelectionSurface, Offset)? _resolveSurfaceAt(Offset globalPosition) {
+  /// Like [positionForGlobal] but also returns soft-wrap [TextAffinity].
+  (MarkdownPosition, TextAffinity)? hitForGlobal(
+    Offset globalPosition, {
+    bool requireContainment = false,
+  }) {
+    final resolved = _resolveSurfaceAt(
+      globalPosition,
+      clampToNearest: !requireContainment,
+    );
+    if (resolved == null) return null;
+    return resolved.$1.hitForGlobal(resolved.$2);
+  }
+
+  /// Whether [globalPosition] lies inside a mounted selectable surface's
+  /// bounds (no nearest-neighbor clamp). Used to gate gesture *starts*.
+  bool hitsSelectableContent(Offset globalPosition) {
+    for (final surface in _surfaces.values) {
+      final bounds = surface.globalBounds;
+      if (!bounds.isEmpty && bounds.contains(globalPosition)) return true;
+    }
+    return false;
+  }
+
+  /// Resolves the surface a global point belongs to.
+  ///
+  /// When [clampToNearest] is true (default), a miss picks the vertically
+  /// nearest surface and clamps the point into it so a drag through gaps
+  /// between widgets still extends. When false, a miss returns null so
+  /// gesture starts do not arm on chrome / empty space.
+  (MarkdownSelectionSurface, Offset)? _resolveSurfaceAt(
+    Offset globalPosition, {
+    bool clampToNearest = true,
+  }) {
     MarkdownSelectionSurface? nearest;
     var bestDistance = double.infinity;
     for (final surface in _surfaces.values) {
@@ -780,6 +934,7 @@ class MarkdownSelectionController extends ChangeNotifier {
       // width/height) has nothing to select and would invert the clamp below.
       if (bounds.isEmpty) continue;
       if (bounds.contains(globalPosition)) return (surface, globalPosition);
+      if (!clampToNearest) continue;
       final dy = globalPosition.dy < bounds.top
           ? bounds.top - globalPosition.dy
           : (globalPosition.dy > bounds.bottom
@@ -790,7 +945,7 @@ class MarkdownSelectionController extends ChangeNotifier {
         nearest = surface;
       }
     }
-    if (nearest == null) return null;
+    if (!clampToNearest || nearest == null) return null;
     final bounds = nearest.globalBounds;
     // Clamp INTO the surface, keeping the upper bound >= the lower bound so a
     // very small surface never inverts the limits (num.clamp throws then).
@@ -811,43 +966,79 @@ class MarkdownSelectionController extends ChangeNotifier {
   void clear() => selection = null;
 
   /// Collapses the selection at [position].
-  void collapseAt(MarkdownPosition position) =>
-      selection = MarkdownSelection.collapsed(position);
+  void collapseAt(
+    MarkdownPosition position, {
+    TextAffinity affinity = TextAffinity.downstream,
+  }) =>
+      _commitSelection(
+        MarkdownSelection.collapsed(position),
+        baseAffinity: affinity,
+        extentAffinity: affinity,
+      );
 
   /// Extends the moving end of the selection to [position] (anchoring [base]
   /// first if there is no selection yet).
-  void extendTo(MarkdownPosition position) {
+  void extendTo(
+    MarkdownPosition position, {
+    TextAffinity affinity = TextAffinity.downstream,
+  }) {
     final sel = _selection;
-    selection = sel == null
-        ? MarkdownSelection.collapsed(position)
-        : MarkdownSelection(base: sel.base, extent: position);
+    if (sel == null) {
+      collapseAt(position, affinity: affinity);
+      return;
+    }
+    _commitSelection(
+      MarkdownSelection(base: sel.base, extent: position),
+      extentAffinity: affinity,
+    );
   }
 
   /// Begins a selection at a global point (e.g. a drag start).
-  void startAtGlobal(Offset globalPosition) {
-    final p = positionForGlobal(globalPosition);
-    if (p != null) collapseAt(p);
+  ///
+  /// When [requireContainment] is true (default), a miss outside every
+  /// mounted surface is ignored — gesture starts must not clamp onto the
+  /// nearest markdown from chrome / empty space.
+  void startAtGlobal(
+    Offset globalPosition, {
+    bool requireContainment = true,
+  }) {
+    final hit = hitForGlobal(
+      globalPosition,
+      requireContainment: requireContainment,
+    );
+    if (hit != null) collapseAt(hit.$1, affinity: hit.$2);
   }
 
   /// Extends the selection to a global point (e.g. a drag update).
   void extendToGlobal(Offset globalPosition) {
-    final p = positionForGlobal(globalPosition);
-    if (p != null) extendTo(p);
+    final hit = hitForGlobal(globalPosition);
+    if (hit != null) extendTo(hit.$1, affinity: hit.$2);
   }
 
   /// Selects everything across every registered document.
+  ///
+  /// Marks [toolbarWanted] so a mounted scope shows the context menu without
+  /// waiting for a gesture (same chrome lifecycle as assigning [selection]).
   void selectAll() {
     if (_docs.isEmpty) return;
     final first = _docs.first, last = _docs.last;
     if (first.model.blocks.isEmpty || last.model.blocks.isEmpty) return;
     final lastBlock = last.model.blocks.length - 1;
-    selection = MarkdownSelection(
-      base: MarkdownPosition(documentId: first.id, blockIndex: 0, offset: 0),
-      extent: MarkdownPosition(
-        documentId: last.id,
-        blockIndex: lastBlock,
-        offset: markdownBlockRenderedText(last.model.blocks[lastBlock]).length,
+    // Before [_commitSelection]'s notify so a listening scope restores chrome
+    // on the same turn (not only after a later gesture).
+    toolbarWanted = true;
+    _commitSelection(
+      MarkdownSelection(
+        base: MarkdownPosition(documentId: first.id, blockIndex: 0, offset: 0),
+        extent: MarkdownPosition(
+          documentId: last.id,
+          blockIndex: lastBlock,
+          offset:
+              markdownBlockRenderedText(last.model.blocks[lastBlock]).length,
+        ),
       ),
+      baseAffinity: TextAffinity.downstream,
+      extentAffinity: TextAffinity.upstream,
     );
   }
 
@@ -908,8 +1099,18 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// (`TextPainter.getWordBoundary`, keeping intra-word punctuation like
   /// apostrophes); falls back to the text-based [wordRangeIn] heuristic when
   /// the surface can't answer (e.g. an unmounted document during a drag).
-  MarkdownSelection? wordSelectionAt(Offset globalPosition) {
-    final resolved = _resolveSurfaceAt(globalPosition);
+  ///
+  /// When [requireContainment] is true, returns null unless the point lies
+  /// inside a surface (no nearest-neighbor clamp). Gesture *starts* should
+  /// pass true; in-drag *extend* keeps the default false.
+  MarkdownSelection? wordSelectionAt(
+    Offset globalPosition, {
+    bool requireContainment = false,
+  }) {
+    final resolved = _resolveSurfaceAt(
+      globalPosition,
+      clampToNearest: !requireContainment,
+    );
     if (resolved == null) return null;
     final (surface, point) = resolved;
     final id = surface.documentId;
@@ -936,8 +1137,16 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   /// The ordered selection of the whole block at a global point, without
   /// applying it.
-  MarkdownSelection? blockSelectionAt(Offset globalPosition) {
-    final p = positionForGlobal(globalPosition);
+  ///
+  /// See [wordSelectionAt] for [requireContainment].
+  MarkdownSelection? blockSelectionAt(
+    Offset globalPosition, {
+    bool requireContainment = false,
+  }) {
+    final p = positionForGlobal(
+      globalPosition,
+      requireContainment: requireContainment,
+    );
     if (p == null) return null;
     final di = _orderIndex(p.documentId);
     if (di < 0) return null;
@@ -950,17 +1159,47 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   /// Selects the word at a global point (double-click / long-press). Returns
   /// the ordered anchor selection it applied, or null if the point misses.
-  MarkdownSelection? selectWordAtGlobal(Offset globalPosition) {
-    final sel = wordSelectionAt(globalPosition);
-    if (sel != null) selection = sel;
+  ///
+  /// Defaults to [requireContainment] so chrome / empty-space presses do not
+  /// clamp onto the nearest markdown surface.
+  MarkdownSelection? selectWordAtGlobal(
+    Offset globalPosition, {
+    bool requireContainment = true,
+  }) {
+    final sel = wordSelectionAt(
+      globalPosition,
+      requireContainment: requireContainment,
+    );
+    if (sel != null) {
+      // Soft-wrap: keep the trailing handle on the end of the visual run.
+      _commitSelection(
+        sel,
+        baseAffinity: TextAffinity.downstream,
+        extentAffinity: TextAffinity.upstream,
+      );
+    }
     return sel;
   }
 
   /// Selects the whole block (paragraph/line) at a global point (triple-click).
   /// Returns the ordered anchor selection it applied, or null if it misses.
-  MarkdownSelection? selectBlockAtGlobal(Offset globalPosition) {
-    final sel = blockSelectionAt(globalPosition);
-    if (sel != null) selection = sel;
+  ///
+  /// Defaults to [requireContainment] — see [selectWordAtGlobal].
+  MarkdownSelection? selectBlockAtGlobal(
+    Offset globalPosition, {
+    bool requireContainment = true,
+  }) {
+    final sel = blockSelectionAt(
+      globalPosition,
+      requireContainment: requireContainment,
+    );
+    if (sel != null) {
+      _commitSelection(
+        sel,
+        baseAffinity: TextAffinity.downstream,
+        extentAffinity: TextAffinity.upstream,
+      );
+    }
     return sel;
   }
 
@@ -976,14 +1215,33 @@ class MarkdownSelectionController extends ChangeNotifier {
         ? wordSelectionAt(globalPosition)
         : blockSelectionAt(globalPosition);
     if (target == null) return;
+    // Soft-wrap caret placement: reading-start edges use downstream, reading-
+    // end edges use upstream. Directed base/extent may be reversed when the
+    // drag expands past the original anchor.
+    const startAff = TextAffinity.downstream;
+    const endAff = TextAffinity.upstream;
     // anchor and target are each ordered (base <= extent). Keep the fixed
     // anchor edge as the base and put the moving edge in extent.
     if (_compare(target.base, anchor.base) < 0) {
-      selection = MarkdownSelection(base: anchor.extent, extent: target.base);
+      // Expanding toward the start: directed base stays at the old reading
+      // end; directed extent moves to the new reading start (reversed).
+      _commitSelection(
+        MarkdownSelection(base: anchor.extent, extent: target.base),
+        baseAffinity: endAff,
+        extentAffinity: startAff,
+      );
     } else if (_compare(target.extent, anchor.extent) > 0) {
-      selection = MarkdownSelection(base: anchor.base, extent: target.extent);
+      _commitSelection(
+        MarkdownSelection(base: anchor.base, extent: target.extent),
+        baseAffinity: startAff,
+        extentAffinity: endAff,
+      );
     } else {
-      selection = MarkdownSelection(base: anchor.base, extent: anchor.extent);
+      _commitSelection(
+        MarkdownSelection(base: anchor.base, extent: anchor.extent),
+        baseAffinity: startAff,
+        extentAffinity: endAff,
+      );
     }
   }
 
@@ -1037,26 +1295,79 @@ class MarkdownSelectionController extends ChangeNotifier {
     }
   }
 
-  /// Moves one edge of the selection to a global point, keeping the other edge
-  /// fixed. Used by the draggable selection handles: [isStart] moves the
-  /// reading-order start edge, otherwise the end edge.
+  /// Whether [selection] is reversed: [MarkdownSelection.base] sits after
+  /// [MarkdownSelection.extent] in reading order. Handle overlays follow the
+  /// directed edges and flip types when this is true.
+  bool get isSelectionReversed {
+    final sel = _selection;
+    if (sel == null || sel.isCollapsed) return false;
+    return _compare(sel.base, sel.extent) > 0;
+  }
+
+  /// Moves one directed edge of the selection to a global point, keeping the
+  /// other edge fixed. [isStart] moves [MarkdownSelection.base] (the start
+  /// handle); otherwise moves [MarkdownSelection.extent] (the end handle).
+  ///
+  /// Edges may cross (reversed selection). Landing exactly on the fixed edge
+  /// nudges one character away so the selection never collapses mid-drag.
   void moveSelectionEdgeToGlobal(
     Offset globalPosition, {
     required bool isStart,
   }) {
     final sel = _selection;
     if (sel == null) return;
-    final moved = positionForGlobal(globalPosition);
-    if (moved == null) return;
-    final (a, b) = _ordered(sel);
+    final hit = hitForGlobal(globalPosition);
+    if (hit == null) return;
+    final (rawMoved, affinity) = hit;
+    final fixed = isStart ? sel.extent : sel.base;
+    final previous = isStart ? sel.base : sel.extent;
+    final moved = _avoidCollapse(rawMoved, fixed: fixed, previous: previous);
+    if (moved == fixed) return;
     final next = isStart
-        ? MarkdownSelection(base: b, extent: moved)
-        : MarkdownSelection(base: a, extent: moved);
-    // Don't let a handle drag collapse the selection out from under itself
-    // (that would dispose the overlay mid-gesture); keep one caret gap.
-    if (next.isCollapsed) return;
-    selection = next;
+        ? MarkdownSelection(base: moved, extent: fixed)
+        : MarkdownSelection(base: fixed, extent: moved);
+    if (isStart) {
+      _commitSelection(
+        next,
+        baseAffinity: affinity,
+        extentAffinity: _affinityForDirectedEdge(sel, fixed),
+      );
+    } else {
+      _commitSelection(
+        next,
+        baseAffinity: _affinityForDirectedEdge(sel, fixed),
+        extentAffinity: affinity,
+      );
+    }
   }
+
+  /// If [moved] coincides with [fixed], bounce one character back toward
+  /// [previous] (the side the moving edge approached from).
+  MarkdownPosition _avoidCollapse(
+    MarkdownPosition moved, {
+    required MarkdownPosition fixed,
+    required MarkdownPosition previous,
+  }) {
+    if (moved != fixed) return moved;
+    final cmp = _compare(previous, fixed);
+    if (cmp > 0) {
+      return _stepCharacter(fixed, forward: true);
+    }
+    if (cmp < 0) {
+      return _stepCharacter(fixed, forward: false);
+    }
+    final forward = _stepCharacter(fixed, forward: true);
+    if (forward != fixed) return forward;
+    return _stepCharacter(fixed, forward: false);
+  }
+
+  TextAffinity _affinityForDirectedEdge(
+    MarkdownSelection sel,
+    MarkdownPosition edge,
+  ) =>
+      identical(edge, sel.base) || edge == sel.base
+          ? _baseAffinity
+          : _extentAffinity;
 
   // --- geometry (mounted surfaces) -----------------------------------------
 
@@ -1079,43 +1390,150 @@ class MarkdownSelectionController extends ChangeNotifier {
     return out;
   }
 
-  /// Resolves the mounted surfaces and local/global caret rects at the two ends
-  /// of the current selection, for placing selection handles. Null when the
-  /// selection is collapsed or neither end is mounted.
+  /// Resolves the mounted surfaces and local/global caret rects at the two
+  /// directed edges of the current selection ([MarkdownSelection.base] /
+  /// [MarkdownSelection.extent]), for placing selection handles.
+  ///
+  /// When an edge's owning surface is unmounted (list virtualization) but
+  /// other surfaces still paint the selection, that handle is proxied onto
+  /// the nearest mounted rect so chrome stays visible. Null only when the
+  /// selection is collapsed or no mounted geometry can place either handle.
+  ///
+  /// When directed carets nearly coincide (soft-wrap affinity / scroll churn)
+  /// but the selection still paints a real span, both edges fall back to the
+  /// visible rect extremes so Material left+right handles do not stack into a
+  /// "peanut" at one caret.
   MarkdownHandleEndpoints? selectionHandleEndpoints() {
+    final sel = _selection;
+    if (sel == null || sel.isCollapsed) return null;
+
+    MarkdownSelectionSurface? startSurface = _surfaces[sel.base.documentId];
+    MarkdownSelectionSurface? endSurface = _surfaces[sel.extent.documentId];
+    Rect? startLocal = startSurface?.caretRectFor(sel.base, _baseAffinity);
+    Rect? endLocal = endSurface?.caretRectFor(sel.extent, _extentAffinity);
+
+    if (startSurface == null || startLocal == null) {
+      final proxy = _proxyHandleOnVisibleSelection(forStartEdge: true);
+      if (proxy != null) {
+        startSurface = proxy.$1;
+        startLocal = proxy.$2;
+      }
+    }
+    if (endSurface == null || endLocal == null) {
+      final proxy = _proxyHandleOnVisibleSelection(forStartEdge: false);
+      if (proxy != null) {
+        endSurface = proxy.$1;
+        endLocal = proxy.$2;
+      }
+    }
+
+    if (startSurface == null ||
+        startLocal == null ||
+        endSurface == null ||
+        endLocal == null) {
+      return null;
+    }
+
+    final startOrigin = startSurface.globalBounds.topLeft;
+    final endOrigin = endSurface.globalBounds.topLeft;
+    final startGlobal = startLocal.shift(startOrigin);
+    final endGlobal = endLocal.shift(endOrigin);
+    final startPt = Offset(startGlobal.left, startGlobal.bottom);
+    final endPt = Offset(endGlobal.right, endGlobal.bottom);
+
+    if ((startPt - endPt).distance < _kMinHandleCaretSeparation) {
+      final separated = _separateCoincidentHandleCarets();
+      if (separated != null) return separated;
+    }
+
+    return MarkdownHandleEndpoints(
+      startSurface: startSurface,
+      startLocal: startLocal,
+      startGlobal: startGlobal,
+      endSurface: endSurface,
+      endLocal: endLocal,
+      endGlobal: endGlobal,
+    );
+  }
+
+  /// Directed start/end from visible selection extremes when carets collapse.
+  MarkdownHandleEndpoints? _separateCoincidentHandleCarets() {
+    final readingStart = _proxyHandleOnVisibleSelection(forStartEdge: true);
+    final readingEnd = _proxyHandleOnVisibleSelection(forStartEdge: false);
+    if (readingStart == null || readingEnd == null) return null;
+
+    final startGlobal =
+        readingStart.$2.shift(readingStart.$1.globalBounds.topLeft);
+    final endGlobal = readingEnd.$2.shift(readingEnd.$1.globalBounds.topLeft);
+    final startPt = Offset(startGlobal.left, startGlobal.bottom);
+    final endPt = Offset(endGlobal.right, endGlobal.bottom);
+    if ((startPt - endPt).distance < _kMinHandleCaretSeparation) {
+      return null;
+    }
+
+    // Map reading-order extremes onto directed base/extent handles.
+    final reversed = isSelectionReversed;
+    final start = reversed ? readingEnd : readingStart;
+    final end = reversed ? readingStart : readingEnd;
+    return MarkdownHandleEndpoints(
+      startSurface: start.$1,
+      startLocal: start.$2,
+      startGlobal: start.$2.shift(start.$1.globalBounds.topLeft),
+      endSurface: end.$1,
+      endLocal: end.$2,
+      endGlobal: end.$2.shift(end.$1.globalBounds.topLeft),
+    );
+  }
+
+  /// Places a handle on the nearest mounted surface that still paints the
+  /// selection when the true edge surface is unmounted.
+  (MarkdownSelectionSurface, Rect)? _proxyHandleOnVisibleSelection({
+    required bool forStartEdge,
+  }) {
     final sel = _selection;
     if (sel == null || sel.isCollapsed) return null;
     final (a, b) = _ordered(sel);
     final startDoc = _orderIndex(a.documentId);
     final endDoc = _orderIndex(b.documentId);
     if (startDoc < 0 || endDoc < 0) return null;
-    MarkdownSelectionSurface? startSurface, endSurface;
-    Rect? startLocal, startGlobal, endLocal, endGlobal;
-    for (var d = startDoc; d <= endDoc; d++) {
-      final surface = _surfaces[_docs[d].id];
-      if (surface == null) continue;
-      final local = surface.localSelectionRects();
-      if (local.isEmpty) continue;
-      final global = surface.globalSelectionRects();
-      if (global.length != local.length) continue;
-      if (startSurface == null) {
-        startSurface = surface;
-        startLocal = local.first;
-        startGlobal = global.first;
+
+    if (forStartEdge) {
+      for (var d = startDoc; d <= endDoc; d++) {
+        final surface = _surfaces[_docs[d].id];
+        if (surface == null) continue;
+        final locals = surface.localSelectionRects();
+        if (locals.isEmpty) continue;
+        var best = locals.first;
+        for (final r in locals.skip(1)) {
+          if (r.top < best.top || (r.top == best.top && r.left < best.left)) {
+            best = r;
+          }
+        }
+        return (
+          surface,
+          Rect.fromLTWH(best.left, best.top, 0, best.height),
+        );
       }
-      endSurface = surface;
-      endLocal = local.last;
-      endGlobal = global.last;
+    } else {
+      for (var d = endDoc; d >= startDoc; d--) {
+        final surface = _surfaces[_docs[d].id];
+        if (surface == null) continue;
+        final locals = surface.localSelectionRects();
+        if (locals.isEmpty) continue;
+        var best = locals.first;
+        for (final r in locals) {
+          if (r.bottom > best.bottom ||
+              (r.bottom == best.bottom && r.right > best.right)) {
+            best = r;
+          }
+        }
+        return (
+          surface,
+          Rect.fromLTWH(best.right, best.top, 0, best.height),
+        );
+      }
     }
-    if (startSurface == null || endSurface == null) return null;
-    return MarkdownHandleEndpoints(
-      startSurface: startSurface,
-      startLocal: startLocal!,
-      startGlobal: startGlobal!,
-      endSurface: endSurface,
-      endLocal: endLocal!,
-      endGlobal: endGlobal!,
-    );
+    return null;
   }
 
   /// The selected range within [documentId]'s block [blockIndex], or null when
@@ -1129,6 +1547,9 @@ class MarkdownSelectionController extends ChangeNotifier {
     if (di < 0) return null;
     final startDoc = _orderIndex(a.documentId);
     final endDoc = _orderIndex(b.documentId);
+    // An unregistered endpoint used to sort to -1, so `di < startDoc` never
+    // excluded registered docs and every body between 0 and endDoc painted.
+    if (startDoc < 0 || endDoc < 0) return null;
     if (di < startDoc || di > endDoc) return null;
     final model = _docs[di].model; // di is already resolved above
     if (blockIndex < 0 || blockIndex >= model.blocks.length) return null;
@@ -1202,9 +1623,21 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   int _compare(MarkdownPosition a, MarkdownPosition b) {
     final ai = _orderIndex(a.documentId), bi = _orderIndex(b.documentId);
-    if (ai != bi) return ai.compareTo(bi);
-    if (a.blockIndex != b.blockIndex)
+    // Unregistered ids must not sort as -1 ahead of every registered doc —
+    // that inverted cross-document spans and made [rangeFor] paint the world.
+    if (ai < 0 && bi < 0) {
+      final byId = a.documentId.toString().compareTo(b.documentId.toString());
+      if (byId != 0) return byId;
+    } else if (ai < 0) {
+      return 1;
+    } else if (bi < 0) {
+      return -1;
+    } else if (ai != bi) {
+      return ai.compareTo(bi);
+    }
+    if (a.blockIndex != b.blockIndex) {
       return a.blockIndex.compareTo(b.blockIndex);
+    }
     return a.offset.compareTo(b.offset);
   }
 

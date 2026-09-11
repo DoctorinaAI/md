@@ -289,7 +289,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       );
 
   @override
-  ThemeExtension<MarkdownThemeData> copyWith({
+  MarkdownThemeData copyWith({
     TextDirection? textDirection,
     TextScaler? textScaler,
     TextStyle? textStyle,

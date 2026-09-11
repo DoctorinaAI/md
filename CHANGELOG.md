@@ -1,3 +1,62 @@
+## Unreleased
+
+### Registry / multi-body selection
+- **FIXED**: `removeDocument` defers while a surface for that id is still mounted
+  and flushes on `detachSurface`; a later `putDocument` cancels the pending
+  remove. Parent `State.dispose` can run before child detach — eager remove left
+  hittable surfaces with no registry entry (`rangeFor` / ordering broken).
+- **FIXED**: `rangeFor` and endpoint ordering ignore unregistered document ids
+  instead of treating them as index `-1` (which painted every body from the
+  start of the registry through the other endpoint).
+- **CHANGED**: `MarkdownRenderObject` heals with `putDocument` on attach / when
+  the controller is wired while already attached, so a mounted selectable surface
+  is never missing from the registry. Prefer explicit app registration for
+  unmounted docs and unique reading-order `order` values.
+
+### Selection chrome (SelectionArea parity)
+- **ADDED**: Read-only selection chrome on the controller / `MarkdownSelectionScope`
+  path brought up to Flutter `SelectableRegion` / `SelectionArea` quality without
+  remounting SelectionArea:
+  - Content-gated touch `TapAndHorizontalDragGestureRecognizer` + long-press
+    (consecutive taps, no `DoubleTapGestureRecognizer` arena delay); mouse
+    `TapAndPanGestureRecognizer`.
+  - Gesture **starts** require a hit on mounted selectable markdown (chrome /
+    empty space do not nearest-neighbor clamp); clamp remains for **extend**
+    across gaps.
+  - Soft-wrap affinity on handles; directed base/extent edges with reverse
+    handle types; coincident-caret separation; handle proxies when an endpoint
+    surface unmounts (virtualization).
+  - Native `SelectionOverlay` handles + magnifier on touch; LeaderLayer follow
+    across scroll / multi-widget hosts.
+  - Keyboard Copy / Select-all / Shift-extend / Esc; adaptive Copy / Select-all
+    toolbar with live re-anchoring.
+  - Word / block granular multi-tap and long-press; link hand cursor / I-beam on
+    selectable content.
+
+### Selection engine rework
+- **ADDED**: Edge-zone autoscroll while dragging (body / handle / long-press)
+  near the padded viewport — host-union hard-stop, direction arming gate,
+  past-viewport max velocity while the union still allows that direction
+  (`MarkdownSelectionScope.autoscroll`, default `edgeZone: 48`).
+- **CHANGED**: Toolbar hides while expanding (body or handle drag) and may
+  re-show on drag end; anchors recompute on selection change, host/ancestor
+  scroll, and mounted-surface layout change.
+- **CHANGED**: Toolbar placement — both endpoints in clip use stock
+  above-preferring anchors; **bottom-only** endpoint prefers below that caret;
+  neither endpoint in clip (tall mid-viewport) top-pins so the below-fallback
+  cannot sink to the host bottom; empty intersection hides the overlay while
+  `toolbarWanted` restores on scroll-back / remount.
+- **FIXED**: Programmatic `controller.selectAll()` / assigning a non-collapsed
+  `controller.selection` starts the toolbar lifecycle without a gesture.
+- **FIXED**: Selection highlight stays outside the glyph `Picture` cache —
+  under glyphs by default (sharp text), with a second pass **above** opaque
+  chrome (`selectionHighlightAboveCachedContent`) for code fences, table zebra
+  rows, and inline monospace / highlight backgrounds
+  (`markdownSpansPaintOpaqueBackground`).
+- **FIXED**: Focus loss does not clear selection while a pointer drag is active
+  (list rebuilds during autoscroll); geometry walks defer off `performLayout`
+  (`sizeAccessAllowed`).
+
 ## 0.2.0
 
 > **Upgrading from 0.0.x?** See the

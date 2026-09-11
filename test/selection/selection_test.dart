@@ -1,6 +1,48 @@
+import 'dart:ui' show Offset, Rect, TextAffinity;
+
 import 'package:flutter/painting.dart' show TextRange;
+import 'package:flutter/rendering.dart' show LayerLink;
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _FakeSurface implements MarkdownSelectionSurface {
+  _FakeSurface(this.documentId);
+
+  @override
+  final Object documentId;
+
+  @override
+  Rect get globalBounds => Rect.zero;
+
+  @override
+  MarkdownPosition? positionForGlobal(Offset globalPosition) => null;
+
+  @override
+  (MarkdownPosition, TextAffinity)? hitForGlobal(Offset globalPosition) => null;
+
+  @override
+  Rect? caretRectFor(MarkdownPosition position, TextAffinity affinity) => null;
+
+  @override
+  (int, int, int)? wordBoundaryForGlobal(Offset globalPosition) => null;
+
+  @override
+  List<Rect> globalSelectionRects() => const <Rect>[];
+
+  @override
+  List<Rect> localSelectionRects() => const <Rect>[];
+
+  @override
+  void setSelectionHandleLayers({
+    LayerLink? startLink,
+    Offset? startLocal,
+    LayerLink? endLink,
+    Offset? endLocal,
+  }) {}
+
+  @override
+  void repaintSelection() {}
+}
 
 class _UpperFormatter implements MarkdownSelectionFormatter {
   const _UpperFormatter();
@@ -149,10 +191,59 @@ void main() {
       expect(c.rangeFor('missing', 0), isNull);
     });
 
+    test('rangeFor ignores spans with an unregistered endpoint', () {
+      // Surfaces can hit-test a body that was never putDocument'd. Ordering
+      // used to treat missing ids as -1 and paint every registered doc.
+      final c = two()
+        ..selection = const MarkdownSelection(
+          base: MarkdownPosition(documentId: 'a', blockIndex: 0, offset: 0),
+          extent: MarkdownPosition(
+            documentId: 'ghost',
+            blockIndex: 0,
+            offset: 3,
+          ),
+        );
+      expect(c.rangeFor('a', 0), isNull);
+      expect(c.rangeFor('b', 0), isNull);
+      expect(c.rangeFor('ghost', 0), isNull);
+      expect(c.selectedContent().documents, isEmpty);
+    });
+
     test('removeDocument drops a touching selection', () {
       final c = two()..selection = full;
       c.removeDocument('a');
       expect(c.selection, isNull);
+    });
+
+    test('removeDocument defers while a surface is mounted', () {
+      final c = MarkdownSelectionController()..putDocument('a', docA, order: 0);
+      final surface = _FakeSurface('a');
+      c.attachSurface(surface);
+
+      c.removeDocument('a');
+      expect(c.documentCount, 1);
+
+      c.selection = const MarkdownSelection(
+        base: MarkdownPosition(documentId: 'a', blockIndex: 0, offset: 0),
+        extent: MarkdownPosition(documentId: 'a', blockIndex: 0, offset: 5),
+      );
+      expect(c.rangeFor('a', 0), const TextRange(start: 0, end: 5));
+
+      c.detachSurface(surface);
+      expect(c.documentCount, 0);
+      expect(c.selection, isNull);
+    });
+
+    test('putDocument cancels a deferred remove', () {
+      final c = MarkdownSelectionController()..putDocument('a', docA, order: 0);
+      final surface = _FakeSurface('a');
+      c.attachSurface(surface);
+      c.removeDocument('a');
+      expect(c.documentCount, 1);
+
+      c.putDocument('a', docA, order: 0);
+      c.detachSurface(surface);
+      expect(c.documentCount, 1);
     });
 
     test('notifies listeners on selection change', () {

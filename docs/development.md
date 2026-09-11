@@ -106,7 +106,7 @@ Base `package:flutter_lints/flutter.yaml`, plus `strict-casts`, `strict-raw-type
 
 ## Dependencies
 
-- `dependencies`: `flutter` (sdk), `meta: ^1.16.0`.
+- `dependencies`: `flutter` (sdk), `meta: any`.
 - `dev_dependencies`: `flutter_test` (sdk), `flutter_lints: >=5.0.0 <7.0.0`,
   `markdown: ^7.3.0` (benchmark comparison only), `benchmark_harness: ^2.3.1`.
 

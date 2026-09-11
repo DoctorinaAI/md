@@ -59,6 +59,15 @@ abstract interface class SelectableBlockPainter implements BlockPainter {
   /// Maps a block-local [local] offset to a rendered-text index.
   int offsetForLocalPosition(Offset local);
 
+  /// Maps a block-local [local] point to a rendered-text index and the
+  /// [TextAffinity] from [TextPainter.getPositionForOffset]. Affinity matters
+  /// at soft-wrap boundaries (same offset, end of one visual line vs start of
+  /// the next) so handles stay on the line under the pointer.
+  (int, TextAffinity) positionAndAffinityForLocal(Offset local);
+
+  /// Block-local caret rect for [offset] with [affinity] (soft-wrap aware).
+  Rect caretRectFor(int offset, TextAffinity affinity);
+
   /// Highlight rectangles (block-local) for the rendered range `[start, end)`.
   List<Rect> boxesForRange(int start, int end);
 
@@ -71,6 +80,13 @@ abstract interface class SelectableBlockPainter implements BlockPainter {
   /// Whether an actionable link (a span carrying a tap recognizer) sits under
   /// the block-local [local] point — used to show the click (hand) cursor.
   bool isLinkAtLocal(Offset local);
+
+  /// When true, the selection highlight is also painted *above* the cached
+  /// content picture so an opaque block background (e.g. a code fence) does
+  /// not hide it. Default text blocks leave this false so glyphs stay on top
+  /// of the highlight — matching [SelectableRegion] / [SelectionArea] paint
+  /// order (sharp text, no washed-out overlay).
+  bool get selectionHighlightAboveCachedContent;
 }
 
 /// Provides [SelectableBlockPainter] for a block backed by a single
@@ -84,11 +100,36 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
   Offset get selectionOrigin => Offset.zero;
 
   @override
+  bool get selectionHighlightAboveCachedContent => false;
+
+  @override
   String get renderedText => selectionPainter.plainText;
 
   @override
   int offsetForLocalPosition(Offset local) =>
-      selectionPainter.getPositionForOffset(local - selectionOrigin).offset;
+      positionAndAffinityForLocal(local).$1;
+
+  @override
+  (int, TextAffinity) positionAndAffinityForLocal(Offset local) {
+    final position =
+        selectionPainter.getPositionForOffset(local - selectionOrigin);
+    return (position.offset, position.affinity);
+  }
+
+  @override
+  Rect caretRectFor(int offset, TextAffinity affinity) {
+    final len = selectionPainter.plainText.length;
+    final o = offset.clamp(0, len);
+    final position = TextPosition(offset: o, affinity: affinity);
+    final caret = selectionPainter.getOffsetForCaret(position, Rect.zero);
+    final height = selectionPainter.getFullHeightForCaret(position, Rect.zero);
+    return Rect.fromLTWH(
+      selectionOrigin.dx + caret.dx,
+      selectionOrigin.dy + caret.dy,
+      0,
+      height,
+    );
+  }
 
   @override
   List<Rect> boxesForRange(int start, int end) => selectionPainter
@@ -146,12 +187,49 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
   List<SelectableFragment> get fragments;
 
   @override
-  int offsetForLocalPosition(Offset local) {
+  bool get selectionHighlightAboveCachedContent => false;
+
+  @override
+  int offsetForLocalPosition(Offset local) =>
+      positionAndAffinityForLocal(local).$1;
+
+  @override
+  (int, TextAffinity) positionAndAffinityForLocal(Offset local) {
     final fragment = _nearestFragment(local);
-    if (fragment == null) return 0;
-    final inner =
-        fragment.painter.getPositionForOffset(local - fragment.origin).offset;
-    return fragment.textStart + inner.clamp(0, fragment.length);
+    if (fragment == null) {
+      return (0, TextAffinity.downstream);
+    }
+    final dx =
+        (local.dx - fragment.origin.dx).clamp(0.0, fragment.painter.width);
+    final dy =
+        (local.dy - fragment.origin.dy).clamp(0.0, fragment.painter.height);
+    final position = fragment.painter.getPositionForOffset(Offset(dx, dy));
+    final offset =
+        fragment.textStart + position.offset.clamp(0, fragment.length);
+    return (offset, position.affinity);
+  }
+
+  @override
+  Rect caretRectFor(int offset, TextAffinity affinity) {
+    final fragment = _fragmentForOffset(offset);
+    if (fragment == null) return Rect.zero;
+    final local = (offset - fragment.textStart).clamp(0, fragment.length);
+    final position = TextPosition(offset: local, affinity: affinity);
+    final caret = fragment.painter.getOffsetForCaret(position, Rect.zero);
+    final height = fragment.painter.getFullHeightForCaret(position, Rect.zero);
+    return Rect.fromLTWH(
+      fragment.origin.dx + caret.dx,
+      fragment.origin.dy + caret.dy,
+      0,
+      height,
+    );
+  }
+
+  SelectableFragment? _fragmentForOffset(int offset) {
+    for (final fragment in fragments) {
+      if (offset <= fragment.textEnd) return fragment;
+    }
+    return fragments.isEmpty ? null : fragments.last;
   }
 
   @override

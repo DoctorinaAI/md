@@ -63,7 +63,7 @@ void main() => group('MarkdownThemeData', () {
             textStyle: const TextStyle(fontSize: 14),
             onLinkTap: (_, __) => called = true,
           );
-          final copy = theme.copyWith() as MarkdownThemeData;
+          final copy = theme.copyWith();
           expect(copy.onLinkTap, isNotNull);
           copy.onLinkTap!('t', 'u');
           expect(called, isTrue);
@@ -73,7 +73,7 @@ void main() => group('MarkdownThemeData', () {
           final copy = base().copyWith(
             linkColor: Colors.green,
             linkStyle: const TextStyle(fontStyle: FontStyle.italic),
-          ) as MarkdownThemeData;
+          );
           expect(copy.linkColor, Colors.green);
           expect(copy.linkStyle?.fontStyle, FontStyle.italic);
         });
