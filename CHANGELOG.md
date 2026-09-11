@@ -1,5 +1,11 @@
 ## Unreleased
 
+### Line clamp
+- **ADDED**: `clampMarkdownToLines` / `MarkdownLineClamp` — painter-measured
+  height for the first N visual text lines at a given width (line-boundary cut;
+  spacers/dividers add height without spending the line budget). Callers size a
+  clipped box; the renderer itself has no line budget.
+
 ### Registry / multi-body selection
 - **FIXED**: `removeDocument` defers while a surface for that id is still mounted
   and flushes on `detachSurface`; a later `putDocument` cancels the pending

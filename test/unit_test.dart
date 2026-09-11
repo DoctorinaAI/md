@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'highlight/highlight_test.dart' as highlight_test;
+import 'line_clamp/line_clamp_test.dart' as line_clamp_test;
 import 'nodes/nodes_test.dart' as nodes_test;
 import 'parser/block_test.dart' as block_test;
 import 'parser/edge_cases_test.dart' as edge_cases_test;
@@ -13,6 +14,8 @@ import 'parser/regression_test.dart' as regression_test;
 import 'parser/streaming_test.dart' as streaming_test;
 import 'selection/markup_formatter_test.dart' as markup_formatter_test;
 import 'selection/selection_autoscroll_test.dart' as selection_autoscroll_test;
+import 'selection/selection_handle_endpoints_test.dart'
+    as selection_handle_endpoints_test;
 import 'selection/selection_handles_test.dart' as selection_handles_test;
 import 'selection/selection_keyboard_test.dart' as selection_keyboard_test;
 import 'selection/selection_test.dart' as selection_test;
@@ -39,7 +42,9 @@ void main() => group('Unit', () {
       selection_widget_test.main();
       selection_keyboard_test.main();
       selection_handles_test.main();
+      selection_handle_endpoints_test.main();
       selection_autoscroll_test.main();
+      line_clamp_test.main();
       render_test.main();
       widget_test.main();
     });
