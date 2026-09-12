@@ -5,6 +5,22 @@ import 'package:flutter/material.dart';
 import '../flutter_md.dart';
 import 'highlight/engine.dart';
 
+/// Signature for dynamically resolving the [MouseCursor] at a content-local
+/// [localOffset] within a Markdown render surface.
+///
+/// [blockIndex] is the source index of the hit block in `Markdown.blocks`, or
+/// `null` if the offset does not fall within any block.
+///
+/// [block] is the hit [MD$Block] model, or `null` if no block was hit.
+///
+/// Returning `null` falls back to default cursor resolution (click for links,
+/// text for selectable content, basic/defer otherwise).
+typedef MarkdownCursorResolver = MouseCursor? Function(
+  Offset localOffset,
+  int? blockIndex,
+  MD$Block? block,
+);
+
 /// {@template markdown_theme_data}
 /// Theme data for Markdown widgets.
 /// {@endtemplate}
@@ -34,6 +50,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.builder,
     this.onLinkTap,
     this.highlighter,
+    this.cursorResolver,
   })  : _headingStyles = List<TextStyle?>.filled(8, null),
         _textStyles = HashMap<int, TextStyle>();
 
@@ -62,6 +79,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     BlockPainter? Function(MD$Block block, MarkdownThemeData theme)? builder,
     void Function(String title, String url)? onLinkTap,
     SyntaxHighlighter? highlighter,
+    MarkdownCursorResolver? cursorResolver,
   }) {
     return MarkdownThemeData(
       textStyle: textStyle ??
@@ -93,6 +111,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       builder: builder,
       onLinkTap: onLinkTap,
       highlighter: highlighter,
+      cursorResolver: cursorResolver,
     );
   }
 
@@ -204,6 +223,14 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// the exact set of languages you support so unused grammars tree-shake away.
   final SyntaxHighlighter? highlighter;
 
+  /// An optional callback to dynamically resolve the mouse cursor based on
+  /// hover offset, hit block index, and hit block model.
+  ///
+  /// When `null`, or when the callback returns `null`, the renderer falls back
+  /// to its default cursors (hand cursor for actionable links, I-beam text
+  /// cursor for selectable documents, or deferred cursor otherwise).
+  final MarkdownCursorResolver? cursorResolver;
+
   final List<TextStyle?> _headingStyles;
 
   /// Returns a [TextStyle] for the given heading level.
@@ -312,6 +339,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     BlockPainter? Function(MD$Block block, MarkdownThemeData theme)? builder,
     void Function(String title, String url)? onLinkTap,
     SyntaxHighlighter? highlighter,
+    MarkdownCursorResolver? cursorResolver,
   }) =>
       MarkdownThemeData(
         textDirection: textDirection ?? this.textDirection,
@@ -338,6 +366,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
         builder: builder ?? this.builder,
         onLinkTap: onLinkTap ?? this.onLinkTap,
         highlighter: highlighter ?? this.highlighter,
+        cursorResolver: cursorResolver ?? this.cursorResolver,
       );
 
   @override
@@ -374,6 +403,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       builder: t < 0.5 ? builder : other?.builder,
       onLinkTap: t < 0.5 ? onLinkTap : other?.onLinkTap,
       highlighter: t < 0.5 ? highlighter : other?.highlighter,
+      cursorResolver: t < 0.5 ? cursorResolver : other?.cursorResolver,
     );
   }
 

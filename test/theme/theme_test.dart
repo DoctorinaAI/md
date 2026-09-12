@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/src/services/mouse_cursor.dart';
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -90,6 +91,85 @@ void main() => group('MarkdownThemeData', () {
           final b = MarkdownThemeData(textStyle: const TextStyle(fontSize: 20));
           final mid = a.lerp(b, 0.5) as MarkdownThemeData;
           expect(mid.textStyle.fontSize, 15);
+        });
+      });
+
+      group('cursorResolver', () {
+        test('accepts resolver in constructor', () {
+          SystemMouseCursor resolver(
+                  Offset offset, int? idx, MD$Block? block) =>
+              SystemMouseCursors.click;
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            cursorResolver: resolver,
+          );
+          expect(theme.cursorResolver, same(resolver));
+        });
+
+        test('preserves cursorResolver in copyWith', () {
+          SystemMouseCursor resolver(
+                  Offset offset, int? idx, MD$Block? block) =>
+              SystemMouseCursors.click;
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            cursorResolver: resolver,
+          );
+          final copy = theme.copyWith();
+          expect(copy.cursorResolver, same(resolver));
+        });
+
+        test('overrides cursorResolver in copyWith', () {
+          SystemMouseCursor r1(Offset offset, int? idx, MD$Block? block) =>
+              SystemMouseCursors.click;
+          SystemMouseCursor r2(Offset offset, int? idx, MD$Block? block) =>
+              SystemMouseCursors.text;
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            cursorResolver: r1,
+          );
+          final copy = theme.copyWith(cursorResolver: r2);
+          expect(copy.cursorResolver, same(r2));
+        });
+
+        test('lerp selects resolver based on t', () {
+          SystemMouseCursor r1(Offset offset, int? idx, MD$Block? block) =>
+              SystemMouseCursors.click;
+          SystemMouseCursor r2(Offset offset, int? idx, MD$Block? block) =>
+              SystemMouseCursors.text;
+          final a = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            cursorResolver: r1,
+          );
+          final b = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            cursorResolver: r2,
+          );
+          final midA = a.lerp(b, 0.4) as MarkdownThemeData;
+          final midB = a.lerp(b, 0.6) as MarkdownThemeData;
+          expect(midA.cursorResolver, same(r1));
+          expect(midB.cursorResolver, same(r2));
+        });
+
+        testWidgets('mergeTheme passes cursorResolver', (tester) async {
+          SystemMouseCursor resolver(
+                  Offset offset, int? idx, MD$Block? block) =>
+              SystemMouseCursors.click;
+          late MarkdownThemeData derived;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(),
+              home: Builder(
+                builder: (context) {
+                  derived = MarkdownThemeData.mergeTheme(
+                    Theme.of(context),
+                    cursorResolver: resolver,
+                  );
+                  return const SizedBox();
+                },
+              ),
+            ),
+          );
+          expect(derived.cursorResolver, same(resolver));
         });
       });
 

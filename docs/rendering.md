@@ -190,6 +190,10 @@ Render-override hooks:
   dropping text-bearing spans shifts the painter's offset space vs the model, so
   the highlight stays right but copied text can misalign. Avoid dropping
   text-bearing spans when selection is enabled.**
+- **`cursorResolver`** `MouseCursor? Function(Offset, int?, MD$Block?)` —
+  dynamically resolves hover mouse cursors per local offset, hit block index,
+  and hit block model, falling back to default link/text/defer cursors when null.
+  Can also be supplied directly to `MarkdownWidget.cursorResolver`.
 
 Styling: `textStyle`, per-level `h1Style..h6Style` (+ cached `headingStyleFor`),
 `textStyleFor(MD$Style)` (cached mapping of the bitmask → bold/italic/underline/

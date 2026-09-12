@@ -24,13 +24,22 @@ class MarkdownRenderObject extends RenderBox
   MarkdownRenderObject({
     required Markdown markdown,
     required MarkdownThemeData theme,
-  }) : _painter = MarkdownPainter(
+    MarkdownCursorResolver? cursorResolver,
+  })  : _theme = theme,
+        _cursorResolver = cursorResolver,
+        _painter = MarkdownPainter(
           markdown: markdown,
           theme: theme,
         );
 
   /// Painter for rendering markdown content.
   final MarkdownPainter _painter;
+
+  MarkdownThemeData _theme;
+  MarkdownCursorResolver? _cursorResolver;
+
+  MarkdownCursorResolver? get _effectiveCursorResolver =>
+      _cursorResolver ?? _theme.cursorResolver;
 
   /// The selection controller this render object participates in, if any.
   MarkdownSelectionController? _controller;
@@ -167,6 +176,14 @@ class MarkdownRenderObject extends RenderBox
   }
 
   @override
+  List<Rect> localBoxesForRange(
+    int blockIndex,
+    int startOffset,
+    int endOffset,
+  ) =>
+      _painter.localBoxesForRange(blockIndex, startOffset, endOffset);
+
+  @override
   void setSelectionHandleLayers({
     LayerLink? startLink,
     Offset? startLocal,
@@ -204,26 +221,59 @@ class MarkdownRenderObject extends RenderBox
     if (!_disposed && attached) markNeedsPaint();
   }
 
-  // --- MouseTrackerAnnotation (I-beam cursor over selectable text) ---
+  // --- MouseTrackerAnnotation (cursor over links and selectable text) ---
 
-  /// Whether the pointer is currently hovering an actionable link (updated in
-  /// [handleEvent]); drives the click (hand) cursor.
-  bool _hoverLink = false;
+  /// Currently resolved hover cursor, or null when pointer is not hovering.
+  MouseCursor? _hoverCursor;
 
-  /// Presents the click (hand) cursor over links, the text (I-beam) cursor
-  /// while this document participates in a selection controller (so users see
-  /// the content is selectable), and otherwise defers to what is behind it.
-  @override
-  MouseCursor get cursor {
-    if (_hoverLink) return SystemMouseCursors.click;
-    return _controller != null ? SystemMouseCursors.text : MouseCursor.defer;
+  MouseCursor _resolveCursorAt(Offset local) {
+    final resolver = _effectiveCursorResolver;
+    if (resolver != null) {
+      final hit = _painter.blockAtLocal(local);
+      final (blockIndex, block) = hit ?? (null, null);
+      final custom = resolver(local, blockIndex, block);
+      if (custom != null) return custom;
+    }
+    if (_painter.isLinkAtLocal(local)) {
+      return SystemMouseCursors.click;
+    }
+    if (_controller != null && _painter.isSelectableAtLocal(local)) {
+      return SystemMouseCursors.text;
+    }
+    return MouseCursor.defer;
   }
+
+  void _updateHoverCursor(Offset local) {
+    final next = _resolveCursorAt(local);
+    if (next != _hoverCursor) {
+      _hoverCursor = next;
+      if (!_disposed && attached) markNeedsPaint();
+    }
+  }
+
+  void _clearHoverCursor() {
+    if (_hoverCursor != null) {
+      _hoverCursor = null;
+      if (!_disposed && attached) markNeedsPaint();
+    }
+  }
+
+  /// Presents the dynamically resolved cursor if hovered, the click (hand)
+  /// cursor over links, the text (I-beam) cursor while this document
+  /// participates in a selection controller (so users see the content is
+  /// selectable), and otherwise defers to what is behind it.
+  @override
+  MouseCursor get cursor =>
+      _hoverCursor ??
+      (_controller != null ? SystemMouseCursors.text : MouseCursor.defer);
 
   @override
   void Function(PointerEnterEvent)? get onEnter => null;
 
   @override
-  void Function(PointerExitEvent)? get onExit => null;
+  void Function(PointerExitEvent)? get onExit => _handlePointerExit;
+
+  void _handlePointerExit(PointerExitEvent event) => _clearHoverCursor();
 
   @override
   bool get validForMouseTracker => !_disposed && attached;
@@ -294,15 +344,12 @@ class MarkdownRenderObject extends RenderBox
 
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
-    // Track hover so the cursor can switch to the hand over links. A repaint is
-    // what prompts MouseTracker to re-read [cursor] (same mechanism as
-    // RenderMouseRegion); we only repaint when the link state actually flips.
+    // Track hover so the cursor can switch to custom resolved cursors or the
+    // hand over links. A repaint prompts MouseTracker to re-read [cursor] (same
+    // mechanism as RenderMouseRegion); we only repaint when the cursor state
+    // actually flips.
     if (event is PointerHoverEvent) {
-      final link = _painter.isLinkAtLocal(event.localPosition);
-      if (link != _hoverLink) {
-        _hoverLink = link;
-        if (!_disposed && attached) markNeedsPaint();
-      }
+      _updateHoverCursor(event.localPosition);
     }
     _painter.handleEvent(event);
   }
@@ -333,7 +380,13 @@ class MarkdownRenderObject extends RenderBox
   void update({
     required Markdown markdown,
     required MarkdownThemeData theme,
+    MarkdownCursorResolver? cursorResolver,
   }) {
+    _theme = theme;
+    if (_cursorResolver != cursorResolver) {
+      _cursorResolver = cursorResolver;
+      _clearHoverCursor();
+    }
     if (_painter.update(
       markdown: markdown,
       theme: theme,
@@ -357,6 +410,7 @@ class MarkdownRenderObject extends RenderBox
     // Drop leaders before leaving the tree so a detached surface cannot keep
     // LayerLinks alive and produce ghost / double handles after remount churn.
     _clearSelectionHandleLayers();
+    _clearHoverCursor();
     super.detach();
   }
 

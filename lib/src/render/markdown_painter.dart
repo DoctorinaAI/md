@@ -218,6 +218,37 @@ class MarkdownPainter {
     return painter.isLinkAtLocal(blockLocal);
   }
 
+  /// Resolves the source block index and [MD$Block] at [local], or `null` if
+  /// the point lies outside any painted block.
+  (int, MD$Block)? blockAtLocal(Offset local) {
+    if (_needsLayout || _isEmpty || _blockPainters.isEmpty) return null;
+    if (local.dx < 0 ||
+        local.dx >= _size.width ||
+        local.dy < 0 ||
+        local.dy >= _size.height) {
+      return null;
+    }
+    final idx = _blockIndexForDy(local.dy);
+    if (idx < 0 || idx >= _blockPainters.length) return null;
+    final sourceIndex = _sourceIndices[idx];
+    if (sourceIndex < 0 || sourceIndex >= _markdown.blocks.length) return null;
+    return (sourceIndex, _markdown.blocks[sourceIndex]);
+  }
+
+  /// Whether the content under [local] belongs to a selectable block.
+  bool isSelectableAtLocal(Offset local) {
+    if (_needsLayout || _isEmpty || _blockPainters.isEmpty) return false;
+    if (local.dx < 0 ||
+        local.dx >= _size.width ||
+        local.dy < 0 ||
+        local.dy >= _size.height) {
+      return false;
+    }
+    final idx = _blockIndexForDy(local.dy);
+    if (idx < 0 || idx >= _blockPainters.length) return false;
+    return _blockPainters[idx] is SelectableBlockPainter;
+  }
+
   /// Paints the selection highlight of every selectable block, using [rangeOf]
   /// to look up the selected rendered range for a source block index.
   ///
@@ -262,6 +293,40 @@ class MarkdownPainter {
       }
     }
     return out;
+  }
+
+  /// Content-local rectangles covering the rendered text range
+  /// `[startOffset, endOffset]` within the block at [blockIndex] (a source
+  /// index in [Markdown.blocks]).
+  ///
+  /// Queries the cached block painter directly without re-layout, shifting
+  /// rects by the block's vertical offset. Returns an empty list when the
+  /// block is not painted, not selectable, or if `startOffset >= endOffset`.
+  List<Rect> localBoxesForRange(
+    int blockIndex,
+    int startOffset,
+    int endOffset,
+  ) {
+    if (_needsLayout || _isEmpty || _blockPainters.isEmpty) {
+      return const <Rect>[];
+    }
+    if (startOffset >= endOffset) return const <Rect>[];
+    for (var i = 0; i < _blockPainters.length; i++) {
+      if (_sourceIndices[i] != blockIndex) continue;
+      final painter = _blockPainters[i];
+      if (painter is! SelectableBlockPainter) return const <Rect>[];
+      final len = painter.renderedText.length;
+      final start = startOffset.clamp(0, len);
+      final end = endOffset.clamp(0, len);
+      if (start >= end) return const <Rect>[];
+      final top = _blockOffsets[i];
+      final boxes = painter.boxesForRange(start, end);
+      if (boxes.isEmpty) return const <Rect>[];
+      return <Rect>[
+        for (final rect in boxes) rect.shift(Offset(0, top)),
+      ];
+    }
+    return const <Rect>[];
   }
 
   /// Update the painter with new values.

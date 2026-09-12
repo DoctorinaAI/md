@@ -498,6 +498,19 @@ abstract interface class MarkdownSelectionSurface {
   /// used to anchor handle leader layers.
   List<Rect> localSelectionRects();
 
+  /// Content-local rectangles covering the rendered text range
+  /// `[startOffset, endOffset]` within the block at [blockIndex] (a source
+  /// index in `Markdown.blocks`).
+  ///
+  /// Queries the underlying block painter directly without re-layout. Returns
+  /// an empty list when the block is not mounted, not selectable, or the range
+  /// is empty.
+  List<Rect> localBoxesForRange(
+    int blockIndex,
+    int startOffset,
+    int endOffset,
+  );
+
   /// Sets the selection-handle leader layers this surface paints, so the
   /// scope's `SelectionOverlay` handles follow the content. Pass a [startLink]
   /// or [endLink] with its content-local anchor; pass null to remove a handle.

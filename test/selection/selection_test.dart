@@ -1,8 +1,9 @@
 import 'dart:ui' show Offset, Rect, TextAffinity;
 
-import 'package:flutter/painting.dart' show TextRange;
+import 'package:flutter/painting.dart' show TextRange, TextStyle;
 import 'package:flutter/rendering.dart' show LayerLink;
 import 'package:flutter_md/flutter_md.dart';
+import 'package:flutter_md/src/render.dart' show MarkdownPainter;
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeSurface implements MarkdownSelectionSurface {
@@ -31,6 +32,14 @@ class _FakeSurface implements MarkdownSelectionSurface {
 
   @override
   List<Rect> localSelectionRects() => const <Rect>[];
+
+  @override
+  List<Rect> localBoxesForRange(
+    int blockIndex,
+    int startOffset,
+    int endOffset,
+  ) =>
+      const <Rect>[];
 
   @override
   void setSelectionHandleLayers({
@@ -286,6 +295,100 @@ void main() {
     test('punctuation forms its own run', () {
       // "a===b": clicking on the punctuation run selects just the "===".
       expect(word('a===b', 2), (1, 4));
+    });
+  });
+
+  group('localBoxesForRange', () {
+    final theme = MarkdownThemeData(
+      textStyle: const TextStyle(fontSize: 14),
+    );
+
+    test('returns non-empty bounding boxes for valid character range', () {
+      final doc = Markdown.fromString('Hello world');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      final boxes = painter.localBoxesForRange(0, 0, 5);
+      expect(boxes, isNotEmpty);
+      expect(boxes.first.left, greaterThanOrEqualTo(0));
+      expect(boxes.first.width, greaterThan(0));
+      expect(boxes.first.height, greaterThan(0));
+    });
+
+    test('shifts boxes by vertical block offset for subsequent blocks', () {
+      final doc = Markdown.fromString('First paragraph\n\nSecond paragraph');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      final firstBoxes = painter.localBoxesForRange(0, 0, 5);
+      // Block index 2 is the second paragraph (index 1 is MD$Spacer).
+      final secondBoxes = painter.localBoxesForRange(2, 0, 6);
+      expect(firstBoxes, isNotEmpty);
+      expect(secondBoxes, isNotEmpty);
+      expect(secondBoxes.first.top, greaterThan(firstBoxes.first.bottom));
+    });
+
+    test('returns multiple boxes for soft-wrapped text', () {
+      final doc = Markdown.fromString(
+        'A very long line of text that wraps into multiple lines '
+        'when constrained to a narrow width.',
+      );
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 80);
+
+      final fullLen = doc.blocks.first.text.length;
+      final boxes = painter.localBoxesForRange(0, 0, fullLen);
+      expect(boxes.length, greaterThan(1));
+    });
+
+    test('returns empty list for empty or inverted range', () {
+      final doc = Markdown.fromString('Hello world');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      expect(painter.localBoxesForRange(0, 5, 5), isEmpty);
+      expect(painter.localBoxesForRange(0, 5, 2), isEmpty);
+    });
+
+    test('clamps out-of-bounds start and end offsets gracefully', () {
+      final doc = Markdown.fromString('Hello');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      final boxes = painter.localBoxesForRange(0, -10, 100);
+      expect(boxes, isNotEmpty);
+      final normalBoxes = painter.localBoxesForRange(0, 0, 5);
+      expect(boxes.first, normalBoxes.first);
+    });
+
+    test('returns empty list for invalid or non-selectable block index', () {
+      final doc = Markdown.fromString('Hello\n\n---\n\nWorld');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      // Block index 2 is divider (---).
+      expect(painter.localBoxesForRange(2, 0, 3), isEmpty);
+      // Non-existent block index.
+      expect(painter.localBoxesForRange(99, 0, 3), isEmpty);
+      expect(painter.localBoxesForRange(-1, 0, 3), isEmpty);
+    });
+
+    test('returns empty list before layout completes', () {
+      final doc = Markdown.fromString('Hello world');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      expect(painter.localBoxesForRange(0, 0, 5), isEmpty);
+    });
+
+    test('blockAtLocal respects horizontal and vertical bounds', () {
+      final doc = Markdown.fromString('Hello');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      expect(painter.blockAtLocal(const Offset(-5, 5)), isNull);
+      expect(painter.blockAtLocal(const Offset(405, 5)), isNull);
+      expect(painter.blockAtLocal(const Offset(5, -5)), isNull);
+      expect(painter.blockAtLocal(const Offset(5, 500)), isNull);
+      expect(painter.blockAtLocal(const Offset(5, 5)), isNotNull);
     });
   });
 }

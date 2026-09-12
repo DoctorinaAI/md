@@ -59,6 +59,29 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('MarkdownSelectionSurface exposes localBoxesForRange',
+        (tester) async {
+      final md = Markdown.fromString('Hello selectable world');
+      final controller = MarkdownSelectionController()
+        ..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+
+      await tester.pumpWidget(_wrap(
+        controller,
+        const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 400, child: _Doc('d')),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final surface = controller.mountedSurfaces.first;
+      final boxes = surface.localBoxesForRange(0, 0, 5);
+      expect(boxes, isNotEmpty);
+      expect(boxes.first.width, greaterThan(0));
+      expect(boxes.first.height, greaterThan(0));
+    });
+
     testWidgets('drag spans two MarkdownWidgets with a document separator',
         (tester) async {
       final a = Markdown.fromString('First message body');
@@ -2031,6 +2054,177 @@ void main() {
       expect(
         RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
         SystemMouseCursors.basic,
+      );
+    });
+
+    testWidgets('cursorResolver overrides hover cursor with custom cursor',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 400,
+              child: MarkdownWidget(
+                markdown: Markdown.fromString('Custom cursor text'),
+                cursorResolver: (offset, blockIndex, block) =>
+                    SystemMouseCursors.grab,
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final gesture =
+          await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      await gesture.moveTo(tester.getCenter(find.byType(MarkdownWidget)));
+      await tester.pumpAndSettle();
+
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.grab,
+      );
+    });
+
+    testWidgets('cursorResolver receives block details and updates dynamically',
+        (tester) async {
+      final doc = Markdown.fromString('# Heading\n\nSecond block text');
+      final seenIndices = <int?>[];
+      final seenBlocks = <MD$Block?>[];
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 400,
+              child: MarkdownWidget(
+                markdown: doc,
+                cursorResolver: (offset, blockIndex, block) {
+                  seenIndices.add(blockIndex);
+                  seenBlocks.add(block);
+                  if (block is MD$Heading) {
+                    return SystemMouseCursors.grab;
+                  }
+                  return SystemMouseCursors.cell;
+                },
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final gesture =
+          await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      // Hover over heading (near the top).
+      final widgetTopLeft = tester.getTopLeft(find.byType(MarkdownWidget));
+      await gesture.moveTo(widgetTopLeft + const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.grab,
+      );
+      expect(seenIndices, contains(0));
+      expect(seenBlocks.any((b) => b is MD$Heading), isTrue);
+
+      // Hover over second paragraph (further down).
+      final widgetBottom = tester.getBottomLeft(find.byType(MarkdownWidget));
+      await gesture.moveTo(widgetBottom - const Offset(-10, 10));
+      await tester.pumpAndSettle();
+
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.cell,
+      );
+      expect(seenIndices, contains(2));
+      expect(seenBlocks.any((b) => b is MD$Paragraph), isTrue);
+    });
+
+    testWidgets('cursorResolver returning null falls back to default cursors',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: MarkdownTheme(
+            data: MarkdownThemeData(
+              textStyle: const TextStyle(fontSize: 14),
+              onLinkTap: (_, __) {},
+              cursorResolver: (offset, blockIndex, block) => null,
+            ),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 400,
+                child: MarkdownWidget(
+                  markdown:
+                      Markdown.fromString('[click me](https://example.com)'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final gesture =
+          await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(
+          tester.getTopLeft(find.byType(MarkdownWidget)) + const Offset(8, 8));
+      await tester.pumpAndSettle();
+
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.click,
+      );
+    });
+
+    testWidgets('MarkdownWidget.cursorResolver overrides theme cursorResolver',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: MarkdownTheme(
+            data: MarkdownThemeData(
+              textStyle: const TextStyle(fontSize: 14),
+              cursorResolver: (offset, blockIndex, block) =>
+                  SystemMouseCursors.forbidden,
+            ),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 400,
+                child: MarkdownWidget(
+                  markdown: Markdown.fromString('Text here'),
+                  cursorResolver: (offset, blockIndex, block) =>
+                      SystemMouseCursors.grab,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final gesture =
+          await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.byType(MarkdownWidget)));
+      await tester.pumpAndSettle();
+
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.grab,
       );
     });
   });

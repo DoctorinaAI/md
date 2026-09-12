@@ -1,5 +1,15 @@
 ## Unreleased
 
+### Dynamic cursor resolution & span bounding boxes
+- **ADDED**: `MarkdownThemeData.cursorResolver` and `MarkdownWidget.cursorResolver`
+  (`MarkdownCursorResolver`) — unopinionated hook to dynamically resolve hover
+  mouse cursors per local offset, block index, and block model, falling back to
+  default link/text/defer cursors when returning null.
+- **ADDED**: `MarkdownSelectionSurface.localBoxesForRange` and
+  `MarkdownPainter.localBoxesForRange` — fast query returning content-local
+  bounding boxes for an arbitrary character range within a block, directly from
+  cached block painters without re-layout.
+
 ### Line clamp
 - **ADDED**: `clampMarkdownToLines` / `MarkdownLineClamp` — painter-measured
   height for the first N visual text lines at a given width (line-boundary cut;

@@ -68,6 +68,9 @@ onto a live render object, **implemented by `MarkdownRenderObject`**:
 - `MarkdownPosition? positionForGlobal(Offset)` — global point → logical position
 - `List<Rect> globalSelectionRects()` / `localSelectionRects()` — highlight rects
   (screen / content-local); used for handles, magnifier, toolbar anchor
+- `localBoxesForRange(int blockIndex, int startOffset, int endOffset)` —
+  content-local line bounding boxes for a character range within a block,
+  queried directly from cached block painters without re-layout
 - `setSelectionHandleLayers({startLink, startLocal, endLink, endLocal})` — the
   handle `LayerLink`s the surface paints so the overlay's handles follow content
 - `repaintSelection()` — repaint just the highlight; safe during build
