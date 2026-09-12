@@ -350,7 +350,7 @@ void main() {
 
         final endpoints = controller.selectionHandleEndpoints();
         expect(endpoints, isNotNull);
-        // Directed start handle follows base (right); end follows extent 
+        // Directed start handle follows base (right); end follows extent
         // (left).
         expect(
             endpoints!.startGlobal.left, greaterThan(endpoints.endGlobal.left));

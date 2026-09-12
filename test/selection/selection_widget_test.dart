@@ -425,6 +425,50 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('desktop mouse drag and double-click do not show toolbar',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(
+                id: 'd', model: Markdown.fromString('Hello selectable world')),
+          ]);
+        final tl = await pumpParagraph(tester, controller);
+
+        // 1. Mouse drag selects without showing toolbar.
+        await _mouseDrag(
+            tester, tl + const Offset(2, 6), tl + const Offset(120, 6));
+        expect(controller.getText(), isNotEmpty);
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
+        expect(state.toolbarIsVisible, isFalse,
+            reason: 'desktop mouse drag must not pop the toolbar');
+
+        // Clear selection by clicking.
+        await _clicks(tester, tl + const Offset(2, 6), 1);
+        expect(state.toolbarIsVisible, isFalse);
+
+        await tester.pump(const Duration(milliseconds: 600));
+
+        // 2. Mouse double-click selects word without showing toolbar.
+        await _clicks(tester, tl + const Offset(8, 8), 2);
+        expect(controller.getText(), 'Hello');
+        expect(state.toolbarIsVisible, isFalse,
+            reason: 'desktop double-click must not pop the toolbar');
+
+        await tester.pump(const Duration(milliseconds: 600));
+
+        // 3. Mouse triple-click selects block without showing toolbar.
+        await _clicks(tester, tl + const Offset(8, 8), 3);
+        expect(controller.getText(), 'Hello selectable world');
+        expect(state.toolbarIsVisible, isFalse,
+            reason: 'desktop triple-click must not pop the toolbar');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
     testWidgets('touch double-tap selects a word and shows the toolbar',
         (tester) async {
       final controller = MarkdownSelectionController()
@@ -663,6 +707,80 @@ void main() {
             find.byType(MarkdownSelectionScope));
         expect(state.toolbarIsVisible, isTrue);
         expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets(
+        'secondary-click on desktop without selection shows toolbar '
+        'without selecting text', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(
+                id: 'd', model: Markdown.fromString('Hello selectable world')),
+          ]);
+        final tl = await pumpParagraph(tester, controller);
+
+        final wordPos = tl + const Offset(8, 8);
+        final g = await tester.startGesture(wordPos,
+            kind: PointerDeviceKind.mouse, buttons: kSecondaryMouseButton);
+        await g.up();
+        await tester.pumpAndSettle();
+
+        expect(controller.selection, isNull,
+            reason:
+                'desktop right click without selection must not select text');
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
+        expect(state.toolbarIsVisible, isTrue);
+        expect(state.contextMenuAnchors.primaryAnchor, wordPos);
+        expect(find.byType(AdaptiveTextSelectionToolbar), findsOneWidget);
+        expect(
+            find.descendant(
+              of: find.byType(AdaptiveTextSelectionToolbar),
+              matching: find.textContaining(RegExp(r'Select [aA]ll')),
+            ),
+            findsOneWidget);
+        expect(find.text('Copy'), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets(
+        'desktop context menu preserves right-click anchor after Select all',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(
+                id: 'd', model: Markdown.fromString('Hello selectable world')),
+          ]);
+        final tl = await pumpParagraph(tester, controller);
+
+        final wordPos = tl + const Offset(40, 8);
+        final g = await tester.startGesture(wordPos,
+            kind: PointerDeviceKind.mouse, buttons: kSecondaryMouseButton);
+        await g.up();
+        await tester.pumpAndSettle();
+
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
+        expect(state.toolbarIsVisible, isTrue);
+        expect(state.contextMenuAnchors.primaryAnchor, wordPos);
+
+        // Tap "Select All" from the desktop context menu.
+        await tester.tap(find.textContaining(RegExp(r'Select [aA]ll')));
+        await tester.pumpAndSettle();
+
+        expect(controller.getText(), 'Hello selectable world');
+        expect(state.toolbarIsVisible, isTrue);
+        expect(state.contextMenuAnchors.primaryAnchor, wordPos,
+            reason: 'desktop context menu must keep its right-click anchor');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -1143,6 +1261,68 @@ void main() {
                 'toolbar follows parent scroll via ScrollNotificationObserver');
         expect(after.dy, closeTo(before.dy - 120, 1.0));
         expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'desktop context menu dismisses when enclosing scrollable scrolls',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+        try {
+          final scrollController = ScrollController();
+          addTearDown(scrollController.dispose);
+          final controller = MarkdownSelectionController()
+            ..setDocuments(<MarkdownDocumentRef>[
+              MarkdownDocumentRef(
+                id: 'd',
+                model: Markdown.fromString('Hello selectable world again'),
+              ),
+            ]);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: ListView(
+                  controller: scrollController,
+                  children: <Widget>[
+                    const SizedBox(height: 200),
+                    MarkdownSelectionScope(
+                      controller: controller,
+                      child: const SizedBox(width: 400, child: _Doc('d')),
+                    ),
+                    const SizedBox(height: 1200),
+                  ],
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          controller.selectAll();
+          await tester.pumpAndSettle();
+
+          final docPos = tester.getTopLeft(find.byType(MarkdownWidget)) +
+              const Offset(8, 8);
+          final g = await tester.startGesture(docPos,
+              kind: PointerDeviceKind.mouse, buttons: kSecondaryMouseButton);
+          await g.up();
+          await tester.pumpAndSettle();
+
+          final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope),
+          );
+          expect(state.toolbarIsVisible, isTrue);
+          expect(find.byType(AdaptiveTextSelectionToolbar), findsOneWidget);
+
+          scrollController.jumpTo(50);
+          await tester.pumpAndSettle();
+
+          expect(state.toolbarIsVisible, isFalse,
+              reason: 'scrolling on desktop must dismiss the context menu');
+          expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
       },
     );
 
@@ -1734,8 +1914,9 @@ void main() {
       }
     });
 
-    testWidgets('controller.selectAll starts the toolbar without a gesture',
-        (tester) async {
+    testWidgets(
+        'controller.selectAll on desktop updates selection without '
+        'showing toolbar', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       try {
         final md = Markdown.fromString('Programmatic select all');
@@ -1752,22 +1933,83 @@ void main() {
         controller.selectAll();
         await tester.pumpAndSettle();
 
-        expect(controller.toolbarWanted, isTrue);
+        expect(controller.toolbarWanted, isFalse);
         expect(controller.getText(), 'Programmatic select all');
         final state = tester.state<MarkdownSelectionScopeState>(
             find.byType(MarkdownSelectionScope));
+        expect(state.toolbarIsVisible, isFalse);
+        expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('controller.selectAll on mobile shows the toolbar with options',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        final md = Markdown.fromString('Mobile select all');
+        final controller = MarkdownSelectionController()
+          ..setDocuments(
+              <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+
+        await tester.pumpWidget(
+            _wrap(controller, const SizedBox(width: 400, child: _Doc('d'))));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
+
+        controller.selectAll();
+        await tester.pumpAndSettle();
+
+        expect(controller.toolbarWanted, isTrue);
+        expect(controller.getText(), 'Mobile select all');
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
         expect(state.toolbarIsVisible, isTrue);
+        expect(find.byType(AdaptiveTextSelectionToolbar), findsOneWidget);
         expect(find.text('Copy'), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
     });
 
-    testWidgets('assigning controller.selection starts the toolbar',
+    testWidgets(
+        'assigning controller.selection on desktop does not show toolbar',
         (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       try {
         final md = Markdown.fromString('Assign selection range');
+        final controller = MarkdownSelectionController()
+          ..setDocuments(
+              <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+
+        await tester.pumpWidget(
+            _wrap(controller, const SizedBox(width: 400, child: _Doc('d'))));
+        await tester.pumpAndSettle();
+
+        controller.selection = const MarkdownSelection(
+          base: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 0),
+          extent: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 6),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.toolbarWanted, isFalse);
+        expect(controller.getText(), 'Assign');
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
+        expect(state.toolbarIsVisible, isFalse);
+        expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('assigning controller.selection on mobile shows the toolbar',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        final md = Markdown.fromString('Assign on mobile');
         final controller = MarkdownSelectionController()
           ..setDocuments(
               <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
@@ -1787,6 +2029,37 @@ void main() {
         final state = tester.state<MarkdownSelectionScopeState>(
             find.byType(MarkdownSelectionScope));
         expect(state.toolbarIsVisible, isTrue);
+        expect(find.byType(AdaptiveTextSelectionToolbar), findsOneWidget);
+        expect(find.text('Copy'), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('keyboard select all does not show toolbar on desktop',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      try {
+        final md = Markdown.fromString('Keyboard select all');
+        final controller = MarkdownSelectionController()
+          ..setDocuments(
+              <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: md)]);
+
+        await tester.pumpWidget(
+            _wrap(controller, const SizedBox(width: 400, child: _Doc('d'))));
+        await tester.pumpAndSettle();
+
+        Actions.invoke(
+          tester.element(find.byType(MarkdownWidget)),
+          const SelectAllTextIntent(SelectionChangedCause.keyboard),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.getText(), 'Keyboard select all');
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
+        expect(state.toolbarIsVisible, isFalse);
+        expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

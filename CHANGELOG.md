@@ -1,10 +1,11 @@
 ## Unreleased
 
 ### Dynamic cursor resolution & span bounding boxes
-- **ADDED**: `MarkdownThemeData.cursorResolver` and `MarkdownWidget.cursorResolver`
-  (`MarkdownCursorResolver`) — unopinionated hook to dynamically resolve hover
-  mouse cursors per local offset, block index, and block model, falling back to
-  default link/text/defer cursors when returning null.
+- **ADDED**: `MarkdownThemeData.cursorResolver` and
+  `MarkdownWidget.cursorResolver` (`MarkdownCursorResolver`) — unopinionated
+  hook to dynamically resolve hover mouse cursors per local offset, block
+  index, and block model, falling back to default link/text/defer cursors when
+  returning null.
 - **ADDED**: `MarkdownSelectionSurface.localBoxesForRange` and
   `MarkdownPainter.localBoxesForRange` — fast query returning content-local
   bounding boxes for an arbitrary character range within a block, directly from
@@ -17,22 +18,22 @@
   clipped box; the renderer itself has no line budget.
 
 ### Registry / multi-body selection
-- **FIXED**: `removeDocument` defers while a surface for that id is still mounted
+- **FIXED**: `removeDocument` defers while a surface for that id is mounted
   and flushes on `detachSurface`; a later `putDocument` cancels the pending
-  remove. Parent `State.dispose` can run before child detach — eager remove left
-  hittable surfaces with no registry entry (`rangeFor` / ordering broken).
+  remove. Parent `State.dispose` can run before child detach — eager remove
+  left hittable surfaces with no registry entry (`rangeFor` / ordering broken).
 - **FIXED**: `rangeFor` and endpoint ordering ignore unregistered document ids
   instead of treating them as index `-1` (which painted every body from the
   start of the registry through the other endpoint).
-- **CHANGED**: `MarkdownRenderObject` heals with `putDocument` on attach / when
-  the controller is wired while already attached, so a mounted selectable surface
-  is never missing from the registry. Prefer explicit app registration for
-  unmounted docs and unique reading-order `order` values.
+- **CHANGED**: `MarkdownRenderObject` heals with `putDocument` on attach /
+  when the controller is wired while already attached, so a mounted selectable
+  surface is never missing from the registry. Prefer explicit app registration
+  for unmounted docs and unique reading-order `order` values.
 
 ### Selection chrome (SelectionArea parity)
-- **ADDED**: Read-only selection chrome on the controller / `MarkdownSelectionScope`
-  path brought up to Flutter `SelectableRegion` / `SelectionArea` quality without
-  remounting SelectionArea:
+- **ADDED**: Read-only selection chrome on the controller /
+  `MarkdownSelectionScope` path brought up to Flutter `SelectableRegion` /
+  `SelectionArea` quality without remounting SelectionArea:
   - Content-gated touch `TapAndHorizontalDragGestureRecognizer` + long-press
     (consecutive taps, no `DoubleTapGestureRecognizer` arena delay); mouse
     `TapAndPanGestureRecognizer`.
@@ -48,6 +49,18 @@
     toolbar with live re-anchoring.
   - Word / block granular multi-tap and long-press; link hand cursor / I-beam on
     selectable content.
+- **CHANGED**: Desktop selection toolbar parity with stock Flutter:
+  - On desktop (`macOS`, `Linux`, `Windows`), mouse drags, double/triple clicks,
+    keyboard shortcuts (`Cmd/Ctrl+A`), and programmatic selection updates
+    do not pop up the toolbar.
+  - Right-click on desktop shows the context toolbar at the click coordinates
+    without mutating the active selection (no select-word / caret collapse).
+  - Desktop context menu preserves its right-click anchor when triggering
+    actions such as "Select all", rather than jumping to selection endpoints.
+  - Desktop context menu dismisses immediately upon scroll.
+  - On mobile (`Android`, `iOS`), touch gestures and programmatic selection
+    (`selectAll`, `selection = ...`) continue to present the adaptive toolbar
+    and handles with action items.
 
 ### Selection engine rework
 - **ADDED**: Edge-zone autoscroll while dragging (body / handle / long-press)
@@ -62,8 +75,6 @@
   neither endpoint in clip (tall mid-viewport) top-pins so the below-fallback
   cannot sink to the host bottom; empty intersection hides the overlay while
   `toolbarWanted` restores on scroll-back / remount.
-- **FIXED**: Programmatic `controller.selectAll()` / assigning a non-collapsed
-  `controller.selection` starts the toolbar lifecycle without a gesture.
 - **FIXED**: Selection highlight stays outside the glyph `Picture` cache —
   under glyphs by default (sharp text), with a second pass **above** opaque
   chrome (`selectionHighlightAboveCachedContent`) for code fences, table zebra

@@ -6,6 +6,14 @@ import 'package:flutter/rendering.dart' show LayerLink;
 import 'markdown.dart';
 import 'nodes.dart';
 
+bool get _isDesktopPlatform => switch (defaultTargetPlatform) {
+      TargetPlatform.linux ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows =>
+        true,
+      _ => false,
+    };
+
 /// Rendered plain text of a single [MD$Block] — the concatenation of its span
 /// texts, in the coordinate space that `TextPainter.getPositionForOffset`
 /// indexes. This is the single source of truth shared by selection extraction
@@ -696,9 +704,10 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   /// The current selection, or null when nothing is selected.
   ///
-  /// Assigning a non-collapsed range marks [toolbarWanted] so a mounted
-  /// [MarkdownSelectionScope] starts (or restores) the toolbar without a
-  /// gesture. Gesture-driven updates go through [_commitSelection] instead.
+  /// On mobile platforms, assigning a non-collapsed range marks [toolbarWanted]
+  /// so a mounted [MarkdownSelectionScope] shows the context menu with copy
+  /// options. On desktop platforms, [toolbarWanted] remains false to match
+  /// standard OS selection behavior.
   MarkdownSelection? get selection => _selection;
   set selection(MarkdownSelection? value) {
     if (value == _selection) return;
@@ -708,7 +717,9 @@ class MarkdownSelectionController extends ChangeNotifier {
       _baseAffinity = TextAffinity.downstream;
       _extentAffinity = TextAffinity.downstream;
     } else {
-      toolbarWanted = true;
+      if (!_isDesktopPlatform) {
+        toolbarWanted = true;
+      }
       _group?._claim(this);
     }
     notifyListeners();
@@ -1030,16 +1041,18 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   /// Selects everything across every registered document.
   ///
-  /// Marks [toolbarWanted] so a mounted scope shows the context menu without
-  /// waiting for a gesture (same chrome lifecycle as assigning [selection]).
+  /// On mobile platforms, marks [toolbarWanted] so a mounted scope shows
+  /// the context menu without waiting for a gesture (since mobile users lack
+  /// physical copy shortcuts). On desktop platforms, [toolbarWanted] remains
+  /// false to match standard OS selection behavior.
   void selectAll() {
     if (_docs.isEmpty) return;
     final first = _docs.first, last = _docs.last;
     if (first.model.blocks.isEmpty || last.model.blocks.isEmpty) return;
     final lastBlock = last.model.blocks.length - 1;
-    // Before [_commitSelection]'s notify so a listening scope restores chrome
-    // on the same turn (not only after a later gesture).
-    toolbarWanted = true;
+    if (!_isDesktopPlatform) {
+      toolbarWanted = true;
+    }
     _commitSelection(
       MarkdownSelection(
         base: MarkdownPosition(documentId: first.id, blockIndex: 0, offset: 0),

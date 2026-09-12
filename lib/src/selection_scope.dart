@@ -278,9 +278,10 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (sel != _lastSelection) {
       _lastSelection = sel;
       widget.onSelectionChanged?.call(sel);
-      // Selection moved — drop a frozen right-click anchor so the toolbar
-      // tracks the live selection bounds instead.
-      if (_contextMenuController.isShown) {
+      // Selection moved — on mobile, drop a frozen right-click anchor so
+      // the toolbar tracks the live selection bounds instead. On desktop,
+      // preserve the user's secondary-click anchor.
+      if (_contextMenuController.isShown && !_isDesktopPlatform) {
         _lastSecondaryTapDown = null;
       }
     }
@@ -288,12 +289,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (sel case final current? when !current.isCollapsed) {
       if (_dragGlobal == null) {
         // Outside a drag: restore when [toolbarWanted] (scroll remount /
-        // programmatic selectAll / selection=), else start chrome for keyboard
-        // / other _commitSelection ranges.
+        // geometry change).
         if (controller.toolbarWanted) {
           _refreshToolbarForVisibleGeometry();
-        } else {
-          showToolbar();
         }
       }
     } else {
@@ -311,6 +309,14 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
         TargetPlatform.android ||
         TargetPlatform.iOS ||
         TargetPlatform.fuchsia =>
+          true,
+        _ => false,
+      };
+
+  bool get _isDesktopPlatform => switch (Theme.of(context).platform) {
+        TargetPlatform.linux ||
+        TargetPlatform.macOS ||
+        TargetPlatform.windows =>
           true,
         _ => false,
       };
@@ -419,7 +425,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
             toolbarLayerLink: _toolbarLink,
             magnifierConfiguration: _effectiveMagnifier,
           );
-          // Android long-press: keep overlay for magnifier, show handles on 
+          // Android long-press: keep overlay for magnifier, show handles on
           // end.
           if (!_deferHandleShow) {
             overlay.showHandles();
@@ -516,6 +522,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
 
   void _onBodyDragEnd() {
     _stopAutoscroll();
+    if (_isDesktopPlatform || _isPrecisePointer(_lastPointerDeviceKind)) {
+      return;
+    }
     if (controller.selection case final sel? when !sel.isCollapsed) {
       showToolbar();
     }
@@ -780,6 +789,12 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     }
     if (_toolbarClipBounds() case final clip?) {
       if (_visibleSelectionBoundsIn(clip) case final visible?) {
+        if (_isDesktopPlatform) {
+          return TextSelectionToolbarAnchors(
+            primaryAnchor: visible.bottomLeft,
+            secondaryAnchor: visible.bottomLeft,
+          );
+        }
         return _anchorsForVisibleSelection(visible, clip);
       }
     }
@@ -787,7 +802,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     // the menu when geometry leaves the host.
     final host = _hostGlobalBounds();
     return TextSelectionToolbarAnchors(
-      primaryAnchor: host.isEmpty ? Offset.zero : host.center,
+      primaryAnchor: host.isEmpty
+          ? Offset.zero
+          : (_isDesktopPlatform ? host.topLeft : host.center),
     );
   }
 
@@ -961,8 +978,10 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (widget.contextMenuBuilder case final builder?) {
       if (Overlay.maybeOf(context, rootOverlay: true) == null) return;
       controller.toolbarWanted = true;
-      _lastSecondaryTapDown = location;
-      if (location == null) {
+      if (location != null) {
+        _lastSecondaryTapDown = location;
+      }
+      if (_lastSecondaryTapDown == null) {
         if (_visibleSelectionBounds() case null) {
           _contextMenuController.remove();
           return;
@@ -1023,11 +1042,13 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
 
   /// Forces handles + toolbar to refresh even when the range is unchanged
   /// (double-tap re-select must not be a no-op).
-  void _refreshSelectionChrome({Offset? toolbarAt}) {
+  void _refreshSelectionChrome({Offset? toolbarAt, bool showToolbar = true}) {
     _syncOverlay();
     _updateHandlesAndOverlay();
-    if (controller.selection case final sel? when !sel.isCollapsed) {
-      showToolbar(toolbarAt);
+    if (showToolbar) {
+      if (controller.selection case final sel? when !sel.isCollapsed) {
+        this.showToolbar(toolbarAt);
+      }
     }
   }
 
@@ -1178,7 +1199,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     } else if (!_beginSelection(d.globalPosition, d.consecutiveTapCount)) {
       return;
     }
-    _refreshSelectionChrome();
+    final showToolbarOnTap = !_isDesktopPlatform && !_isPrecisePointer(d.kind);
+    _refreshSelectionChrome(showToolbar: showToolbarOnTap);
   }
 
   void _handleDragStart(TapDragStartDetails d) {
@@ -1238,6 +1260,12 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   /// the host viewport entirely, temporarily remove the menu (keeping the
   /// restore intent); bring it back when selection paint re-enters view.
   void _onScrollAffectingChrome() {
+    if (_isDesktopPlatform) {
+      if (toolbarIsVisible) {
+        hideToolbar();
+      }
+      return;
+    }
     _refreshToolbarForVisibleGeometry();
     // Scroll notifications can run before child layout finishes (common when
     // the scope itself was outside the viewport cache). Retry next frame.
@@ -1266,7 +1294,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     });
   }
 
-  /// Shows, rebuilds, or suppresses the toolbar from visible selection 
+  /// Shows, rebuilds, or suppresses the toolbar from visible selection
   /// geometry.
   ///
   /// Must not run during layout/build — geometry walks use [localToGlobal].
@@ -1278,7 +1306,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
       _scheduleToolbarGeometryRefresh();
       return;
     }
-    _lastSecondaryTapDown = null;
+    if (!_isDesktopPlatform) {
+      _lastSecondaryTapDown = null;
+    }
     if (_visibleSelectionBounds() case null) {
       _contextMenuController.remove();
       return;
@@ -1324,8 +1354,30 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     final onSelection = _positionIsOnActiveSelection(d.globalPosition);
     final previousSecondary = _previousSecondaryTapAnchor;
     final toolbarWasVisible = toolbarIsVisible;
-    // Common paths: on-selection keeps the range and shows/toggles toolbar;
-    // off-selection follows platform select/collapse.
+
+    // Desktop: right-click opens/toggles the context toolbar without mutating
+    // the selection (no select-word or collapse-to-caret side-effects).
+    if (_isDesktopPlatform) {
+      if (toolbarWasVisible) {
+        if (defaultTargetPlatform == TargetPlatform.macOS) {
+          if (previousSecondary case final anchor?
+              when anchor == d.globalPosition) {
+            hideToolbar();
+            _previousSecondaryTapAnchor = d.globalPosition;
+            return;
+          }
+        } else if (defaultTargetPlatform == TargetPlatform.linux) {
+          hideToolbar();
+          _previousSecondaryTapAnchor = d.globalPosition;
+          return;
+        }
+      }
+      showToolbar(d.globalPosition);
+      _previousSecondaryTapAnchor = d.globalPosition;
+      return;
+    }
+
+    // Mobile / touch platforms:
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
       case TargetPlatform.fuchsia:
@@ -1348,18 +1400,6 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
         }
         showToolbar(d.globalPosition);
       case TargetPlatform.macOS:
-        if (toolbarWasVisible) {
-          if (previousSecondary case final anchor?
-              when anchor == d.globalPosition) {
-            hideToolbar();
-            _previousSecondaryTapAnchor = d.globalPosition;
-            return;
-          }
-        }
-        if (!onSelection) {
-          controller.selectWordAtGlobal(d.globalPosition);
-        }
-        showToolbar(d.globalPosition);
       case TargetPlatform.iOS:
         if (!onSelection) {
           controller.selectWordAtGlobal(d.globalPosition);
@@ -1414,7 +1454,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
             ..onDragEnd = ((_) => _onBodyDragEnd()),
         ),
         // Secondary-only (any device): right-click opens the context toolbar.
-        // Distinct type key so it can coexist with other recognizers in the 
+        // Distinct type key so it can coexist with other recognizers in the
         // map.
         _SecondaryTapGestureRecognizer: GestureRecognizerFactoryWithHandlers<
             _SecondaryTapGestureRecognizer>(
