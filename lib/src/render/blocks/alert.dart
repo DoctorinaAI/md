@@ -29,6 +29,8 @@ class BlockPainter$Alert
     required List<MD$Span> spans,
     required this.theme,
   })  : _accent = theme.alertColorFor(alert),
+        _selectionHighlightAboveCachedContent =
+            markdownSpansPaintOpaqueBackground(spans),
         titlePainter = TextPainter(
           text: TextSpan(
             text: alert.title,
@@ -47,6 +49,13 @@ class BlockPainter$Alert
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
         );
+
+  /// Alert chrome and optional inline monospace/highlight fills sit in the
+  /// content [Picture].
+  @override
+  bool get selectionHighlightAboveCachedContent =>
+      _selectionHighlightAboveCachedContent;
+  final bool _selectionHighlightAboveCachedContent;
 
   /// The kind of the alert being painted.
   final MD$AlertType alert;

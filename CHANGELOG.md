@@ -1,3 +1,89 @@
+## Unreleased
+
+### Dynamic cursor resolution & span bounding boxes
+- **ADDED**: `MarkdownThemeData.cursorResolver` and
+  `MarkdownWidget.cursorResolver` (`MarkdownCursorResolver`) — unopinionated
+  hook to dynamically resolve hover mouse cursors per local offset, block
+  index, and block model, falling back to default link/text/defer cursors when
+  returning null.
+- **ADDED**: `MarkdownSelectionSurface.localBoxesForRange` and
+  `MarkdownPainter.localBoxesForRange` — fast query returning content-local
+  bounding boxes for an arbitrary character range within a block, directly from
+  cached block painters without re-layout.
+
+### Line clamp
+- **ADDED**: `clampMarkdownToLines` / `MarkdownLineClamp` — painter-measured
+  height for the first N visual text lines at a given width (line-boundary cut;
+  spacers/dividers add height without spending the line budget). Callers size a
+  clipped box; the renderer itself has no line budget.
+
+### Registry / multi-body selection
+- **FIXED**: `removeDocument` defers while a surface for that id is mounted
+  and flushes on `detachSurface`; a later `putDocument` cancels the pending
+  remove. Parent `State.dispose` can run before child detach — eager remove
+  left hittable surfaces with no registry entry (`rangeFor` / ordering broken).
+- **FIXED**: `rangeFor` and endpoint ordering ignore unregistered document ids
+  instead of treating them as index `-1` (which painted every body from the
+  start of the registry through the other endpoint).
+- **CHANGED**: `MarkdownRenderObject` heals with `putDocument` on attach /
+  when the controller is wired while already attached, so a mounted selectable
+  surface is never missing from the registry. Prefer explicit app registration
+  for unmounted docs and unique reading-order `order` values.
+
+### Selection chrome (SelectionArea parity)
+- **ADDED**: Read-only selection chrome on the controller /
+  `MarkdownSelectionScope` path brought up to Flutter `SelectableRegion` /
+  `SelectionArea` quality without remounting SelectionArea:
+  - Content-gated touch `TapAndHorizontalDragGestureRecognizer` + long-press
+    (consecutive taps, no `DoubleTapGestureRecognizer` arena delay); mouse
+    `TapAndPanGestureRecognizer`.
+  - Gesture **starts** require a hit on mounted selectable markdown (chrome /
+    empty space do not nearest-neighbor clamp); clamp remains for **extend**
+    across gaps.
+  - Soft-wrap affinity on handles; directed base/extent edges with reverse
+    handle types; coincident-caret separation; handle proxies when an endpoint
+    surface unmounts (virtualization).
+  - Native `SelectionOverlay` handles + magnifier on touch; LeaderLayer follow
+    across scroll / multi-widget hosts.
+  - Keyboard Copy / Select-all / Shift-extend / Esc; adaptive Copy / Select-all
+    toolbar with live re-anchoring.
+  - Word / block granular multi-tap and long-press; link hand cursor / I-beam on
+    selectable content.
+- **CHANGED**: Desktop selection toolbar parity with stock Flutter:
+  - On desktop (`macOS`, `Linux`, `Windows`), mouse drags, double/triple clicks,
+    keyboard shortcuts (`Cmd/Ctrl+A`), and programmatic selection updates
+    do not pop up the toolbar.
+  - Right-click on desktop shows the context toolbar at the click coordinates
+    without mutating the active selection (no select-word / caret collapse).
+  - Desktop context menu preserves its right-click anchor when triggering
+    actions such as "Select all", rather than jumping to selection endpoints.
+  - Desktop context menu dismisses immediately upon scroll.
+  - On mobile (`Android`, `iOS`), touch gestures and programmatic selection
+    (`selectAll`, `selection = ...`) continue to present the adaptive toolbar
+    and handles with action items.
+
+### Selection engine rework
+- **ADDED**: Edge-zone autoscroll while dragging (body / handle / long-press)
+  near the padded viewport — host-union hard-stop, direction arming gate,
+  past-viewport max velocity while the union still allows that direction
+  (`MarkdownSelectionScope.autoscroll`, default `edgeZone: 48`).
+- **CHANGED**: Toolbar hides while expanding (body or handle drag) and may
+  re-show on drag end; anchors recompute on selection change, host/ancestor
+  scroll, and mounted-surface layout change.
+- **CHANGED**: Toolbar placement — both endpoints in clip use stock
+  above-preferring anchors; **bottom-only** endpoint prefers below that caret;
+  neither endpoint in clip (tall mid-viewport) top-pins so the below-fallback
+  cannot sink to the host bottom; empty intersection hides the overlay while
+  `toolbarWanted` restores on scroll-back / remount.
+- **FIXED**: Selection highlight stays outside the glyph `Picture` cache —
+  under glyphs by default (sharp text), with a second pass **above** opaque
+  chrome (`selectionHighlightAboveCachedContent`) for code fences, table zebra
+  rows, and inline monospace / highlight backgrounds
+  (`markdownSpansPaintOpaqueBackground`).
+- **FIXED**: Focus loss does not clear selection while a pointer drag is active
+  (list rebuilds during autoscroll); geometry walks defer off `performLayout`
+  (`sizeAccessAllowed`).
+
 ## 0.2.0
 
 > **Upgrading from 0.0.x?** See the

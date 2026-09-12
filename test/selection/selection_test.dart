@@ -1,6 +1,57 @@
-import 'package:flutter/painting.dart' show TextRange;
+import 'dart:ui' show Offset, Rect, TextAffinity;
+
+import 'package:flutter/painting.dart' show TextRange, TextStyle;
+import 'package:flutter/rendering.dart' show LayerLink;
 import 'package:flutter_md/flutter_md.dart';
+import 'package:flutter_md/src/render.dart' show MarkdownPainter;
 import 'package:flutter_test/flutter_test.dart';
+
+class _FakeSurface implements MarkdownSelectionSurface {
+  _FakeSurface(this.documentId);
+
+  @override
+  final Object documentId;
+
+  @override
+  Rect get globalBounds => Rect.zero;
+
+  @override
+  MarkdownPosition? positionForGlobal(Offset globalPosition) => null;
+
+  @override
+  (MarkdownPosition, TextAffinity)? hitForGlobal(Offset globalPosition) => null;
+
+  @override
+  Rect? caretRectFor(MarkdownPosition position, TextAffinity affinity) => null;
+
+  @override
+  (int, int, int)? wordBoundaryForGlobal(Offset globalPosition) => null;
+
+  @override
+  List<Rect> globalSelectionRects() => const <Rect>[];
+
+  @override
+  List<Rect> localSelectionRects() => const <Rect>[];
+
+  @override
+  List<Rect> localBoxesForRange(
+    int blockIndex,
+    int startOffset,
+    int endOffset,
+  ) =>
+      const <Rect>[];
+
+  @override
+  void setSelectionHandleLayers({
+    LayerLink? startLink,
+    Offset? startLocal,
+    LayerLink? endLink,
+    Offset? endLocal,
+  }) {}
+
+  @override
+  void repaintSelection() {}
+}
 
 class _UpperFormatter implements MarkdownSelectionFormatter {
   const _UpperFormatter();
@@ -149,10 +200,59 @@ void main() {
       expect(c.rangeFor('missing', 0), isNull);
     });
 
+    test('rangeFor ignores spans with an unregistered endpoint', () {
+      // Surfaces can hit-test a body that was never putDocument'd. Ordering
+      // used to treat missing ids as -1 and paint every registered doc.
+      final c = two()
+        ..selection = const MarkdownSelection(
+          base: MarkdownPosition(documentId: 'a', blockIndex: 0, offset: 0),
+          extent: MarkdownPosition(
+            documentId: 'ghost',
+            blockIndex: 0,
+            offset: 3,
+          ),
+        );
+      expect(c.rangeFor('a', 0), isNull);
+      expect(c.rangeFor('b', 0), isNull);
+      expect(c.rangeFor('ghost', 0), isNull);
+      expect(c.selectedContent().documents, isEmpty);
+    });
+
     test('removeDocument drops a touching selection', () {
       final c = two()..selection = full;
       c.removeDocument('a');
       expect(c.selection, isNull);
+    });
+
+    test('removeDocument defers while a surface is mounted', () {
+      final c = MarkdownSelectionController()..putDocument('a', docA, order: 0);
+      final surface = _FakeSurface('a');
+      c.attachSurface(surface);
+
+      c.removeDocument('a');
+      expect(c.documentCount, 1);
+
+      c.selection = const MarkdownSelection(
+        base: MarkdownPosition(documentId: 'a', blockIndex: 0, offset: 0),
+        extent: MarkdownPosition(documentId: 'a', blockIndex: 0, offset: 5),
+      );
+      expect(c.rangeFor('a', 0), const TextRange(start: 0, end: 5));
+
+      c.detachSurface(surface);
+      expect(c.documentCount, 0);
+      expect(c.selection, isNull);
+    });
+
+    test('putDocument cancels a deferred remove', () {
+      final c = MarkdownSelectionController()..putDocument('a', docA, order: 0);
+      final surface = _FakeSurface('a');
+      c.attachSurface(surface);
+      c.removeDocument('a');
+      expect(c.documentCount, 1);
+
+      c.putDocument('a', docA, order: 0);
+      c.detachSurface(surface);
+      expect(c.documentCount, 1);
     });
 
     test('notifies listeners on selection change', () {
@@ -195,6 +295,100 @@ void main() {
     test('punctuation forms its own run', () {
       // "a===b": clicking on the punctuation run selects just the "===".
       expect(word('a===b', 2), (1, 4));
+    });
+  });
+
+  group('localBoxesForRange', () {
+    final theme = MarkdownThemeData(
+      textStyle: const TextStyle(fontSize: 14),
+    );
+
+    test('returns non-empty bounding boxes for valid character range', () {
+      final doc = Markdown.fromString('Hello world');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      final boxes = painter.localBoxesForRange(0, 0, 5);
+      expect(boxes, isNotEmpty);
+      expect(boxes.first.left, greaterThanOrEqualTo(0));
+      expect(boxes.first.width, greaterThan(0));
+      expect(boxes.first.height, greaterThan(0));
+    });
+
+    test('shifts boxes by vertical block offset for subsequent blocks', () {
+      final doc = Markdown.fromString('First paragraph\n\nSecond paragraph');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      final firstBoxes = painter.localBoxesForRange(0, 0, 5);
+      // Block index 2 is the second paragraph (index 1 is MD$Spacer).
+      final secondBoxes = painter.localBoxesForRange(2, 0, 6);
+      expect(firstBoxes, isNotEmpty);
+      expect(secondBoxes, isNotEmpty);
+      expect(secondBoxes.first.top, greaterThan(firstBoxes.first.bottom));
+    });
+
+    test('returns multiple boxes for soft-wrapped text', () {
+      final doc = Markdown.fromString(
+        'A very long line of text that wraps into multiple lines '
+        'when constrained to a narrow width.',
+      );
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 80);
+
+      final fullLen = doc.blocks.first.text.length;
+      final boxes = painter.localBoxesForRange(0, 0, fullLen);
+      expect(boxes.length, greaterThan(1));
+    });
+
+    test('returns empty list for empty or inverted range', () {
+      final doc = Markdown.fromString('Hello world');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      expect(painter.localBoxesForRange(0, 5, 5), isEmpty);
+      expect(painter.localBoxesForRange(0, 5, 2), isEmpty);
+    });
+
+    test('clamps out-of-bounds start and end offsets gracefully', () {
+      final doc = Markdown.fromString('Hello');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      final boxes = painter.localBoxesForRange(0, -10, 100);
+      expect(boxes, isNotEmpty);
+      final normalBoxes = painter.localBoxesForRange(0, 0, 5);
+      expect(boxes.first, normalBoxes.first);
+    });
+
+    test('returns empty list for invalid or non-selectable block index', () {
+      final doc = Markdown.fromString('Hello\n\n---\n\nWorld');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      // Block index 2 is divider (---).
+      expect(painter.localBoxesForRange(2, 0, 3), isEmpty);
+      // Non-existent block index.
+      expect(painter.localBoxesForRange(99, 0, 3), isEmpty);
+      expect(painter.localBoxesForRange(-1, 0, 3), isEmpty);
+    });
+
+    test('returns empty list before layout completes', () {
+      final doc = Markdown.fromString('Hello world');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      expect(painter.localBoxesForRange(0, 0, 5), isEmpty);
+    });
+
+    test('blockAtLocal respects horizontal and vertical bounds', () {
+      final doc = Markdown.fromString('Hello');
+      final painter = MarkdownPainter(markdown: doc, theme: theme);
+      painter.layout(maxWidth: 400);
+
+      expect(painter.blockAtLocal(const Offset(-5, 5)), isNull);
+      expect(painter.blockAtLocal(const Offset(405, 5)), isNull);
+      expect(painter.blockAtLocal(const Offset(5, -5)), isNull);
+      expect(painter.blockAtLocal(const Offset(5, 500)), isNull);
+      expect(painter.blockAtLocal(const Offset(5, 5)), isNotNull);
     });
   });
 }

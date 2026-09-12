@@ -1,21 +1,25 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'highlight/highlight_test.dart' as highlight_test;
+import 'line_clamp/line_clamp_test.dart' as line_clamp_test;
+import 'nodes/nodes_test.dart' as nodes_test;
 import 'parser/block_test.dart' as block_test;
 import 'parser/edge_cases_test.dart' as edge_cases_test;
 import 'parser/gfm_test.dart' as gfm_test;
 import 'parser/golden_test.dart' as golden_test;
-import 'nodes/nodes_test.dart' as nodes_test;
 import 'parser/inline_test.dart' as inline_test;
 import 'parser/math_test.dart' as math_test;
 import 'parser/parser_test.dart' as parser_test;
 import 'parser/regression_test.dart' as regression_test;
 import 'parser/streaming_test.dart' as streaming_test;
 import 'selection/markup_formatter_test.dart' as markup_formatter_test;
+import 'selection/selection_autoscroll_test.dart' as selection_autoscroll_test;
+import 'selection/selection_handle_endpoints_test.dart'
+    as selection_handle_endpoints_test;
 import 'selection/selection_handles_test.dart' as selection_handles_test;
 import 'selection/selection_keyboard_test.dart' as selection_keyboard_test;
 import 'selection/selection_test.dart' as selection_test;
 import 'selection/selection_widget_test.dart' as selection_widget_test;
-import 'highlight/highlight_test.dart' as highlight_test;
 import 'theme/theme_test.dart' as theme_test;
 import 'widget/render_test.dart' as render_test;
 import 'widget/widget_test.dart' as widget_test;
@@ -38,6 +42,9 @@ void main() => group('Unit', () {
       selection_widget_test.main();
       selection_keyboard_test.main();
       selection_handles_test.main();
+      selection_handle_endpoints_test.main();
+      selection_autoscroll_test.main();
+      line_clamp_test.main();
       render_test.main();
       widget_test.main();
     });

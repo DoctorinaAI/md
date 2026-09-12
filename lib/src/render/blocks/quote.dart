@@ -28,7 +28,9 @@ class BlockPainter$Quote
     required List<MD$Span> spans,
     required this.indent,
     required this.theme,
-  })  : painter = TextPainter(
+  })  : _selectionHighlightAboveCachedContent =
+            markdownSpansPaintOpaqueBackground(spans),
+        painter = TextPainter(
           text: paragraphFromMarkdownSpans(
             spans: spans,
             theme: theme,
@@ -44,6 +46,12 @@ class BlockPainter$Quote
           ..isAntiAlias = false
           ..strokeWidth = 4.0
           ..style = PaintingStyle.fill;
+
+  /// Inline monospace/highlight fills live in the content [Picture].
+  @override
+  bool get selectionHighlightAboveCachedContent =>
+      _selectionHighlightAboveCachedContent;
+  final bool _selectionHighlightAboveCachedContent;
 
   /// The theme used to style the quote.
   final MarkdownThemeData theme;

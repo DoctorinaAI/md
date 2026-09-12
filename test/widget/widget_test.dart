@@ -3,6 +3,7 @@
 // branch that builds a default `MarkdownThemeData` from the build context in
 // both `createRenderObject` and `updateRenderObject`.
 import 'package:flutter/material.dart';
+import 'package:flutter/src/services/mouse_cursor.dart';
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -62,6 +63,25 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(heightOf(tester), greaterThan(0));
+    });
+
+    testWidgets('MarkdownWidget honors cursorResolver', (tester) async {
+      SystemMouseCursor resolver(Offset offset, int? idx, MD$Block? block) =>
+          SystemMouseCursors.click;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 300,
+              child: MarkdownWidget(
+                markdown: Markdown.fromString('Hello'),
+                cursorResolver: resolver,
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
     });
   });
 }
