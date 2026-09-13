@@ -122,10 +122,16 @@ void main() {
           ));
           await tester.pumpAndSettle();
 
-          final rect = tester.getRect(find.byType(MarkdownWidget));
-          // Long-press a word near the right of the first visual line, then
+          final surface = controller.mountedSurfaces.first;
+          final box = surface as RenderBox;
+          final lineBoxes = surface.localBoxesForRange(0, 0, 20);
+          expect(lineBoxes, isNotEmpty);
+          final line = lineBoxes.first;
+          // Long-press near the end of the first visual line's glyphs, then
           // drag left/up so extendSelectionGranular reverses directed edges.
-          final press = rect.topLeft + Offset(rect.width - 24, 10);
+          final press = box.localToGlobal(
+            Offset(line.right - 4, line.center.dy),
+          );
           final gesture = await tester.startGesture(press);
           await tester.pump(const Duration(milliseconds: 600));
           await gesture.moveBy(const Offset(-160, -4));

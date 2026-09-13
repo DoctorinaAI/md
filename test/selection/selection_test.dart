@@ -22,6 +22,9 @@ class _FakeSurface implements MarkdownSelectionSurface {
   (MarkdownPosition, TextAffinity)? hitForGlobal(Offset globalPosition) => null;
 
   @override
+  bool hitsSelectableGlyphs(Offset globalPosition) => false;
+
+  @override
   Rect? caretRectFor(MarkdownPosition position, TextAffinity affinity) => null;
 
   @override

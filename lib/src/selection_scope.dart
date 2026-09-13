@@ -68,6 +68,9 @@ class MarkdownSelectionScope extends StatefulWidget {
     this.focusNode,
     this.enabled = true,
     this.enableTouchGestures = true,
+    this.enableTouchConsecutiveTaps = true,
+    this.canStartSelectionAt,
+    this.ownsSelectionChrome,
     this.selectionColor,
     this.contextMenuBuilder = defaultContextMenuBuilder,
     this.magnifierConfiguration,
@@ -87,17 +90,50 @@ class MarkdownSelectionScope extends StatefulWidget {
   final FocusNode? focusNode;
 
   /// Whether selection gestures, handles and shortcuts are active. When false
-  /// the scope is inert (but still exposes the controller to descendants).
+  /// the scope is inert (but still exposes the controller to descendants):
+  /// no gestures, handles, toolbar overlay, or shortcuts. Flipping back to
+  /// true with an existing non-collapsed range restores handles; when
+  /// [MarkdownSelectionController.toolbarWanted] is set, restores the toolbar.
   final bool enabled;
 
   /// Whether touch / stylus / trackpad selection gestures are armed.
   ///
-  /// Defaults to true. Set to false when an enclosing viewport owns touch
-  /// entry (for example a chat list where double-tap is desktop/mouse-only,
-  /// long-press is message-then-text, and tap must reach code/link chrome).
-  /// Mouse drag / double-click / triple-click, selection handles, magnifier,
-  /// context toolbar, and keyboard shortcuts remain active when [enabled].
+  /// Defaults to true. Set to false when an enclosing viewport owns all touch
+  /// entry. Mouse drag / double-click / triple-click, selection handles,
+  /// magnifier, context toolbar, and keyboard shortcuts remain active when
+  /// [enabled].
+  ///
+  /// When false, focus loss also does **not** clear the selection — the host
+  /// viewport may steal focus while keeping the range alive. The same focus
+  /// retention applies when [enableTouchConsecutiveTaps] is false (long-press
+  /// only): taps stay with the enclosing host.
   final bool enableTouchGestures;
+
+  /// Whether touch consecutive-tap / horizontal-drag selection is armed.
+  ///
+  /// Defaults to true. Requires [enableTouchGestures]. When false, the touch
+  /// long-press → word → drag-extend recognizer still arms, but the touch
+  /// tap / multi-tap / horizontal-drag recognizer does not — so double-tap
+  /// cannot enter text while long-press remains continuous. Mouse multi-click
+  /// is unaffected.
+  final bool enableTouchConsecutiveTaps;
+
+  /// Optional host gate for starting a body selection at a global point.
+  ///
+  /// When this returns false, mouse/touch selection recognizers do not claim
+  /// the pointer and [_beginSelection] refuses — so enclosing hosts can own
+  /// taps on chrome (links, code headers) without the scope eating the click.
+  /// Null means every selectable-content hit may start selection.
+  final bool Function(Offset globalPosition)? canStartSelectionAt;
+
+  /// Optional host gate for which document ids this scope may paint handles /
+  /// toolbar for.
+  ///
+  /// When several scopes share one [controller] (chat per-body mounts), only
+  /// the scope that owns the selection’s document should show chrome — otherwise
+  /// each enabled scope paints a duplicate handle pair. Null means this scope
+  /// may show chrome for any non-collapsed selection (single-scope hosts).
+  final bool Function(Object documentId)? ownsSelectionChrome;
 
   /// The selection highlight color. Defaults to the ambient
   /// `DefaultSelectionStyle`/`TextSelectionTheme` color.
@@ -248,6 +284,21 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (oldWidget.selectionColor != widget.selectionColor) {
       _applySelectionColor();
     }
+    // Host may enable the scope after arming a subject / range (chat mobile
+    // message-then-text). Sync handles and restore the toolbar when chrome
+    // becomes eligible. Disabling clears visible chrome but keeps
+    // [toolbarWanted] so a later enable can restore.
+    if (oldWidget.enabled != widget.enabled) {
+      if (widget.enabled) {
+        _syncOverlay();
+        if (controller.toolbarWanted) {
+          _refreshToolbarForVisibleGeometry();
+        }
+      } else {
+        _clearHandles();
+        _contextMenuController.remove();
+      }
+    }
   }
 
   @override
@@ -265,9 +316,12 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   }
 
   void _handleFocusChanged() {
-    // When touch gestures are host-owned, do not clear on focus loss — the
-    // enclosing viewport may steal focus while keeping the range alive.
-    if (!widget.enableTouchGestures) return;
+    // When touch entry is host-owned (all touch off, or long-press-only), do
+    // not clear on focus loss — the enclosing viewport may steal focus while
+    // keeping the range alive.
+    if (!widget.enableTouchGestures || !widget.enableTouchConsecutiveTaps) {
+      return;
+    }
     if (_focusNode.hasFocus) return;
     // Keep the range while a pointer drag is active — list rebuilds during
     // autoscroll can steal focus without an intentional dismiss.
@@ -302,8 +356,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (sel case final current? when !current.isCollapsed) {
       if (_dragGlobal == null) {
         // Outside a drag: restore when [toolbarWanted] (scroll remount /
-        // geometry change).
-        if (controller.toolbarWanted) {
+        // geometry change). Skip while disabled — chrome comes back on
+        // the enabled flip in [didUpdateWidget].
+        if (widget.enabled && controller.toolbarWanted) {
           _refreshToolbarForVisibleGeometry();
         }
       }
@@ -316,15 +371,27 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
 
   // --- native handles + magnifier ------------------------------------------
 
-  bool get _handlesEnabled =>
-      widget.enabled &&
-      switch (Theme.of(context).platform) {
-        TargetPlatform.android ||
-        TargetPlatform.iOS ||
-        TargetPlatform.fuchsia =>
-          true,
-        _ => false,
-      };
+  bool get _handlesEnabled {
+    if (!widget.enabled) return false;
+    if (!_ownsChromeForCurrentSelection) return false;
+    return switch (Theme.of(context).platform) {
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.fuchsia =>
+        true,
+      _ => false,
+    };
+  }
+
+  /// Whether this scope may paint handles/toolbar for the live selection.
+  bool get _ownsChromeForCurrentSelection {
+    final owns = widget.ownsSelectionChrome;
+    if (owns == null) return true;
+    return switch (controller.selection) {
+      final sel? when !sel.isCollapsed => owns(sel.base.documentId),
+      _ => false,
+    };
+  }
 
   bool get _isDesktopPlatform => switch (Theme.of(context).platform) {
         TargetPlatform.linux ||
@@ -994,6 +1061,15 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
       if (location != null) {
         _lastSecondaryTapDown = location;
       }
+      // Inert while disabled — keep [toolbarWanted] for the enable flip.
+      if (!widget.enabled) {
+        _contextMenuController.remove();
+        return;
+      }
+      if (!_ownsChromeForCurrentSelection) {
+        _contextMenuController.remove();
+        return;
+      }
       if (_lastSecondaryTapDown == null) {
         if (_visibleSelectionBounds() case null) {
           _contextMenuController.remove();
@@ -1076,6 +1152,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (!controller.hitsSelectableContent(global)) {
       return false;
     }
+    if (widget.canStartSelectionAt?.call(global) == false) {
+      return false;
+    }
     final effective = _effectiveConsecutiveTapCount(tapCount);
     _granularity = switch (effective) {
       <= 1 => 1,
@@ -1143,11 +1222,30 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   /// Touch recognizer joins the arena only on selectable text, or while chrome
   /// must still receive taps (active range / toolbar) to dismiss or extend.
   bool _shouldArmTouchSelectionGesture(Offset global) {
+    if (widget.canStartSelectionAt?.call(global) == false) {
+      // Still arm while chrome must receive taps to dismiss/extend.
+      if (controller.selection case final sel? when !sel.isCollapsed) {
+        return true;
+      }
+      return _contextMenuController.isShown;
+    }
     if (controller.hitsSelectableContent(global)) return true;
     if (controller.selection case final sel? when !sel.isCollapsed) {
       return true;
     }
     return _contextMenuController.isShown;
+  }
+
+  bool _shouldArmMouseSelectionGesture(Offset global) {
+    // No host gate → legacy always-join mouse arena (SelectableRegion path).
+    final gate = widget.canStartSelectionAt;
+    if (gate == null) return true;
+    if (!gate(global)) return false;
+    return controller.hitsSelectableContent(global) ||
+        switch (controller.selection) {
+          final sel? when !sel.isCollapsed => true,
+          _ => _contextMenuController.isShown,
+        };
   }
 
   /// With an active range, take horizontal drags eagerly (block dismissible /
@@ -1197,12 +1295,20 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (effective <= 1) {
       // Touch / non-precise: dismiss immediately (no double-tap arena wait).
       // Mouse: collapse to a caret at the click, matching prior desktop UX.
+      // Miss outside selectable surface with an established range: clear
+      // (tdesktop empty Selecting / needTextSelectionClear parity) — do not
+      // leave the old range when beginSelection refuses.
       if (!_isPrecisePointer(d.kind)) {
         hideToolbar();
         clearSelection();
         return;
       }
-      _beginSelection(d.globalPosition, d.consecutiveTapCount);
+      if (!_beginSelection(d.globalPosition, d.consecutiveTapCount)) {
+        if (controller.selection case final sel? when !sel.isCollapsed) {
+          hideToolbar();
+          clearSelection();
+        }
+      }
       return;
     }
 
@@ -1312,7 +1418,11 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   ///
   /// Must not run during layout/build — geometry walks use [localToGlobal].
   void _refreshToolbarForVisibleGeometry() {
-    if (!controller.toolbarWanted) return;
+    if (!widget.enabled || !controller.toolbarWanted) return;
+    if (!_ownsChromeForCurrentSelection) {
+      _contextMenuController.remove();
+      return;
+    }
     final phase = SchedulerBinding.instance.schedulerPhase;
     if (phase == SchedulerPhase.persistentCallbacks ||
         phase == SchedulerPhase.midFrameMicrotasks) {
@@ -1426,10 +1536,13 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     final map = <Type, GestureRecognizerFactory>{
       // Mouse: taps + pan drag. Consecutive-tap counting stays on one
       // recognizer (SelectableRegion mouse path). Double-click / triple-click
-      // word and block selection live here — desktop/mouse only.
-      TapAndPanGestureRecognizer:
-          GestureRecognizerFactoryWithHandlers<TapAndPanGestureRecognizer>(
-        () => TapAndPanGestureRecognizer(
+      // word and block selection live here — desktop/mouse only. Content-
+      // gated so host chrome (links / code headers) can win the arena.
+      _ContentGatedTapAndPanGestureRecognizer:
+          GestureRecognizerFactoryWithHandlers<
+              _ContentGatedTapAndPanGestureRecognizer>(
+        () => _ContentGatedTapAndPanGestureRecognizer(
+          shouldArm: _shouldArmMouseSelectionGesture,
           supportedDevices: const <PointerDeviceKind>{
             PointerDeviceKind.mouse,
           },
@@ -1445,8 +1558,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
       // Secondary-only (any device): right-click opens the context toolbar.
       // Distinct type key so it can coexist with other recognizers in the
       // map.
-      _SecondaryTapGestureRecognizer: GestureRecognizerFactoryWithHandlers<
-          _SecondaryTapGestureRecognizer>(
+      _SecondaryTapGestureRecognizer:
+          GestureRecognizerFactoryWithHandlers<_SecondaryTapGestureRecognizer>(
         () => _SecondaryTapGestureRecognizer(),
         (recognizer) => recognizer
           ..onSecondaryTapDown =
@@ -1464,24 +1577,28 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     // / scrollable page does not steal edge swipes on chrome. With an
     // active selection, eagerly wins horizontal drag (blocks dismissible);
     // otherwise yields to competing [HorizontalDragGestureRecognizer]s.
-    map[_ContentGatedTapAndHorizontalDragGestureRecognizer] =
-        GestureRecognizerFactoryWithHandlers<
-            _ContentGatedTapAndHorizontalDragGestureRecognizer>(
-      () => _ContentGatedTapAndHorizontalDragGestureRecognizer(
-        shouldArm: _shouldArmTouchSelectionGesture,
-        shouldEagerVictoryOnDrag: () => _shouldEagerVictoryOnTouchDrag,
-        supportedDevices: PointerDeviceKind.values
-            .where((d) => d != PointerDeviceKind.mouse)
-            .toSet(),
-      ),
-      (recognizer) => recognizer
-        ..dragStartBehavior = DragStartBehavior.down
-        ..onTapDown = _handleTapDown
-        ..onTapUp = _handleTapUp
-        ..onDragStart = _handleDragStart
-        ..onDragUpdate = _handleDragUpdate
-        ..onDragEnd = ((_) => _onBodyDragEnd()),
-    );
+    // Chat hosts set [enableTouchConsecutiveTaps] false so taps stay with
+    // the viewport while long-press below still owns continuous text entry.
+    if (widget.enableTouchConsecutiveTaps) {
+      map[_ContentGatedTapAndHorizontalDragGestureRecognizer] =
+          GestureRecognizerFactoryWithHandlers<
+              _ContentGatedTapAndHorizontalDragGestureRecognizer>(
+        () => _ContentGatedTapAndHorizontalDragGestureRecognizer(
+          shouldArm: _shouldArmTouchSelectionGesture,
+          shouldEagerVictoryOnDrag: () => _shouldEagerVictoryOnTouchDrag,
+          supportedDevices: PointerDeviceKind.values
+              .where((d) => d != PointerDeviceKind.mouse)
+              .toSet(),
+        ),
+        (recognizer) => recognizer
+          ..dragStartBehavior = DragStartBehavior.down
+          ..onTapDown = _handleTapDown
+          ..onTapUp = _handleTapUp
+          ..onDragStart = _handleDragStart
+          ..onDragUpdate = _handleDragUpdate
+          ..onDragEnd = ((_) => _onBodyDragEnd()),
+      );
+    }
 
     // Touch: long-press selects the word under the finger, then drags
     // extend by word (a plain swipe still scrolls an enclosing list).
@@ -1510,8 +1627,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
           _dragIsHandle = false;
           _autoscrollSession.reset();
           // Android shows handles on press-end; other platforms on start.
-          _deferHandleShow =
-              defaultTargetPlatform == TargetPlatform.android;
+          _deferHandleShow = defaultTargetPlatform == TargetPlatform.android;
           // Match TextField long-press: Android vibrate (LONG_PRESS) via
           // Feedback.forLongPress; iOS heavy-impact. selectionClick alone
           // is CLOCK_TICK and is easy to miss when handles are deferred.
@@ -1652,6 +1768,27 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
 /// secondary-only right-click recognizer in [RawGestureDetector]'s gestures.
 final class _SecondaryTapGestureRecognizer extends TapGestureRecognizer {
   _SecondaryTapGestureRecognizer();
+}
+
+/// Mouse [TapAndPanGestureRecognizer] that skips the arena when the host gate
+/// refuses selection at the pointer (links / code chrome).
+final class _ContentGatedTapAndPanGestureRecognizer
+    extends TapAndPanGestureRecognizer {
+  _ContentGatedTapAndPanGestureRecognizer({
+    required this.shouldArm,
+    super.supportedDevices,
+  });
+
+  /// Return true to track this pointer; false leaves the arena to ancestors.
+  final bool Function(Offset globalPosition) shouldArm;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    if (!shouldArm(event.position)) {
+      return;
+    }
+    super.addAllowedPointer(event);
+  }
 }
 
 /// [TapAndHorizontalDragGestureRecognizer] that skips the arena when the

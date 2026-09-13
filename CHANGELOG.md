@@ -1,5 +1,40 @@
 ## Unreleased
 
+### Glyph-tight hit testing
+- **CHANGED**: Hover I-beam and link hit-testing use rendered **line/glyph
+  boxes**, not the full max-width layout of a paragraph. Empty horizontal
+  gutter beside a short line is no longer I-beam / click-to-open.
+- **CHANGED**: Gesture *starts* (`hitsSelectableContent`) stay **surface-
+  bounds** (press inside the document/bubble arms text selection — tdesktop
+  `PointState::Inside` parity). Drag-extend may still clamp outside glyphs.
+- **CHANGED**: Mouse single-click that misses selectable content while a
+  non-collapsed range is active clears the selection (tdesktop empty
+  Selecting / dismiss parity), instead of leaving the old range.
+- **ADDED**: `SelectableBlockPainter.hitsRenderedTextAt`,
+  `MarkdownSelectionSurface.hitsSelectableGlyphs`, and
+  `MarkdownSelectionController.hitsSelectableGlyphs`.
+
+### Selection host gates
+- **ADDED**: `MarkdownSelectionScope.canStartSelectionAt` — optional host gate
+  so enclosing UIs can refuse selection starts on chrome (links, code headers)
+  without the scope claiming the pointer.
+- **ADDED**: `MarkdownSelectionScope.enableTouchGestures` — when false, touch /
+  stylus / trackpad selection recognizers stay off; mouse multi-click, handles,
+  toolbar, and keyboard remain. Focus loss also does not clear the range (host
+  viewport may steal focus).
+- **ADDED**: `MarkdownSelectionScope.enableTouchConsecutiveTaps` — when false
+  (with `enableTouchGestures` true), touch long-press → word → drag-extend
+  still arms, but touch multi-tap / horizontal-drag selection does not. Chat
+  hosts use this so taps stay with the viewport while continuous text entry
+  works. Focus loss also does not clear the range in that mode.
+- **ADDED**: `MarkdownSelectionScope.ownsSelectionChrome` — optional host gate
+  so only the scope that owns the selection’s document paints handles/toolbar
+  when several scopes share one controller (chat per-body mounts).
+- **CHANGED**: Flipping `enabled` from false → true with an existing
+  non-collapsed range restores handles; when `toolbarWanted` is set, restores
+  the toolbar. While disabled, the scope stays inert for chrome (no toolbar /
+  handles) but keeps `toolbarWanted` for that restore path.
+
 ### Dynamic cursor resolution & span bounding boxes
 - **ADDED**: `MarkdownThemeData.cursorResolver` and
   `MarkdownWidget.cursorResolver` (`MarkdownCursorResolver`) — unopinionated

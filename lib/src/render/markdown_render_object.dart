@@ -144,6 +144,22 @@ class MarkdownRenderObject extends RenderBox
   }
 
   @override
+  bool hitsSelectableGlyphs(Offset globalPosition) {
+    if (_documentId == null) return false;
+    final bounds = globalBounds;
+    if (bounds.isEmpty || !bounds.contains(globalPosition)) return false;
+    return _painter.isSelectableAtLocal(globalToLocal(globalPosition));
+  }
+
+  @override
+  bool isLinkAtGlobal(Offset globalPosition) {
+    if (_documentId == null) return false;
+    final bounds = globalBounds;
+    if (bounds.isEmpty || !bounds.contains(globalPosition)) return false;
+    return _painter.isLinkAtLocal(globalToLocal(globalPosition));
+  }
+
+  @override
   Rect? caretRectFor(MarkdownPosition position, TextAffinity affinity) {
     final id = _documentId;
     if (id == null || position.documentId != id) return null;

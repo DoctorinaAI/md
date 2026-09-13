@@ -143,19 +143,40 @@ exposes the controller to descendant `MarkdownWidget`s via an inherited widget.
 `MarkdownSelectionScopeState` is **public** so a custom toolbar can drive it.
 
 Params: `controller` (required), `child`, `focusNode`, `enabled` (false ⇒ inert
-but still exposes the controller), `selectionColor`, `contextMenuBuilder` (null ⇒
-no toolbar), `magnifierConfiguration`, `selectionControls`, `onSelectionChanged`.
+gestures/handles/toolbar/shortcuts but still exposes the controller; flipping
+back to true with an existing range + `toolbarWanted` restores handles/toolbar),
+`enableTouchGestures` (false ⇒ no touch/stylus/trackpad selection recognizers —
+mouse multi-click, handles, toolbar, and keyboard remain; focus loss also does
+not clear the range so a host viewport can steal focus without dismissing),
+`enableTouchConsecutiveTaps` (false with touch gestures on ⇒ long-press → word
+→ drag-extend only; touch multi-tap / horizontal-drag stay off so an enclosing
+chat viewport keeps taps; focus loss also retains the range),
+`ownsSelectionChrome` (optional host gate: return true only for document ids
+this scope may paint handles/toolbar for — chat per-body mounts share one
+controller and must not each paint a duplicate handle pair),
+`canStartSelectionAt`
+(optional host gate: return false so link/code chrome taps are not claimed by
+the scope), `selectionColor`, `contextMenuBuilder` (null ⇒ no toolbar),
+`magnifierConfiguration`, `selectionControls`, `onSelectionChanged`.
 Statics: `MarkdownSelectionScope.of/maybeOf` (→ controller), `stateOf` (→ state).
 
-- **Gestures:** mouse uses `TapAndPanGestureRecognizer`; touch/stylus/trackpad
-  use a content-gated `TapAndHorizontalDragGestureRecognizer` (SelectableRegion
-  split) so consecutive-tap counting stays on one recognizer with **no**
-  `DoubleTapGestureRecognizer` arena delay — **single** tap dismisses/clears on
-  touch (caret on mouse), **double** selects the word on tap-down and shows
-  chrome on tap-up, **triple** selects the block, `Shift`-click extends, and a
-  drag after a double/triple keeps word/block granularity. The touch recognizer
-  and long-press only join the arena on a selectable hit (or while a non-collapsed
-  selection / toolbar is up). With an active selection, `eagerVictoryOnDrag` is
+- **Gestures:** mouse uses a content-/host-gated `TapAndPanGestureRecognizer`;
+  touch/stylus/trackpad use a content-gated `TapAndHorizontalDragGestureRecognizer`
+  (SelectableRegion split) so consecutive-tap counting stays on one recognizer
+  with **no** `DoubleTapGestureRecognizer` arena delay — **single** tap
+  dismisses/clears on touch (caret on mouse), **double** selects the word on
+  tap-down and shows chrome on tap-up, **triple** selects the block, `Shift`-click
+  extends, and a drag after a double/triple keeps word/block granularity. The
+  touch recognizer and long-press only join the arena on a selectable hit
+  inside a mounted surface’s bounds (`hitsSelectableContent` — tdesktop-style
+  bubble Inside, including padding / empty line gutter; I-beam / link hits stay
+  glyph-tight via `hitsSelectableGlyphs`), or while a non-collapsed selection /
+  toolbar is up, and only when
+  `enableTouchGestures` is true. When `enableTouchConsecutiveTaps` is false,
+  only the long-press recognizer is added. When `canStartSelectionAt` returns false at the
+  pointer, mouse/touch start recognizers skip the arena (except while an active
+  range/toolbar still needs dismiss/extend taps on touch). With an active
+  selection, `eagerVictoryOnDrag` is
   on so horizontal swipes stay with selection (block dismissible); without a
   selection it stays off so edge swipes on chrome reach ancestors. Horizontal
   motion still yields vertical scrolling to ancestor scrollables. A
@@ -244,7 +265,8 @@ Statics: `MarkdownSelectionScope.of/maybeOf` (→ controller), `stateOf` (→ st
   synchronously from that callback (including the drag-time handle sync path)
   runs during `performLayout` and asserts `sizeAccessAllowed`. Secondary-tap
   freeze is cleared when the selection moves. Focus loss while the app is
-  resumed clears the selection.
+  resumed clears the selection — except when `enableTouchGestures` is false,
+  where the host may steal focus while keeping the range alive.
 
 - **`MarkdownSelectionGroup`:** pass the same group to several controllers and at
   most one has an active selection — a new non-collapsed selection clears the

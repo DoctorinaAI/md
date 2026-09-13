@@ -318,10 +318,23 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final tl = tester.getTopLeft(find.byType(MarkdownWidget));
-      final br = tester.getBottomRight(find.byType(MarkdownWidget));
-      await _mouseDrag(
-          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+      final surface = controller.mountedSurfaces.first;
+      final box = surface as RenderBox;
+      final cells = surface.localBoxesForRange(0, 0, 1);
+      expect(cells, isNotEmpty);
+      final from = box.localToGlobal(
+        Offset(cells.first.left + 1, cells.first.center.dy),
+      );
+      final last = surface.localBoxesForRange(
+        0,
+        'A\tB\n1\t2\n3\t'.length,
+        'A\tB\n1\t2\n3\t4'.length,
+      );
+      expect(last, isNotEmpty);
+      final to = box.localToGlobal(
+        Offset(last.first.right - 1, last.first.center.dy),
+      );
+      await _mouseDrag(tester, from, to);
 
       expect(controller.getText(), markdownBlockRenderedText(table));
       expect(controller.getText(), 'A\tB\n1\t2\n3\t4');
@@ -343,10 +356,21 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final tl = tester.getTopLeft(find.byType(MarkdownWidget));
-      final br = tester.getBottomRight(find.byType(MarkdownWidget));
+      final surface = controller.mountedSurfaces.first;
+      final box = surface as RenderBox;
+      final first = surface.localBoxesForRange(0, 0, 5);
+      final last = surface.localBoxesForRange(
+        0,
+        'alpha\nbeta\n'.length,
+        'alpha\nbeta\ngamma'.length,
+      );
+      expect(first, isNotEmpty);
+      expect(last, isNotEmpty);
       await _mouseDrag(
-          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+        tester,
+        box.localToGlobal(Offset(first.first.left + 1, first.first.center.dy)),
+        box.localToGlobal(Offset(last.first.right - 1, last.first.center.dy)),
+      );
 
       expect(controller.getText(), 'alpha\nbeta\ngamma');
       expect(tester.takeException(), isNull);
@@ -369,10 +393,19 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final tl = tester.getTopLeft(find.byType(MarkdownWidget));
-      final br = tester.getBottomRight(find.byType(MarkdownWidget));
+      final surface = controller.mountedSurfaces.first;
+      final box = surface as RenderBox;
+      final intro = surface.localBoxesForRange(0, 0, 5);
+      final outroBlock = md.blocks.length - 1;
+      final outroLen = markdownBlockRenderedText(md.blocks[outroBlock]).length;
+      final outro = surface.localBoxesForRange(outroBlock, 0, outroLen);
+      expect(intro, isNotEmpty);
+      expect(outro, isNotEmpty);
       await _mouseDrag(
-          tester, tl + const Offset(2, 2), br - const Offset(2, 2));
+        tester,
+        box.localToGlobal(Offset(intro.first.left + 1, intro.first.center.dy)),
+        box.localToGlobal(Offset(outro.first.right - 1, outro.first.center.dy)),
+      );
 
       expect(controller.getText(), 'Intro line\nA\tB\n1\t2\nOutro line');
       expect(tester.takeException(), isNull);
@@ -865,6 +898,51 @@ void main() {
           reason: 'a single click collapses the selection');
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'mouse click in empty line gutter clears an existing selection',
+      (tester) async {
+        final model = Markdown.fromString('Hi');
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(id: 'd', model: model),
+          ]);
+        await tester.pumpWidget(_wrap(
+          controller,
+          const Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(width: 400, child: _Doc('d')),
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        final surface = controller.mountedSurfaces.first;
+        final boxes = surface.localBoxesForRange(0, 0, 2);
+        expect(boxes, isNotEmpty);
+        final glyph = boxes.first;
+        final gutterLocal = Offset(glyph.right + 80, glyph.center.dy);
+        final gutterGlobal =
+            (surface as RenderBox).localToGlobal(gutterLocal);
+        expect(controller.hitsSelectableContent(gutterGlobal), isTrue);
+        expect(controller.hitsSelectableGlyphs(gutterGlobal), isFalse);
+
+        // Establish a ranged selection on the glyphs.
+        final glyphGlobal =
+            (surface as RenderBox).localToGlobal(glyph.center);
+        await _clicks(tester, glyphGlobal, 2);
+        expect(controller.getText(), isNotEmpty);
+        expect(controller.selection!.isCollapsed, isFalse);
+
+        // Click empty horizontal gutter — must dismiss (surface Inside).
+        await _clicks(tester, gutterGlobal, 1);
+        expect(
+          controller.getText(),
+          isEmpty,
+          reason: 'gutter click clears like tdesktop empty Selecting',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('touch single tap dismisses an active selection',
         (tester) async {
@@ -2267,6 +2345,65 @@ void main() {
       );
     });
 
+    testWidgets(
+      'gutter past end of short line is not selectable / not I-beam',
+      (tester) async {
+        final model = Markdown.fromString('Hi');
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(id: 'd', model: model),
+          ]);
+        await tester.pumpWidget(_wrap(
+          controller,
+          const Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(width: 400, child: _Doc('d')),
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        final surface = controller.mountedSurfaces.first;
+        final boxes = surface.localBoxesForRange(0, 0, 2);
+        expect(boxes, isNotEmpty);
+        final glyph = boxes.first;
+        // Far to the right of the glyphs, still inside the wide surface.
+        final gutterLocal = Offset(glyph.right + 80, glyph.center.dy);
+        expect(
+          surface.globalBounds.width,
+          greaterThan(glyph.right + 80),
+          reason: 'surface must be wider than the short line',
+        );
+        final gutterGlobal =
+            (surface as RenderBox).localToGlobal(gutterLocal);
+
+        expect(
+          controller.hitsSelectableContent(gutterGlobal),
+          isTrue,
+          reason: 'surface bounds still arm text gestures (tdesktop Inside)',
+        );
+        expect(
+          controller.hitsSelectableGlyphs(gutterGlobal),
+          isFalse,
+          reason: 'empty max-width gutter is not glyph ink',
+        );
+
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+          pointer: 1,
+        );
+        await gesture.addPointer(location: Offset.zero);
+        addTearDown(gesture.removePointer);
+        await gesture.moveTo(gutterGlobal);
+        await tester.pumpAndSettle();
+
+        expect(
+          RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+          isNot(SystemMouseCursors.text),
+          reason: 'I-beam must not cover empty horizontal gutter',
+        );
+      },
+    );
+
     testWidgets('an actionable link shows the click (hand) cursor',
         (tester) async {
       await tester.pumpWidget(MaterialApp(
@@ -2501,6 +2638,272 @@ void main() {
       );
     });
   });
+
+  group('host gates for chat', () {
+    testWidgets(
+      'canStartSelectionAt false refuses mouse selection start',
+      (tester) async {
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(
+              id: 'd',
+              model: Markdown.fromString('Hello selectable world'),
+            ),
+          ]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: MarkdownSelectionScope(
+                controller: controller,
+                canStartSelectionAt: (_) => false,
+                child: const Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(width: 400, child: _Doc('d')),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+        final br = tester.getBottomRight(find.byType(MarkdownWidget));
+        await _mouseDrag(
+          tester,
+          tl + const Offset(1, 3),
+          br - const Offset(1, 3),
+        );
+
+        expect(controller.selection, isNull);
+        expect(controller.getText(), isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'canStartSelectionAt true still allows mouse selection start',
+      (tester) async {
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(
+              id: 'd',
+              model: Markdown.fromString('Hello selectable world'),
+            ),
+          ]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: MarkdownSelectionScope(
+                controller: controller,
+                canStartSelectionAt: (_) => true,
+                child: const Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(width: 400, child: _Doc('d')),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+        await _clicks(tester, tl + const Offset(8, 8), 2);
+
+        expect(controller.getText(), 'Hello');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'enableTouchGestures false: touch multi-tap does not select; '
+      'mouse multi-click still does',
+      (tester) async {
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(
+              id: 'd',
+              model: Markdown.fromString('Hello selectable world'),
+            ),
+          ]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: MarkdownSelectionScope(
+                controller: controller,
+                enableTouchGestures: false,
+                child: const Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(width: 400, child: _Doc('d')),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+        final pos = tl + const Offset(8, 8);
+
+        await tester.tapAt(pos);
+        await tester.pump(const Duration(milliseconds: 40));
+        await tester.tapAt(pos);
+        await tester.pumpAndSettle();
+
+        expect(controller.selection, isNull,
+            reason: 'touch double-tap must not enter text selection');
+        expect(controller.getText(), isEmpty);
+
+        await _clicks(tester, pos, 2);
+        expect(controller.getText(), 'Hello',
+            reason: 'mouse double-click remains desktop entry');
+
+        await tester.pump(const Duration(milliseconds: 600));
+        await _clicks(tester, pos, 3);
+        expect(controller.getText(), 'Hello selectable world',
+            reason: 'mouse triple-click still selects the block');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'enableTouchConsecutiveTaps false: touch multi-tap refuses; '
+      'long-press still selects',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        try {
+          final controller = MarkdownSelectionController()
+            ..setDocuments(<MarkdownDocumentRef>[
+              MarkdownDocumentRef(
+                id: 'd',
+                model: Markdown.fromString('Hello selectable world'),
+              ),
+            ]);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: MarkdownSelectionScope(
+                  controller: controller,
+                  enableTouchGestures: true,
+                  enableTouchConsecutiveTaps: false,
+                  child: const Align(
+                    alignment: Alignment.topLeft,
+                    child: SizedBox(width: 400, child: _Doc('d')),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+          final pos = tl + const Offset(8, 8);
+
+          await tester.tapAt(pos);
+          await tester.pump(const Duration(milliseconds: 40));
+          await tester.tapAt(pos);
+          await tester.pumpAndSettle();
+
+          expect(controller.selection, isNull,
+              reason: 'touch double-tap must not enter when consecutive taps off');
+
+          final gesture = await tester.startGesture(pos);
+          await tester.pump(kLongPressTimeout + kPressTimeout);
+          await tester.pump();
+          await gesture.up();
+          await tester.pumpAndSettle();
+
+          expect(controller.getText(), isNotEmpty,
+              reason: 'touch long-press must still select a word');
+          expect(tester.takeException(), isNull);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+
+    testWidgets(
+      'enabling scope with existing range restores handles and toolbar',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        try {
+          final controller = MarkdownSelectionController()
+            ..setDocuments(<MarkdownDocumentRef>[
+              MarkdownDocumentRef(
+                id: 'd',
+                model: Markdown.fromString('Hello selectable world'),
+              ),
+            ]);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: _ToggleEnabledScope(controller: controller),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          controller.selectAll();
+          await tester.pumpAndSettle();
+          expect(controller.selection, isNotNull);
+          expect(controller.selection!.isCollapsed, isFalse);
+          expect(controller.toolbarWanted, isTrue);
+
+          // Disabled: no handle followers / toolbar chrome.
+          expect(find.byType(CompositedTransformFollower), findsNothing);
+          expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
+
+          final toggle = tester.state<_ToggleEnabledScopeState>(
+            find.byType(_ToggleEnabledScope),
+          );
+          toggle.enable();
+          await tester.pumpAndSettle();
+
+          expect(find.byType(CompositedTransformFollower), findsNWidgets(2),
+              reason: 'handles restore when the scope becomes enabled');
+          final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope),
+          );
+          expect(state.toolbarIsVisible, isTrue,
+              reason: 'toolbar restores when toolbarWanted is set');
+          expect(find.byType(AdaptiveTextSelectionToolbar), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  });
+}
+
+/// Host that flips [MarkdownSelectionScope.enabled] after a range exists.
+class _ToggleEnabledScope extends StatefulWidget {
+  const _ToggleEnabledScope({required this.controller});
+
+  final MarkdownSelectionController controller;
+
+  @override
+  State<_ToggleEnabledScope> createState() => _ToggleEnabledScopeState();
+}
+
+class _ToggleEnabledScopeState extends State<_ToggleEnabledScope> {
+  bool _enabled = false;
+
+  void enable() => setState(() => _enabled = true);
+
+  @override
+  Widget build(BuildContext context) => MarkdownSelectionScope(
+        controller: widget.controller,
+        enabled: _enabled,
+        child: const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 400, child: _Doc('d')),
+        ),
+      );
 }
 
 /// A MarkdownWidget that resolves its controller from the ambient scope.

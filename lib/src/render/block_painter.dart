@@ -81,6 +81,13 @@ abstract interface class SelectableBlockPainter implements BlockPainter {
   /// the block-local [local] point — used to show the click (hand) cursor.
   bool isLinkAtLocal(Offset local);
 
+  /// Whether [local] lies over rendered glyph ink (line boxes), not empty
+  /// layout gutter inside the block's max-width.
+  ///
+  /// Gesture starts and hover I-beam must use this; drag-extend may still map
+  /// nearby points via [positionAndAffinityForLocal].
+  bool hitsRenderedTextAt(Offset local);
+
   /// When true, the selection highlight is also painted *above* the cached
   /// content picture so an opaque block background (e.g. a code fence) does
   /// not hide it. Default text blocks leave this false so glyphs stay on top
@@ -146,7 +153,14 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
 
   @override
   bool isLinkAtLocal(Offset local) =>
+      hitsRenderedTextAt(local) &&
       _spanHasRecognizerAt(selectionPainter, local - selectionOrigin);
+
+  @override
+  bool hitsRenderedTextAt(Offset local) => _painterHitsGlyphBoxes(
+        selectionPainter,
+        local - selectionOrigin,
+      );
 }
 
 /// One selectable text run inside a multi-painter block (a list item or a table
@@ -267,8 +281,26 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
   @override
   bool isLinkAtLocal(Offset local) {
     for (final fragment in fragments) {
+      if (!(fragment.origin & fragment.painter.size).contains(local)) {
+        continue;
+      }
+      final inner = local - fragment.origin;
+      // Prefer glyph-tight link hits inside the fragment layout box.
+      if (_painterHitsGlyphBoxes(fragment.painter, inner) &&
+          _spanHasRecognizerAt(fragment.painter, inner)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @override
+  bool hitsRenderedTextAt(Offset local) {
+    // Lists/tables: each fragment's layout box is the hit target (cell / item
+    // run). Paragraph gutters use glyph boxes via [SelectableTextBlock].
+    for (final fragment in fragments) {
       if ((fragment.origin & fragment.painter.size).contains(local)) {
-        return _spanHasRecognizerAt(fragment.painter, local - fragment.origin);
+        return true;
       }
     }
     return false;
@@ -288,6 +320,20 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
     }
     return best;
   }
+}
+
+/// Whether [local] (text-painter coordinates) lies inside any glyph line box
+/// of [painter]'s full rendered range.
+bool _painterHitsGlyphBoxes(TextPainter painter, Offset local) {
+  final plain = painter.plainText;
+  if (plain.isEmpty) return false;
+  final boxes = painter.getBoxesForSelection(
+    TextSelection(baseOffset: 0, extentOffset: plain.length),
+  );
+  for (final box in boxes) {
+    if (box.toRect().contains(local)) return true;
+  }
+  return false;
 }
 
 /// Whether the span under a text-local [local] point in [painter] carries a tap

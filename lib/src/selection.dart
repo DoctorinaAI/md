@@ -486,6 +486,14 @@ abstract interface class MarkdownSelectionSurface {
   /// Like [positionForGlobal] but also returns soft-wrap [TextAffinity].
   (MarkdownPosition, TextAffinity)? hitForGlobal(Offset globalPosition);
 
+  /// Whether [globalPosition] lies over selectable rendered glyphs on this
+  /// surface (tight line boxes — not empty max-width gutter).
+  bool hitsSelectableGlyphs(Offset globalPosition);
+
+  /// Whether [globalPosition] lies over actionable chrome or a tappable link
+  /// (fenced copy header / bottom bar, or a hyperlink span) on this surface.
+  bool isLinkAtGlobal(Offset globalPosition);
+
   /// Content-local caret rect for [position] with [affinity], or null when this
   /// surface does not own that position / cannot place a caret.
   Rect? caretRectFor(MarkdownPosition position, TextAffinity affinity);
@@ -927,15 +935,39 @@ class MarkdownSelectionController extends ChangeNotifier {
       clampToNearest: !requireContainment,
     );
     if (resolved == null) return null;
-    return resolved.$1.hitForGlobal(resolved.$2);
+    final (surface, point) = resolved;
+    // Strict containment = inside a mounted surface (bubble / document bounds),
+    // matching tdesktop PointState::Inside. Glyph-tight checks stay on
+    // [hitsSelectableGlyphs] for I-beam / link hit-testing only.
+    return surface.hitForGlobal(point);
   }
 
   /// Whether [globalPosition] lies inside a mounted selectable surface's
-  /// bounds (no nearest-neighbor clamp). Used to gate gesture *starts*.
+  /// bounds (no nearest-neighbor clamp). Used to gate gesture *starts* —
+  /// tdesktop parity: press inside the bubble arms text selection even on
+  /// padding / empty line gutter; I-beam stays glyph-tight via
+  /// [hitsSelectableGlyphs] / `isSelectableAtLocal`.
   bool hitsSelectableContent(Offset globalPosition) {
     for (final surface in _surfaces.values) {
       final bounds = surface.globalBounds;
       if (!bounds.isEmpty && bounds.contains(globalPosition)) return true;
+    }
+    return false;
+  }
+
+  /// Whether [globalPosition] lies over rendered glyph ink (tight line boxes).
+  bool hitsSelectableGlyphs(Offset globalPosition) {
+    for (final surface in _surfaces.values) {
+      if (surface.hitsSelectableGlyphs(globalPosition)) return true;
+    }
+    return false;
+  }
+
+  /// Whether [globalPosition] lies over a tappable link or fenced copy chrome
+  /// (desktop header / mobile bottom bar) on any mounted surface.
+  bool isLinkAtGlobal(Offset globalPosition) {
+    for (final surface in _surfaces.values) {
+      if (surface.isLinkAtGlobal(globalPosition)) return true;
     }
     return false;
   }

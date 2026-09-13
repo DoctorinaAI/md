@@ -21,6 +21,21 @@ typedef MarkdownCursorResolver = MouseCursor? Function(
   MD$Block? block,
 );
 
+/// Primary system monospace face for inline/`code` and fenced blocks.
+///
+/// Prefer a real family over the CSS generic `'monospace'`, which Flutter does
+/// not map on most platforms (so spans fall back to the body proportional font).
+const String kMonospaceFontFamily = 'Menlo';
+
+/// Fallbacks after [kMonospaceFontFamily] (Android maps `'monospace'`).
+const List<String> kMonospaceFontFamilyFallback = <String>[
+  'Monaco',
+  'Consolas',
+  'Courier New',
+  'Courier',
+  'monospace',
+];
+
 /// {@template markdown_theme_data}
 /// Theme data for Markdown widgets.
 /// {@endtemplate}
@@ -294,7 +309,14 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
                 TextDecoration.lineThrough,
               _ => null,
             },
-            fontFamily: style.contains(MD$Style.monospace) ? 'monospace' : null,
+            // CSS generic `'monospace'` does not resolve on most Flutter
+            // targets (notably Apple); use a real system stack instead.
+            fontFamily: style.contains(MD$Style.monospace)
+                ? kMonospaceFontFamily
+                : null,
+            fontFamilyFallback: style.contains(MD$Style.monospace)
+                ? kMonospaceFontFamilyFallback
+                : null,
             color: switch (style) {
               var s when s.contains(MD$Style.link) => linkColor,
               _ => null,

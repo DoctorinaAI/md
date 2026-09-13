@@ -299,13 +299,23 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final rect = tester.getRect(find.byType(MarkdownWidget));
-      // Select from the start to the far right of the first visual line so the
-      // end edge lands on a soft-wrap boundary.
+      final surface = controller.mountedSurfaces.first;
+      final box = surface as RenderBox;
+      final text = markdownBlockRenderedText(md.blocks.first);
+      final all = surface.localBoxesForRange(0, 0, text.length);
+      expect(all, isNotEmpty);
+      final lineY = all.first.center.dy;
+      final firstLine =
+          all.where((b) => (b.center.dy - lineY).abs() < 1.0).toList();
+      expect(firstLine, isNotEmpty);
+      final left = firstLine.map((b) => b.left).reduce((a, b) => a < b ? a : b);
+      final right =
+          firstLine.map((b) => b.right).reduce((a, b) => a > b ? a : b);
+      // Select across the first visual line's glyphs (not empty max-width gutter).
       await _mouseDrag(
         tester,
-        rect.topLeft + const Offset(2, 8),
-        rect.topLeft + Offset(rect.width - 4, 8),
+        box.localToGlobal(Offset(left + 2, lineY)),
+        box.localToGlobal(Offset(right - 2, lineY)),
       );
       expect(controller.selection, isNotNull);
       expect(controller.selection!.isCollapsed, isFalse);
@@ -314,7 +324,7 @@ void main() {
       expect(endpoints, isNotNull);
       // Upstream affinity / box geometry must keep the end handle on the
       // first line's right edge, not snapped to x≈0 of the next line.
-      expect(endpoints!.endLocal.left, greaterThan(rect.width / 2));
+      expect(endpoints!.endLocal.left, greaterThan(box.size.width / 2));
       expect(tester.takeException(), isNull);
     });
 
@@ -336,12 +346,21 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        final rect = tester.getRect(find.byType(MarkdownWidget));
+        final surface = controller.mountedSurfaces.first;
+        final box = surface as RenderBox;
+        const text = 'Hello selectable world';
+        final startBoxes =
+            surface.localBoxesForRange(0, text.length - 5, text.length);
+        final endBoxes = surface.localBoxesForRange(0, 0, 5);
+        expect(startBoxes, isNotEmpty);
+        expect(endBoxes, isNotEmpty);
         // Drag right-to-left so base is after extent in reading order.
         await _mouseDrag(
           tester,
-          rect.topLeft + Offset(rect.width - 4, 8),
-          rect.topLeft + const Offset(4, 8),
+          box.localToGlobal(
+            Offset(startBoxes.first.right - 1, startBoxes.first.center.dy),
+          ),
+          box.localToGlobal(endBoxes.first.center),
         );
         expect(controller.selection, isNotNull);
         expect(controller.selection!.isCollapsed, isFalse);

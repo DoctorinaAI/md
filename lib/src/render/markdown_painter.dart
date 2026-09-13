@@ -235,7 +235,8 @@ class MarkdownPainter {
     return (sourceIndex, _markdown.blocks[sourceIndex]);
   }
 
-  /// Whether the content under [local] belongs to a selectable block.
+  /// Whether the content under [local] belongs to selectable **glyph** ink
+  /// (not empty max-width gutter to the right of a short line).
   bool isSelectableAtLocal(Offset local) {
     if (_needsLayout || _isEmpty || _blockPainters.isEmpty) return false;
     if (local.dx < 0 ||
@@ -246,7 +247,10 @@ class MarkdownPainter {
     }
     final idx = _blockIndexForDy(local.dy);
     if (idx < 0 || idx >= _blockPainters.length) return false;
-    return _blockPainters[idx] is SelectableBlockPainter;
+    final painter = _blockPainters[idx];
+    if (painter is! SelectableBlockPainter) return false;
+    final blockLocal = Offset(local.dx, local.dy - _blockOffsets[idx]);
+    return painter.hitsRenderedTextAt(blockLocal);
   }
 
   /// Paints the selection highlight of every selectable block, using [rangeOf]
