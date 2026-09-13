@@ -67,6 +67,7 @@ class MarkdownSelectionScope extends StatefulWidget {
     required this.child,
     this.focusNode,
     this.enabled = true,
+    this.enableTouchGestures = true,
     this.selectionColor,
     this.contextMenuBuilder = defaultContextMenuBuilder,
     this.magnifierConfiguration,
@@ -88,6 +89,15 @@ class MarkdownSelectionScope extends StatefulWidget {
   /// Whether selection gestures, handles and shortcuts are active. When false
   /// the scope is inert (but still exposes the controller to descendants).
   final bool enabled;
+
+  /// Whether touch / stylus / trackpad selection gestures are armed.
+  ///
+  /// Defaults to true. Set to false when an enclosing viewport owns touch
+  /// entry (for example a chat list where double-tap is desktop/mouse-only,
+  /// long-press is message-then-text, and tap must reach code/link chrome).
+  /// Mouse drag / double-click / triple-click, selection handles, magnifier,
+  /// context toolbar, and keyboard shortcuts remain active when [enabled].
+  final bool enableTouchGestures;
 
   /// The selection highlight color. Defaults to the ambient
   /// `DefaultSelectionStyle`/`TextSelectionTheme` color.
@@ -255,6 +265,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   }
 
   void _handleFocusChanged() {
+    // When touch gestures are host-owned, do not clear on focus loss — the
+    // enclosing viewport may steal focus while keeping the range alive.
+    if (!widget.enableTouchGestures) return;
     if (_focusNode.hasFocus) return;
     // Keep the range while a pointer drag is active — list rebuilds during
     // autoscroll can steal focus without an intentional dismiss.
@@ -1409,124 +1422,131 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     _previousSecondaryTapAnchor = d.globalPosition;
   }
 
-  Map<Type, GestureRecognizerFactory> get _gestures =>
-      <Type, GestureRecognizerFactory>{
-        // Mouse: taps + pan drag. Consecutive-tap counting stays on one
-        // recognizer (SelectableRegion mouse path).
-        TapAndPanGestureRecognizer:
-            GestureRecognizerFactoryWithHandlers<TapAndPanGestureRecognizer>(
-          () => TapAndPanGestureRecognizer(
-            supportedDevices: const <PointerDeviceKind>{
-              PointerDeviceKind.mouse,
-            },
-          ),
-          (recognizer) => recognizer
-            ..dragStartBehavior = DragStartBehavior.down
-            ..onTapDown = _handleTapDown
-            ..onTapUp = _handleTapUp
-            ..onDragStart = _handleDragStart
-            ..onDragUpdate = _handleDragUpdate
-            ..onDragEnd = ((_) => _onBodyDragEnd()),
+  Map<Type, GestureRecognizerFactory> get _gestures {
+    final map = <Type, GestureRecognizerFactory>{
+      // Mouse: taps + pan drag. Consecutive-tap counting stays on one
+      // recognizer (SelectableRegion mouse path). Double-click / triple-click
+      // word and block selection live here — desktop/mouse only.
+      TapAndPanGestureRecognizer:
+          GestureRecognizerFactoryWithHandlers<TapAndPanGestureRecognizer>(
+        () => TapAndPanGestureRecognizer(
+          supportedDevices: const <PointerDeviceKind>{
+            PointerDeviceKind.mouse,
+          },
         ),
-        // Touch / stylus / trackpad: consecutive taps + horizontal drag-to-
-        // extend, without a DoubleTapGestureRecognizer arena (no ~300ms
-        // single-tap delay). Only joins the arena on selectable content (or
-        // while a selection/toolbar is active) so wrapping a full dismissible
-        // / scrollable page does not steal edge swipes on chrome. With an
-        // active selection, eagerly wins horizontal drag (blocks dismissible);
-        // otherwise yields to competing [HorizontalDragGestureRecognizer]s.
-        _ContentGatedTapAndHorizontalDragGestureRecognizer:
-            GestureRecognizerFactoryWithHandlers<
-                _ContentGatedTapAndHorizontalDragGestureRecognizer>(
-          () => _ContentGatedTapAndHorizontalDragGestureRecognizer(
-            shouldArm: _shouldArmTouchSelectionGesture,
-            shouldEagerVictoryOnDrag: () => _shouldEagerVictoryOnTouchDrag,
-            supportedDevices: PointerDeviceKind.values
-                .where((d) => d != PointerDeviceKind.mouse)
-                .toSet(),
-          ),
-          (recognizer) => recognizer
-            ..dragStartBehavior = DragStartBehavior.down
-            ..onTapDown = _handleTapDown
-            ..onTapUp = _handleTapUp
-            ..onDragStart = _handleDragStart
-            ..onDragUpdate = _handleDragUpdate
-            ..onDragEnd = ((_) => _onBodyDragEnd()),
-        ),
-        // Secondary-only (any device): right-click opens the context toolbar.
-        // Distinct type key so it can coexist with other recognizers in the
-        // map.
-        _SecondaryTapGestureRecognizer: GestureRecognizerFactoryWithHandlers<
-            _SecondaryTapGestureRecognizer>(
-          () => _SecondaryTapGestureRecognizer(),
-          (recognizer) => recognizer
-            ..onSecondaryTapDown =
-                ((d) => _lastSecondaryTapDown = d.globalPosition)
-            ..onSecondaryTapUp = _handleSecondaryTapUp,
-        ),
-        // Touch: long-press selects the word under the finger, then drags
-        // extend by word (a plain swipe still scrolls an enclosing list).
-        // Content-gated like the tap/drag recognizer so chrome swipes are not
-        // held in the arena when the host wraps a dismissible page.
-        _ContentGatedLongPressGestureRecognizer:
-            GestureRecognizerFactoryWithHandlers<
-                _ContentGatedLongPressGestureRecognizer>(
-          () => _ContentGatedLongPressGestureRecognizer(
-            shouldArm: _shouldArmTouchSelectionGesture,
-            supportedDevices: const <PointerDeviceKind>{
-              PointerDeviceKind.touch,
-              PointerDeviceKind.stylus,
-              PointerDeviceKind.invertedStylus,
-            },
-          ),
-          (recognizer) => recognizer
-            ..onLongPressStart = ((d) {
-              _lastPointerDeviceKind = PointerDeviceKind.touch;
-              // Host may wrap chrome + markdown; only arm on a real text hit.
-              if (!controller.hitsSelectableContent(d.globalPosition)) {
-                return;
-              }
-              _focusNode.requestFocus();
-              hideToolbar();
-              _dragIsHandle = false;
-              _autoscrollSession.reset();
-              // Android shows handles on press-end; other platforms on start.
-              _deferHandleShow =
-                  defaultTargetPlatform == TargetPlatform.android;
-              // Match TextField long-press: Android vibrate (LONG_PRESS) via
-              // Feedback.forLongPress; iOS heavy-impact. selectionClick alone
-              // is CLOCK_TICK and is easy to miss when handles are deferred.
-              Feedback.forLongPress(context);
-              // Arm drag before beginSelection so overlay sync is pointer-sync.
-              _dragGlobal = d.globalPosition;
-              _beginSelection(d.globalPosition, 2);
-              // Magnifier still tracks during the press even when handles wait.
-              _selectionOverlay?.showMagnifier(
-                _magnifierInfo(d.globalPosition, isStart: false),
-              );
-              _driveAutoscroll();
-            })
-            ..onLongPressMoveUpdate = ((d) {
-              if (_dragGlobal == null) return;
-              _updateSelection(d.globalPosition);
-              _selectionOverlay?.updateMagnifier(
-                _magnifierInfo(d.globalPosition, isStart: false),
-              );
-            })
-            ..onLongPressEnd = ((_) {
-              if (_dragGlobal == null && controller.selection == null) {
-                return;
-              }
-              _stopAutoscroll();
-              _selectionOverlay?.hideMagnifier();
-              _deferHandleShow = false;
-              _updateHandlesAndOverlay();
-              if (controller.selection case final sel? when !sel.isCollapsed) {
-                showToolbar();
-              }
-            }),
-        ),
-      };
+        (recognizer) => recognizer
+          ..dragStartBehavior = DragStartBehavior.down
+          ..onTapDown = _handleTapDown
+          ..onTapUp = _handleTapUp
+          ..onDragStart = _handleDragStart
+          ..onDragUpdate = _handleDragUpdate
+          ..onDragEnd = ((_) => _onBodyDragEnd()),
+      ),
+      // Secondary-only (any device): right-click opens the context toolbar.
+      // Distinct type key so it can coexist with other recognizers in the
+      // map.
+      _SecondaryTapGestureRecognizer: GestureRecognizerFactoryWithHandlers<
+          _SecondaryTapGestureRecognizer>(
+        () => _SecondaryTapGestureRecognizer(),
+        (recognizer) => recognizer
+          ..onSecondaryTapDown =
+              ((d) => _lastSecondaryTapDown = d.globalPosition)
+          ..onSecondaryTapUp = _handleSecondaryTapUp,
+      ),
+    };
+
+    if (!widget.enableTouchGestures) return map;
+
+    // Touch / stylus / trackpad: consecutive taps + horizontal drag-to-
+    // extend, without a DoubleTapGestureRecognizer arena (no ~300ms
+    // single-tap delay). Only joins the arena on selectable content (or
+    // while a selection/toolbar is active) so wrapping a full dismissible
+    // / scrollable page does not steal edge swipes on chrome. With an
+    // active selection, eagerly wins horizontal drag (blocks dismissible);
+    // otherwise yields to competing [HorizontalDragGestureRecognizer]s.
+    map[_ContentGatedTapAndHorizontalDragGestureRecognizer] =
+        GestureRecognizerFactoryWithHandlers<
+            _ContentGatedTapAndHorizontalDragGestureRecognizer>(
+      () => _ContentGatedTapAndHorizontalDragGestureRecognizer(
+        shouldArm: _shouldArmTouchSelectionGesture,
+        shouldEagerVictoryOnDrag: () => _shouldEagerVictoryOnTouchDrag,
+        supportedDevices: PointerDeviceKind.values
+            .where((d) => d != PointerDeviceKind.mouse)
+            .toSet(),
+      ),
+      (recognizer) => recognizer
+        ..dragStartBehavior = DragStartBehavior.down
+        ..onTapDown = _handleTapDown
+        ..onTapUp = _handleTapUp
+        ..onDragStart = _handleDragStart
+        ..onDragUpdate = _handleDragUpdate
+        ..onDragEnd = ((_) => _onBodyDragEnd()),
+    );
+
+    // Touch: long-press selects the word under the finger, then drags
+    // extend by word (a plain swipe still scrolls an enclosing list).
+    // Content-gated like the tap/drag recognizer so chrome swipes are not
+    // held in the arena when the host wraps a dismissible page.
+    map[_ContentGatedLongPressGestureRecognizer] =
+        GestureRecognizerFactoryWithHandlers<
+            _ContentGatedLongPressGestureRecognizer>(
+      () => _ContentGatedLongPressGestureRecognizer(
+        shouldArm: _shouldArmTouchSelectionGesture,
+        supportedDevices: const <PointerDeviceKind>{
+          PointerDeviceKind.touch,
+          PointerDeviceKind.stylus,
+          PointerDeviceKind.invertedStylus,
+        },
+      ),
+      (recognizer) => recognizer
+        ..onLongPressStart = ((d) {
+          _lastPointerDeviceKind = PointerDeviceKind.touch;
+          // Host may wrap chrome + markdown; only arm on a real text hit.
+          if (!controller.hitsSelectableContent(d.globalPosition)) {
+            return;
+          }
+          _focusNode.requestFocus();
+          hideToolbar();
+          _dragIsHandle = false;
+          _autoscrollSession.reset();
+          // Android shows handles on press-end; other platforms on start.
+          _deferHandleShow =
+              defaultTargetPlatform == TargetPlatform.android;
+          // Match TextField long-press: Android vibrate (LONG_PRESS) via
+          // Feedback.forLongPress; iOS heavy-impact. selectionClick alone
+          // is CLOCK_TICK and is easy to miss when handles are deferred.
+          Feedback.forLongPress(context);
+          // Arm drag before beginSelection so overlay sync is pointer-sync.
+          _dragGlobal = d.globalPosition;
+          _beginSelection(d.globalPosition, 2);
+          // Magnifier still tracks during the press even when handles wait.
+          _selectionOverlay?.showMagnifier(
+            _magnifierInfo(d.globalPosition, isStart: false),
+          );
+          _driveAutoscroll();
+        })
+        ..onLongPressMoveUpdate = ((d) {
+          if (_dragGlobal == null) return;
+          _updateSelection(d.globalPosition);
+          _selectionOverlay?.updateMagnifier(
+            _magnifierInfo(d.globalPosition, isStart: false),
+          );
+        })
+        ..onLongPressEnd = ((_) {
+          if (_dragGlobal == null && controller.selection == null) {
+            return;
+          }
+          _stopAutoscroll();
+          _selectionOverlay?.hideMagnifier();
+          _deferHandleShow = false;
+          _updateHandlesAndOverlay();
+          if (controller.selection case final sel? when !sel.isCollapsed) {
+            showToolbar();
+          }
+        }),
+    );
+    return map;
+  }
 
   late final Map<Type, Action<Intent>> _actions = <Type, Action<Intent>>{
     CopySelectionTextIntent: CallbackAction<CopySelectionTextIntent>(
