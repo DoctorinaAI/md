@@ -45,6 +45,9 @@ class MarkdownPainter {
   /// Current markdown entity to render.
   Markdown _markdown;
 
+  /// The markdown model currently painted by this painter.
+  Markdown get markdown => _markdown;
+
   /// Current theme for the markdown widget.
   MarkdownThemeData _theme;
 
@@ -61,6 +64,17 @@ class MarkdownPainter {
   /// Source `Markdown.blocks` index for each painter (differs from the painter
   /// index whenever a `blockFilter` drops blocks).
   List<int> _sourceIndices = const <int>[];
+
+  /// Builds a block nested inside a quote / alert body.
+  ///
+  /// Routes through [MarkdownThemeData.builder] like a top-level block does —
+  /// a host that replaces the code painter (a fence with a copy button, say)
+  /// expects the same painter inside `> …` as outside it.
+  static BlockPainter _nestedBlockBuilder(
+    MD$Block block,
+    MarkdownThemeData theme,
+  ) =>
+      theme.builder?.call(block, theme) ?? _defaultBlockBuilder(block, theme);
 
   static BlockPainter _defaultBlockBuilder(
     MD$Block block,
@@ -80,6 +94,13 @@ class MarkdownPainter {
           spans: q.spans,
           indent: q.indent,
           theme: theme,
+          children: [
+            for (final child in q.blocks)
+              _nestedBlockBuilder(
+                child,
+                BlockPainter$Quote.inheritFrom(theme, child),
+              ),
+          ],
         ),
         code: (c) => BlockPainter$Code(
           language: c.language,
@@ -103,6 +124,9 @@ class MarkdownPainter {
           alert: a.alert,
           spans: a.spans,
           theme: theme,
+          children: [
+            for (final child in a.blocks) _nestedBlockBuilder(child, theme),
+          ],
         ),
         spacer: (s) => BlockPainter$Spacer(
           count: s.count,
@@ -154,14 +178,35 @@ class MarkdownPainter {
   /// Maps a content-local [local] offset to `(sourceBlockIndex, offset)`, or
   /// null if the hit block does not support selection.
   (int, int)? positionForLocal(Offset local) {
+    final hit = positionAndAffinityForLocal(local);
+    return hit == null ? null : (hit.$1, hit.$2);
+  }
+
+  /// Like [positionForLocal] but also returns the soft-wrap [TextAffinity].
+  (int, int, TextAffinity)? positionAndAffinityForLocal(Offset local) {
     if (_blockPainters.isEmpty) return null;
     final idx = _blockIndexForDy(local.dy);
     final painter = _blockPainters[idx];
     if (painter is! SelectableBlockPainter) return null;
     final blockLocal = Offset(local.dx, local.dy - _blockOffsets[idx]);
     final len = painter.renderedText.length;
-    final offset = painter.offsetForLocalPosition(blockLocal).clamp(0, len);
-    return (_sourceIndices[idx], offset);
+    final (offset, affinity) = painter.positionAndAffinityForLocal(blockLocal);
+    return (_sourceIndices[idx], offset.clamp(0, len), affinity);
+  }
+
+  /// Block-local caret rect for a source block [sourceIndex] at [offset] with
+  /// [affinity], shifted into content-local coordinates. Null when the block
+  /// is not painted or not selectable.
+  Rect? caretRectFor(int sourceIndex, int offset, TextAffinity affinity) {
+    for (var i = 0; i < _blockPainters.length; i++) {
+      if (_sourceIndices[i] != sourceIndex) continue;
+      final painter = _blockPainters[i];
+      if (painter is! SelectableBlockPainter) return null;
+      return painter
+          .caretRectFor(offset, affinity)
+          .shift(Offset(0, _blockOffsets[i]));
+    }
+    return null;
   }
 
   /// Maps a content-local [local] point to the word range at it, as
@@ -194,16 +239,60 @@ class MarkdownPainter {
     return painter.isLinkAtLocal(blockLocal);
   }
 
+  /// Resolves the source block index and [MD$Block] at [local], or `null` if
+  /// the point lies outside any painted block.
+  (int, MD$Block)? blockAtLocal(Offset local) {
+    if (_needsLayout || _isEmpty || _blockPainters.isEmpty) return null;
+    if (local.dx < 0 ||
+        local.dx >= _size.width ||
+        local.dy < 0 ||
+        local.dy >= _size.height) {
+      return null;
+    }
+    final idx = _blockIndexForDy(local.dy);
+    if (idx < 0 || idx >= _blockPainters.length) return null;
+    final sourceIndex = _sourceIndices[idx];
+    if (sourceIndex < 0 || sourceIndex >= _markdown.blocks.length) return null;
+    return (sourceIndex, _markdown.blocks[sourceIndex]);
+  }
+
+  /// Whether the content under [local] belongs to selectable **glyph** ink
+  /// (not empty max-width gutter to the right of a short line).
+  bool isSelectableAtLocal(Offset local) {
+    if (_needsLayout || _isEmpty || _blockPainters.isEmpty) return false;
+    if (local.dx < 0 ||
+        local.dx >= _size.width ||
+        local.dy < 0 ||
+        local.dy >= _size.height) {
+      return false;
+    }
+    final idx = _blockIndexForDy(local.dy);
+    if (idx < 0 || idx >= _blockPainters.length) return false;
+    final painter = _blockPainters[idx];
+    if (painter is! SelectableBlockPainter) return false;
+    final blockLocal = Offset(local.dx, local.dy - _blockOffsets[idx]);
+    return painter.hitsRenderedTextAt(blockLocal);
+  }
+
   /// Paints the selection highlight of every selectable block, using [rangeOf]
   /// to look up the selected rendered range for a source block index.
+  ///
+  /// When [aboveCachedContentOnly] is true, only blocks that report
+  /// [SelectableBlockPainter.selectionHighlightAboveCachedContent] are painted
+  /// (opaque chrome that would hide an under-content highlight).
   void paintHighlight(
     Canvas canvas,
     TextRange? Function(int sourceIndex) rangeOf,
-    Paint paint,
-  ) {
+    Paint paint, {
+    bool aboveCachedContentOnly = false,
+  }) {
     for (var i = 0; i < _blockPainters.length; i++) {
       final painter = _blockPainters[i];
       if (painter is! SelectableBlockPainter) continue;
+      if (aboveCachedContentOnly !=
+          painter.selectionHighlightAboveCachedContent) {
+        continue;
+      }
       final range = rangeOf(_sourceIndices[i]);
       if (range == null || range.start >= range.end) continue;
       final top = _blockOffsets[i];
@@ -229,6 +318,40 @@ class MarkdownPainter {
       }
     }
     return out;
+  }
+
+  /// Content-local rectangles covering the rendered text range
+  /// `[startOffset, endOffset]` within the block at [blockIndex] (a source
+  /// index in [Markdown.blocks]).
+  ///
+  /// Queries the cached block painter directly without re-layout, shifting
+  /// rects by the block's vertical offset. Returns an empty list when the
+  /// block is not painted, not selectable, or if `startOffset >= endOffset`.
+  List<Rect> localBoxesForRange(
+    int blockIndex,
+    int startOffset,
+    int endOffset,
+  ) {
+    if (_needsLayout || _isEmpty || _blockPainters.isEmpty) {
+      return const <Rect>[];
+    }
+    if (startOffset >= endOffset) return const <Rect>[];
+    for (var i = 0; i < _blockPainters.length; i++) {
+      if (_sourceIndices[i] != blockIndex) continue;
+      final painter = _blockPainters[i];
+      if (painter is! SelectableBlockPainter) return const <Rect>[];
+      final len = painter.renderedText.length;
+      final start = startOffset.clamp(0, len);
+      final end = endOffset.clamp(0, len);
+      if (start >= end) return const <Rect>[];
+      final top = _blockOffsets[i];
+      final boxes = painter.boxesForRange(start, end);
+      if (boxes.isEmpty) return const <Rect>[];
+      return <Rect>[
+        for (final rect in boxes) rect.shift(Offset(0, top)),
+      ];
+    }
+    return const <Rect>[];
   }
 
   /// Update the painter with new values.

@@ -16,6 +16,8 @@ class HighlightTab extends StatefulWidget {
 }
 
 class _HighlightTabState extends State<HighlightTab> {
+  late final MarkdownSelectionController _controller =
+      MarkdownSelectionController();
   // Built once; the whole registry is shared between both theme variants.
   final SyntaxHighlighter _dark = MarkdownHighlighter(
     languages: allHighlightLanguages,
@@ -31,8 +33,17 @@ class _HighlightTabState extends State<HighlightTab> {
   final ScrollController _scrollController = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    _controller.setDocuments(<MarkdownDocumentRef>[
+      MarkdownDocumentRef(id: 'main', model: _doc),
+    ]);
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -49,7 +60,14 @@ class _HighlightTabState extends State<HighlightTab> {
       child: SingleChildScrollView(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
-        child: MarkdownWidget(markdown: _doc, theme: theme),
+        child: MarkdownSelectionScope(
+          controller: _controller,
+          child: MarkdownWidget(
+            markdown: _doc,
+            documentId: 'main',
+            theme: theme,
+          ),
+        ),
       ),
     );
   }

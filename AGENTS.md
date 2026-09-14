@@ -95,6 +95,10 @@ Public API is the barrel `lib/flutter_md.dart` (`export … show …`). See
   offsets (highlight stays right, copied text drifts). Avoid with selection on.
 - `MarkdownSelectionController.selectionColor` setter repaints surfaces directly
   and must **not** `notifyListeners` (it's applied during build → would `setState`).
+- `removeDocument` while a surface is mounted is deferred until `detachSurface`;
+  `putDocument` cancels a pending remove. Unregistered selection endpoints must
+  not paint via `-1` ordering — `rangeFor` returns null. Supply unique `order`
+  values for co-hosted bodies.
 - Alert **title** is not selectable (body only). Keyboard word/line extension is
   block-approximate. `MarkdownSelectedBlock.sourceRange` is currently always null.
 - `__x__` = **underline**, not bold. Soft line breaks are preserved inside

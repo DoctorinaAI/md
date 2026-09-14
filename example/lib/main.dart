@@ -10,11 +10,14 @@ import 'tabs/highlight_tab.dart';
 import 'tabs/lorem_tab.dart';
 
 void main() => runZonedGuarded<void>(
-      () => runApp(ThemeModel(
-          notifier: ValueNotifier<ThemeMode>(ThemeMode.dark),
-          child: const App())),
-      (e, s) => print(e),
-    );
+  () => runApp(
+    ThemeModel(
+      notifier: ValueNotifier<ThemeMode>(ThemeMode.dark),
+      child: const App(),
+    ),
+  ),
+  (e, s) => print(e),
+);
 
 /// {@template app}
 /// App widget.
@@ -25,32 +28,32 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Markdown',
-        themeMode: ThemeModel.of(context).value,
-        theme: ThemeData.light(),
-        darkTheme: ThemeData.dark(),
-        home: const HomeScreen(),
-        builder: (context, child) => MarkdownTheme(
-          data: MarkdownThemeData.mergeTheme(
-            Theme.of(context),
-            // Exclude images from the markdown rendering,
-            // so they are not rendered in the output.
-            // Because image spans are not supported yet.
-            spanFilter: (span) => !span.style.contains(MD$Style.image),
-            onLinkTap: (title, url) {
-              ScaffoldMessenger.maybeOf(context)
-                ?..clearSnackBars()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text('Link "$title" tapped: $url'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-            },
-          ),
-          child: child!,
-        ),
-      );
+    title: 'Markdown',
+    themeMode: ThemeModel.of(context).value,
+    theme: ThemeData.light(),
+    darkTheme: ThemeData.dark(),
+    home: const HomeScreen(),
+    builder: (context, child) => MarkdownTheme(
+      data: MarkdownThemeData.mergeTheme(
+        Theme.of(context),
+        // Exclude images from the markdown rendering,
+        // so they are not rendered in the output.
+        // Because image spans are not supported yet.
+        spanFilter: (span) => !span.style.contains(MD$Style.image),
+        onLinkTap: (title, url) {
+          ScaffoldMessenger.maybeOf(context)
+            ?..clearSnackBars()
+            ..showSnackBar(
+              SnackBar(
+                content: Text('Link "$title" tapped: $url'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+        },
+      ),
+      child: child!,
+    ),
+  );
 }
 
 /// {@template theme_model}
@@ -63,28 +66,32 @@ class ThemeModel extends InheritedNotifier<ValueNotifier<ThemeMode>> {
   /// The state from the closest instance of this class
   /// that encloses the given context, if any.
   /// e.g. `Theme.maybeOf(context)`.
-  static ValueNotifier<ThemeMode>? maybeOf(BuildContext context,
-          {bool listen = true}) =>
-      listen
-          ? context.dependOnInheritedWidgetOfExactType<ThemeModel>()?.notifier
-          : context.getInheritedWidgetOfExactType<ThemeModel>()?.notifier;
+  static ValueNotifier<ThemeMode>? maybeOf(
+    BuildContext context, {
+    bool listen = true,
+  }) => listen
+      ? context.dependOnInheritedWidgetOfExactType<ThemeModel>()?.notifier
+      : context.getInheritedWidgetOfExactType<ThemeModel>()?.notifier;
 
   static Never _notFoundInheritedWidgetOfExactType() => throw ArgumentError(
-        'Out of scope, not found inherited widget '
-            'a ThemeModel of the exact type',
-        'out_of_scope',
-      );
+    'Out of scope, not found inherited widget '
+        'a ThemeModel of the exact type',
+    'out_of_scope',
+  );
 
   /// The state from the closest instance of this class
   /// that encloses the given context.
   /// e.g. `Theme.of(context)`
-  static ValueNotifier<ThemeMode> of(BuildContext context,
-          {bool listen = true}) =>
+  static ValueNotifier<ThemeMode> of(
+    BuildContext context, {
+    bool listen = true,
+  }) =>
       maybeOf(context, listen: listen) ?? _notFoundInheritedWidgetOfExactType();
 
   @override
   bool updateShouldNotify(
-      covariant InheritedNotifier<ValueNotifier<ThemeMode>> oldWidget) {
+    covariant InheritedNotifier<ValueNotifier<ThemeMode>> oldWidget,
+  ) {
     return !identical(notifier, oldWidget.notifier);
   }
 }
@@ -115,40 +122,41 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          centerTitle: true,
-          title: const Text('Markdown'),
-          actions: <Widget>[
-            Switch.adaptive(
-              value: ThemeModel.of(context).value == ThemeMode.dark,
-              onChanged: (value) {
-                ThemeModel.of(context).value =
-                    value ? ThemeMode.dark : ThemeMode.light;
-              },
-            ),
-          ],
-          bottom: TabBar(
-            controller: _tabs,
-            tabs: const <Widget>[
-              Tab(text: 'Editor', icon: Icon(Icons.edit)),
-              Tab(text: 'Selection', icon: Icon(Icons.text_fields)),
-              Tab(text: 'Chat', icon: Icon(Icons.chat_bubble_outline)),
-              Tab(text: 'Highlight', icon: Icon(Icons.code)),
-            ],
-          ),
+    appBar: AppBar(
+      centerTitle: true,
+      title: const Text('Markdown'),
+      actions: <Widget>[
+        Switch.adaptive(
+          value: ThemeModel.of(context).value == ThemeMode.dark,
+          onChanged: (value) {
+            ThemeModel.of(context).value = value
+                ? ThemeMode.dark
+                : ThemeMode.light;
+          },
         ),
-        body: SafeArea(
-          child: TabBarView(
-            controller: _tabs,
-            children: const <Widget>[
-              EditorTab(),
-              LoremTab(),
-              ChatTab(),
-              HighlightTab(),
-            ],
-          ),
-        ),
-      );
+      ],
+      bottom: TabBar(
+        controller: _tabs,
+        tabs: const <Widget>[
+          Tab(text: 'Editor', icon: Icon(Icons.edit)),
+          Tab(text: 'Selection', icon: Icon(Icons.text_fields)),
+          Tab(text: 'Chat', icon: Icon(Icons.chat_bubble_outline)),
+          Tab(text: 'Highlight', icon: Icon(Icons.code)),
+        ],
+      ),
+    ),
+    body: SafeArea(
+      child: TabBarView(
+        controller: _tabs,
+        children: const <Widget>[
+          EditorTab(),
+          LoremTab(),
+          ChatTab(),
+          HighlightTab(),
+        ],
+      ),
+    ),
+  );
 }
 
 /// {@template editor_tab}
@@ -165,18 +173,22 @@ class EditorTab extends StatefulWidget {
 /// State for widget EditorTab.
 class _EditorTabState extends State<EditorTab> {
   final MultiChildLayoutDelegate _layoutDelegate = _HomeScreenLayoutDelegate();
-  final TextEditingController _inputController =
-      TextEditingController(text: _markdownExample);
-  final ValueNotifier<Markdown> _outputController =
-      ValueNotifier<Markdown>(const Markdown.empty());
+  final TextEditingController _inputController = TextEditingController(
+    text: _markdownExample,
+  );
+  final ValueNotifier<Markdown> _outputController = ValueNotifier<Markdown>(
+    const Markdown.empty(),
+  );
 
   @override
   void initState() {
     super.initState();
     // `inlineMath` is opt-in (disabled by default); enabled here to showcase
     // the `$...$` LaTeX conversion.
-    final initialMarkdown =
-        Markdown.fromString(_inputController.text, inlineMath: true);
+    final initialMarkdown = Markdown.fromString(
+      _inputController.text,
+      inlineMath: true,
+    );
     _outputController.value = initialMarkdown;
     _inputController.addListener(_onInputChanged);
   }
@@ -203,84 +215,82 @@ class _EditorTabState extends State<EditorTab> {
 
   @override
   Widget build(BuildContext context) => CustomMultiChildLayout(
-        delegate: _layoutDelegate,
-        children: <Widget>[
-          LayoutId(
-            id: 0,
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: <Widget>[
-                    Positioned.fill(
-                      child: TextField(
-                        controller: _inputController,
-                        expands: true,
-                        maxLines: null,
-                        minLines: null,
-                        keyboardType: TextInputType.multiline,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: '____________________________________\n'
-                              '______________________________\n'
-                              '__________________________\n'
-                              '______________________________\n'
-                              '____________________________________\n'
-                              '________________________\n'
-                              '________________________________________\n'
-                              '______________________________\n'
-                              '________________________\n'
-                              '__________________________________________\n'
-                              '______________________________\n',
-                        ),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 12.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.max,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            IconButton.filledTonal(
-                              icon: const Icon(
-                                Icons.refresh,
-                              ),
-                              onPressed: () =>
-                                  _inputController.text = _markdownExample,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          LayoutId(
-            id: 1,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Card(
-                child: SingleChildScrollView(
-                  primary: false,
-                  padding: const EdgeInsets.all(8.0),
-                  child: ValueListenableBuilder(
-                    valueListenable: _outputController,
-                    builder: (context, value, child) => MarkdownWidget(
-                      markdown: value,
+    delegate: _layoutDelegate,
+    children: <Widget>[
+      LayoutId(
+        id: 0,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                Positioned.fill(
+                  child: TextField(
+                    controller: _inputController,
+                    expands: true,
+                    maxLines: null,
+                    minLines: null,
+                    keyboardType: TextInputType.multiline,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText:
+                          '____________________________________\n'
+                          '______________________________\n'
+                          '__________________________\n'
+                          '______________________________\n'
+                          '____________________________________\n'
+                          '________________________\n'
+                          '________________________________________\n'
+                          '______________________________\n'
+                          '________________________\n'
+                          '__________________________________________\n'
+                          '______________________________\n',
                     ),
                   ),
                 ),
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.max,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        IconButton.filledTonal(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: () =>
+                              _inputController.text = _markdownExample,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      LayoutId(
+        id: 1,
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Card(
+            child: SingleChildScrollView(
+              primary: false,
+              padding: const EdgeInsets.all(8.0),
+              child: ValueListenableBuilder(
+                valueListenable: _outputController,
+                builder: (context, value, child) =>
+                    MarkdownWidget(markdown: value),
               ),
             ),
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 }
 
 class _HomeScreenLayoutDelegate extends MultiChildLayoutDelegate {
@@ -290,16 +300,20 @@ class _HomeScreenLayoutDelegate extends MultiChildLayoutDelegate {
   void performLayout(Size size) {
     if (size.width >= size.height) {
       final width = size.width / 2;
-      final constraints =
-          BoxConstraints.tightFor(width: width, height: size.height);
+      final constraints = BoxConstraints.tightFor(
+        width: width,
+        height: size.height,
+      );
       layoutChild(0, constraints);
       layoutChild(1, constraints);
       positionChild(0, Offset.zero);
       positionChild(1, Offset(width, 0));
     } else {
       final height = size.height / 2;
-      final constraints =
-          BoxConstraints.tightFor(width: size.width, height: height);
+      final constraints = BoxConstraints.tightFor(
+        width: size.width,
+        height: height,
+      );
       layoutChild(0, constraints);
       layoutChild(1, constraints);
       positionChild(0, Offset.zero);

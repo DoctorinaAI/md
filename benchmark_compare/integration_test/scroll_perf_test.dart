@@ -35,8 +35,7 @@ final Map<String, StyledFactory> _libraries = styledLibraries;
 // and has no structural chrome, so any raster difference on it is due purely to
 // the rendering model (single cached ui.Picture vs a widget tree), not layout
 // density or code/table/list chrome.
-const String _feedMode =
-    String.fromEnvironment('FEED', defaultValue: 'mixed');
+const String _feedMode = String.fromEnvironment('FEED', defaultValue: 'mixed');
 
 /// A realistic chat feed: representative documents, cycled. Excludes the huge
 /// `complex_large` tier so many messages fit in a scrollable list.

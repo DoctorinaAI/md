@@ -42,9 +42,10 @@ defaults), lays them out top-to-bottom recording each block's top-`y` in
 For selection, the same widget opts in when given a `documentId` **and** a
 resolvable `MarkdownSelectionController` (explicit or via an ambient
 `MarkdownSelectionScope`). The render object then registers itself with the
-controller as a `MarkdownSelectionSurface` and paints the selection highlight
-(looked up from the controller) on top of the glyphs, so it stays visible over
-opaque backgrounds. See [selection](selection.md).
+controller as a `MarkdownSelectionSurface`, heals the document into the registry
+on attach, and paints the selection highlight (looked up from the controller) on
+top of the glyphs, so it stays visible over opaque backgrounds. Registry remove
+is deferred while a surface is still mounted. See [selection](selection.md).
 
 ## Why the model is immutable and selection anchors to it
 

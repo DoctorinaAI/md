@@ -141,6 +141,16 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// blockquote line, matching the historical trim behavior.
   static String _stripQuoteMarker(String line) => line.substring(1).trim();
 
+  /// Whether any line opens (or closes) a fenced code block (` ``` ` / `~~~`).
+  /// Used to decide when a quote/alert body must be re-parsed as nested blocks
+  /// instead of being fed to [_parseInlineSpans].
+  static bool _linesContainFence(Iterable<String> lines) {
+    for (final line in lines) {
+      if (line.startsWith('```') || line.startsWith('~~~')) return true;
+    }
+    return false;
+  }
+
   /// Parses the per-column alignment from a table delimiter row such as
   /// `| :--- | :--: | ---: |`. Returns `null` when [line] is not a valid
   /// delimiter row (which is also used to reject malformed tables).
@@ -268,21 +278,47 @@ class MarkdownDecoder extends Converter<String, Markdown> {
             : null;
         if (alertType != null) {
           // The alert body is everything after the marker line.
-          final body = quoteLines.skip(1).join('\n').trim();
-          pushBlock(MD$Alert(
-            alert: alertType,
-            text: body,
-            spans: _parseInlineSpans(body, math: math),
-          ));
+          final bodyLines = quoteLines.skip(1).toList(growable: false);
+          final body = bodyLines.join('\n').trim();
+          // Fenced code inside alerts must be nested blocks — feeding the
+          // body to [_parseInlineSpans] pairs fence backticks as monospace.
+          if (_linesContainFence(bodyLines)) {
+            final nested = convert(body).blocks;
+            pushBlock(MD$Alert(
+              alert: alertType,
+              text: body,
+              spans: const <MD$Span>[],
+              blocks: nested,
+            ));
+          } else {
+            pushBlock(MD$Alert(
+              alert: alertType,
+              text: body,
+              spans: _parseInlineSpans(body, math: math),
+            ));
+          }
         } else {
           final text = quoteLines.join('\n');
           // TODO(plugfox): Implement indentation for quotes
           // Mike Matiunin <plugfox@gmail.com>, 16 June 2025
-          pushBlock(MD$Quote(
-            indent: 1, // Indentation level for quotes
-            text: text,
-            spans: _parseInlineSpans(text, math: math),
-          ));
+          // CommonMark/GFM: strip `>` then re-parse the body as blocks so a
+          // fenced code block inside a quote stays a code block — not inline
+          // ``monospace`` from backtick pairing in [_parseInlineSpans].
+          if (_linesContainFence(quoteLines)) {
+            final nested = convert(text).blocks;
+            pushBlock(MD$Quote(
+              indent: 1,
+              text: text,
+              spans: const <MD$Span>[],
+              blocks: nested,
+            ));
+          } else {
+            pushBlock(MD$Quote(
+              indent: 1, // Indentation level for quotes
+              text: text,
+              spans: _parseInlineSpans(text, math: math),
+            ));
+          }
         }
         if (i + count == length) break; // Last line is quote/alert
         i = j - 1; // Skip the consumed lines

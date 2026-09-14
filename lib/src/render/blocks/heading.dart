@@ -24,7 +24,9 @@ class BlockPainter$Heading
     required int level,
     required List<MD$Span> spans,
     required this.theme,
-  }) : painter = TextPainter(
+  })  : _selectionHighlightAboveCachedContent =
+            markdownSpansPaintOpaqueBackground(spans),
+        painter = TextPainter(
           text: paragraphFromMarkdownSpans(
             spans: spans,
             theme: theme,
@@ -34,6 +36,11 @@ class BlockPainter$Heading
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
         );
+
+  @override
+  bool get selectionHighlightAboveCachedContent =>
+      _selectionHighlightAboveCachedContent;
+  final bool _selectionHighlightAboveCachedContent;
 
   /// The theme used to style the heading.
   final MarkdownThemeData theme;

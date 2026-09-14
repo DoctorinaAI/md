@@ -23,6 +23,20 @@ TapGestureRecognizer? _buildTapRecognizer(
   return null;
 }
 
+/// Whether any of [spans] paints an opaque / translucent fill behind glyphs
+/// (`monospace` / `highlight` backgrounds from [MarkdownThemeData]). Used to
+/// decide whether the selection tint must paint *above* the cached content
+/// picture so those fills do not hide it.
+bool markdownSpansPaintOpaqueBackground(Iterable<MD$Span> spans) {
+  for (final span in spans) {
+    if (span.style.contains(MD$Style.monospace) ||
+        span.style.contains(MD$Style.highlight)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Helper function to create a [TextSpan] from markdown spans.
 /// This function filters the spans based on the theme's span filter,
 /// and applies the appropriate text style to each span.

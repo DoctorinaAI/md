@@ -17,6 +17,11 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
   @override
   Offset get selectionOrigin => const Offset(padding, padding);
 
+  /// Opaque fence chrome sits in the content [Picture]; highlight must paint
+  /// above that picture or it disappears under the fill.
+  @override
+  bool get selectionHighlightAboveCachedContent => true;
+
   /// Creates a code-block painter for [text] in [language], styled by [theme].
   BlockPainter$Code({
     required String text,

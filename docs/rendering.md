@@ -79,6 +79,7 @@ use `size.width` for full-width backgrounds/rules and to bail when too narrow).
 String get renderedText;                    // MUST equal markdownBlockRenderedText(block)
 int offsetForLocalPosition(Offset local);   // block-local → rendered-text index
 List<Rect> boxesForRange(int start, int end);// block-local highlight rects for [start, end)
+bool get selectionHighlightAboveCachedContent; // true ⇒ also paint highlight above Picture
 ```
 
 Two mixins implement it for you:
@@ -189,6 +190,10 @@ Render-override hooks:
   dropping text-bearing spans shifts the painter's offset space vs the model, so
   the highlight stays right but copied text can misalign. Avoid dropping
   text-bearing spans when selection is enabled.**
+- **`cursorResolver`** `MouseCursor? Function(Offset, int?, MD$Block?)` —
+  dynamically resolves hover mouse cursors per local offset, hit block index,
+  and hit block model, falling back to default link/text/defer cursors when null.
+  Can also be supplied directly to `MarkdownWidget.cursorResolver`.
 
 Styling: `textStyle`, per-level `h1Style..h6Style` (+ cached `headingStyleFor`),
 `textStyleFor(MD$Style)` (cached mapping of the bitmask → bold/italic/underline/
@@ -211,12 +216,17 @@ $Spacer`). Internal (`@meta.internal`, only via `src/render.dart`):
 
 - Glyphs cached in a `ui.Picture` keyed by size; reused on repaint; nulled only on
   `update`/`invalidateLayout`.
-- **Selection highlight is painted outside that cache, on top of the glyphs**
-  (`MarkdownRenderObject.paint` calls `_painter.paint(...)` then
-  `_painter.paintHighlight(...)`), so drags/streaming never rebuild the glyph
-  cache, and a translucent highlight stays visible over opaque block/inline
-  backgrounds (code fences, `inline code`, `==mark==`). Color =
-  `controller.selectionColor ?? _kSelectionColor` (`0x552196F3`).
-- `isRepaintBoundary => controller != null`; `alwaysNeedsCompositing => false`.
-- Handle `LeaderLayer`s are pushed in `paint` (only when a scope supplied
-  start/end `LayerLink` + local offset) so native handles follow scrolling content.
+- **Selection highlight is painted outside the glyph [Picture] cache**, in two
+  passes matching `SelectableRegion` / `SelectionArea`: first **under** the
+  content picture (sharp text — no washed-out overlay), then **above** only for
+  blocks that paint opaque chrome (`selectionHighlightAboveCachedContent`, e.g.
+  code fences, table zebra rows, and blocks whose spans use monospace/highlight
+  backgrounds) so the tint stays visible there. Drags/streaming never rebuild
+  the glyph cache. Color = `controller.selectionColor ?? _kSelectionColor`
+  (`0x552196F3`).
+- `isRepaintBoundary => controller != null`; `alwaysNeedsCompositing` when the
+  surface owns a start and/or end handle `LeaderLayer`.
+- Handle `LeaderLayer`s are pushed in `paint` via `LayerHandle` (only when a
+  scope supplied start/end `LayerLink` + local offset) so native handles follow
+  scrolling content. Links clear on detach so remount / virtualization cannot
+  leave ghost leaders.

@@ -56,9 +56,9 @@ class _ChatTabState extends State<ChatTab> {
   }
 
   List<MarkdownDocumentRef> _refs() => <MarkdownDocumentRef>[
-        for (final (i, m) in _messages.indexed)
-          MarkdownDocumentRef(id: m.id, model: m.markdown, order: i),
-      ];
+    for (final (i, m) in _messages.indexed)
+      MarkdownDocumentRef(id: m.id, model: m.markdown, order: i),
+  ];
 
   Future<void> _copy() async {
     final text = _controller.getText();
@@ -88,11 +88,16 @@ class _ChatTabState extends State<ChatTab> {
     _streamCursor = 0;
     _streamParser.reset();
     setState(() => _messages.add(_Msg(id, false, const Markdown.empty())));
-    _controller.putDocument(id, const Markdown.empty(),
-        order: _messages.length - 1);
+    _controller.putDocument(
+      id,
+      const Markdown.empty(),
+      order: _messages.length - 1,
+    );
     _scrollToBottom();
-    _streamTimer =
-        Timer.periodic(const Duration(milliseconds: 55), (_) => _tick(id));
+    _streamTimer = Timer.periodic(
+      const Duration(milliseconds: 55),
+      (_) => _tick(id),
+    );
   }
 
   void _tick(String id) {
@@ -149,29 +154,28 @@ class _ChatTabState extends State<ChatTab> {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: <Widget>[
-          Expanded(
-            child: MarkdownSelectionScope(
-              controller: _controller,
-              child: ListView.builder(
-                controller: _scroll,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                itemCount: _messages.length,
-                itemBuilder: (context, i) => _Bubble(message: _messages[i]),
-              ),
-            ),
+    children: <Widget>[
+      Expanded(
+        child: MarkdownSelectionScope(
+          controller: _controller,
+          child: ListView.builder(
+            controller: _scroll,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            itemCount: _messages.length,
+            itemBuilder: (context, i) => _Bubble(message: _messages[i]),
           ),
-          _SelectionBar(
-            controller: _controller,
-            isStreaming: _isStreaming,
-            onCopy: _copy,
-            onSelectAll: _controller.selectAll,
-            onClear: _controller.clear,
-            onStream: _toggleStream,
-          ),
-        ],
-      );
+        ),
+      ),
+      _SelectionBar(
+        controller: _controller,
+        isStreaming: _isStreaming,
+        onCopy: _copy,
+        onSelectAll: _controller.selectAll,
+        onClear: _controller.clear,
+        onStream: _toggleStream,
+      ),
+    ],
+  );
 }
 
 class _SelectionBar extends StatelessWidget {
@@ -193,55 +197,55 @@ class _SelectionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        elevation: 8,
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: AnimatedBuilder(
-                    animation: controller,
-                    builder: (context, _) {
-                      final n = controller.getText().length;
-                      return Text(
-                        n == 0
-                            ? 'Drag / long-press-drag across messages · '
-                                'Ctrl/Cmd+C copy · right-click or long-press '
-                                'for the toolbar · handles on touch'
-                            : 'Selected $n characters across messages',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      );
-                    },
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Select all',
-                  onPressed: onSelectAll,
-                  icon: const Icon(Icons.select_all),
-                ),
-                IconButton(
-                  tooltip: 'Clear selection',
-                  onPressed: onClear,
-                  icon: const Icon(Icons.clear),
-                ),
-                TextButton.icon(
-                  onPressed: onStream,
-                  icon: Icon(isStreaming ? Icons.stop : Icons.bolt),
-                  label: Text(isStreaming ? 'Stop' : 'Stream'),
-                ),
-                const SizedBox(width: 4),
-                FilledButton.icon(
-                  onPressed: onCopy,
-                  icon: const Icon(Icons.copy),
-                  label: const Text('Copy'),
-                ),
-              ],
+    elevation: 8,
+    child: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: AnimatedBuilder(
+                animation: controller,
+                builder: (context, _) {
+                  final n = controller.getText().length;
+                  return Text(
+                    n == 0
+                        ? 'Drag / long-press-drag across messages · '
+                              'Ctrl/Cmd+C copy · right-click or long-press '
+                              'for the toolbar · handles on touch'
+                        : 'Selected $n characters across messages',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  );
+                },
+              ),
             ),
-          ),
+            IconButton(
+              tooltip: 'Select all',
+              onPressed: onSelectAll,
+              icon: const Icon(Icons.select_all),
+            ),
+            IconButton(
+              tooltip: 'Clear selection',
+              onPressed: onClear,
+              icon: const Icon(Icons.clear),
+            ),
+            TextButton.icon(
+              onPressed: onStream,
+              icon: Icon(isStreaming ? Icons.stop : Icons.bolt),
+              label: Text(isStreaming ? 'Stop' : 'Stream'),
+            ),
+            const SizedBox(width: 4),
+            FilledButton.icon(
+              onPressed: onCopy,
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy'),
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _Bubble extends StatelessWidget {
@@ -256,8 +260,9 @@ class _Bubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           if (!isUser) ...<Widget>[
@@ -268,7 +273,8 @@ class _Bubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+                maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+              ),
               decoration: BoxDecoration(
                 color: isUser
                     ? scheme.primaryContainer
@@ -283,7 +289,9 @@ class _Bubble extends StatelessWidget {
               child: message.markdown.isEmpty
                   ? const _TypingDots()
                   : MarkdownWidget(
-                      markdown: message.markdown, documentId: message.id),
+                      markdown: message.markdown,
+                      documentId: message.id,
+                    ),
             ),
           ),
           if (isUser) ...<Widget>[
@@ -378,7 +386,8 @@ class _Msg {
 /// [StreamingMarkdownParser] can *freeze* each completed block: once a blank
 /// line proves a paragraph or list is done, it is never re-parsed again — only
 /// the final, still-growing block is.
-const String _streamAnswer = 'Absolutely — here is a streamed reply.\n'
+const String _streamAnswer =
+    'Absolutely — here is a streamed reply.\n'
     '\n'
     'Because the selection is anchored on the **immutable model**, it stays '
     'put while these words arrive one at a time.\n'

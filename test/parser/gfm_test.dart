@@ -78,6 +78,20 @@ void main() => group('GFM extensions', () {
           expect(md.blocks.single, isA<MD$Quote>());
         });
 
+        test('fenced code inside an alert is a nested MD\$Code', () {
+          final md = markdownDecoder.convert(
+            '> [!NOTE]\n'
+            '> ```dart\n'
+            '> print(1);\n'
+            '> ```',
+          );
+          final alert = md.blocks.single as MD$Alert;
+          expect(alert.spans, isEmpty);
+          expect(alert.blocks.single, isA<MD$Code>());
+          expect((alert.blocks.single as MD$Code).language, 'dart');
+          expect((alert.blocks.single as MD$Code).text, 'print(1);');
+        });
+
         test('alert type exposes a human-readable title', () {
           expect(MD$AlertType.note.title, 'Note');
           expect(MD$AlertType.important.title, 'Important');
