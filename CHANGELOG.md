@@ -1,3 +1,16 @@
+## Unreleased
+
+### Line clamp
+- **ADDED**: `clampMarkdownToLines` / `MarkdownLineClamp` — measures a document
+  at a width and reports where its first N visual text lines end, so a host can
+  size a clipped box. The renderer still has no line budget of its own; this is
+  a measurement pass a caller runs itself.
+- **ADDED**: `MarkdownPainter.textLineBottoms()` (`@meta.internal`) — the
+  vertical positions where each visual text line ends. Runs that share a bottom
+  edge (a table row's cells, a bullet and its first line) count as one line;
+  blocks without text (spacer, divider) add height without spending the budget,
+  so a clamp never ends on trailing blank space.
+
 ## 0.2.0
 
 > **Upgrading from 0.0.x?** See the

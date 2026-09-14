@@ -289,6 +289,59 @@ class MarkdownPainter {
     return _size = Size(width, height);
   }
 
+  /// Vertical positions where each visual text line ends, top-down.
+  ///
+  /// Positions are absolute in the laid-out content. Runs sharing a bottom
+  /// edge — cells of a table row, a list bullet and its first line — count as
+  /// one line. Blocks without text (spacer, divider) contribute no line of
+  /// their own; their height still shows in the positions after them.
+  ///
+  /// Only valid after [layout].
+  List<double> textLineBottoms() {
+    if (_isEmpty) return const <double>[];
+    final blocks = _blockPainters;
+    if (_blockOffsets.length != blocks.length) return const <double>[];
+    final bottoms = <double>[];
+    for (var i = 0; i < blocks.length; i++) {
+      final top = _blockOffsets[i];
+      for (final (painter, offset) in _textFragments(blocks[i])) {
+        var bottom = top + offset.dy;
+        for (final line in painter.computeLineMetrics()) {
+          bottom += line.height;
+          bottoms.add(bottom);
+        }
+      }
+    }
+    bottoms.sort();
+    final lines = <double>[];
+    for (final bottom in bottoms) {
+      // Runs of one line round to slightly different bottoms; a cut may only
+      // land where every run on that line has ended.
+      if (lines.isNotEmpty && bottom - lines.last < 1) {
+        lines[lines.length - 1] = bottom;
+        continue;
+      }
+      lines.add(bottom);
+    }
+    return lines;
+  }
+
+  /// Selectable text runs of [block], as `(painter, block-local origin)`.
+  static Iterable<(TextPainter, Offset)> _textFragments(BlockPainter block) {
+    if (block is SelectableTextBlock) {
+      return <(TextPainter, Offset)>[
+        (
+          block.selectionPainter,
+          block.selectionOrigin,
+        )
+      ];
+    }
+    if (block is MultiPainterSelectable) {
+      return block.fragments.map((f) => (f.painter, f.origin));
+    }
+    return const <(TextPainter, Offset)>[];
+  }
+
   /// Routes a tap-down / tap-up to the block under the pointer, re-basing the
   /// event's position into that block's local space (only taps are handled; the
   /// block painters use it to fire link recognizers).
