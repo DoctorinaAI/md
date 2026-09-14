@@ -1056,7 +1056,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
 
   /// Whether the toolbar is currently visible.
   bool get toolbarIsVisible => _contextMenuController.isShown;
-  
+
   /// Whether start/end handle leader layers are attached for the live
   /// selection endpoints.
   ///

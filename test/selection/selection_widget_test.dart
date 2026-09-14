@@ -741,8 +741,7 @@ void main() {
         await tester.pumpAndSettle();
 
         final tl = tester.getTopLeft(find.byType(MarkdownWidget));
-        await tester.tapAt(tl + const Offset(40, 8),
-            buttons: kSecondaryButton);
+        await tester.tapAt(tl + const Offset(40, 8), buttons: kSecondaryButton);
         await tester.pumpAndSettle();
 
         final state = tester.state<MarkdownSelectionScopeState>(

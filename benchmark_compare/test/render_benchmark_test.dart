@@ -152,8 +152,13 @@ void _printTables() {
   final docs = renderCorpus.keys.toList();
   final libs = styledLibraries.keys.toList();
 
-  _matrix('Render (end-to-end: parse + build + layout + paint), us/op — '
-      'lower is better', docs, libs, _results, (v) => v.toStringAsFixed(1));
+  _matrix(
+      'Render (end-to-end: parse + build + layout + paint), us/op — '
+      'lower is better',
+      docs,
+      libs,
+      _results,
+      (v) => v.toStringAsFixed(1));
 
   // Relative-to-flutter_md view (how many times slower each library is).
   const base = 'flutter_md';

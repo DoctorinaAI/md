@@ -311,7 +311,7 @@ void main() {
       final left = firstLine.map((b) => b.left).reduce((a, b) => a < b ? a : b);
       final right =
           firstLine.map((b) => b.right).reduce((a, b) => a > b ? a : b);
-      // Select across the first visual line's glyphs (not empty max-width 
+      // Select across the first visual line's glyphs (not empty max-width
       // gutter).
       await _mouseDrag(
         tester,

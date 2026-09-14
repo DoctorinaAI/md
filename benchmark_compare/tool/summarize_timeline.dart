@@ -103,8 +103,7 @@ void main() {
     final row = StringBuffer('|');
     for (final lib in _libs) {
       final s = summaries[lib];
-      final v =
-          s == null ? null : _num(s, 'average_frame_build_time_millis');
+      final v = s == null ? null : _num(s, 'average_frame_build_time_millis');
       final cell = v == null ? '-' : '${(v / baseBuild).toStringAsFixed(2)}x';
       row.write(' ${cell.padLeft(16)} |');
     }

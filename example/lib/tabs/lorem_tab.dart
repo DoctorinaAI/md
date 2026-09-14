@@ -69,10 +69,12 @@ class LoremTab extends StatefulWidget {
 
 class _LoremTabState extends State<LoremTab> {
   final MarkdownSelectionGroup _group = MarkdownSelectionGroup();
-  late final MarkdownSelectionController _a =
-      MarkdownSelectionController(group: _group);
-  late final MarkdownSelectionController _b =
-      MarkdownSelectionController(group: _group);
+  late final MarkdownSelectionController _a = MarkdownSelectionController(
+    group: _group,
+  );
+  late final MarkdownSelectionController _b = MarkdownSelectionController(
+    group: _group,
+  );
   final Markdown _docA = Markdown.fromString(_loremMdA);
   final Markdown _docB = Markdown.fromString(_loremMdB);
 
@@ -84,10 +86,12 @@ class _LoremTabState extends State<LoremTab> {
   @override
   void initState() {
     super.initState();
-    _a.setDocuments(
-        <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'A', model: _docA)]);
-    _b.setDocuments(
-        <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'B', model: _docB)]);
+    _a.setDocuments(<MarkdownDocumentRef>[
+      MarkdownDocumentRef(id: 'A', model: _docA),
+    ]);
+    _b.setDocuments(<MarkdownDocumentRef>[
+      MarkdownDocumentRef(id: 'B', model: _docB),
+    ]);
     _a.addListener(_onMarkdownSelection);
     _b.addListener(_onMarkdownSelection);
   }
@@ -125,55 +129,58 @@ class _LoremTabState extends State<LoremTab> {
     final how = formatter == null ? 'plain text' : 'Markdown';
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(SnackBar(
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        content: Text('Copied ${text.length} chars as $how'),
-      ));
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          content: Text('Copied ${text.length} chars as $how'),
+        ),
+      );
   }
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 8, top: 4),
-        child: Text(text, style: Theme.of(context).textTheme.labelLarge),
-      );
+    padding: const EdgeInsets.only(bottom: 8, top: 4),
+    child: Text(text, style: Theme.of(context).textTheme.labelLarge),
+  );
 
   /// A custom [contextMenuBuilder] that appends "Copy as Markdown" and
   /// "Copy LOUD" actions to the default Copy / Select-all buttons.
   Widget _loudContextMenu(
     BuildContext context,
     MarkdownSelectionScopeState state,
-  ) =>
-      AdaptiveTextSelectionToolbar.buttonItems(
-        anchors: state.contextMenuAnchors,
-        buttonItems: <ContextMenuButtonItem>[
-          ...state.contextMenuButtonItems,
-          ContextMenuButtonItem(
-            label: 'Copy as Markdown',
-            onPressed: () {
-              // Reconstruct structure (headings, nested lists, tables, …)
-              // instead of the flattened plain text the default Copy uses.
-              Clipboard.setData(ClipboardData(
-                  text: state.controller.getText(_markupFormatter)));
-              state.hideToolbar();
-            },
-          ),
-          ContextMenuButtonItem(
-            label: 'Copy LOUD',
-            onPressed: () {
-              Clipboard.setData(ClipboardData(
-                  text: state.controller.getText().toUpperCase()));
-              state.hideToolbar();
-            },
-          ),
-        ],
-      );
+  ) => AdaptiveTextSelectionToolbar.buttonItems(
+    anchors: state.contextMenuAnchors,
+    buttonItems: <ContextMenuButtonItem>[
+      ...state.contextMenuButtonItems,
+      ContextMenuButtonItem(
+        label: 'Copy as Markdown',
+        onPressed: () {
+          // Reconstruct structure (headings, nested lists, tables, …)
+          // instead of the flattened plain text the default Copy uses.
+          Clipboard.setData(
+            ClipboardData(text: state.controller.getText(_markupFormatter)),
+          );
+          state.hideToolbar();
+        },
+      ),
+      ContextMenuButtonItem(
+        label: 'Copy LOUD',
+        onPressed: () {
+          Clipboard.setData(
+            ClipboardData(text: state.controller.getText().toUpperCase()),
+          );
+          state.hideToolbar();
+        },
+      ),
+    ],
+  );
 
   /// Keyboard/gesture hint shown while nothing is selected.
   Widget _hint() => Text(
-        'Drag to select · Ctrl/Cmd+A all · Shift+arrows extend · '
-        'right-click for the toolbar · Esc clears',
-        style: Theme.of(context).textTheme.bodySmall,
-      );
+    'Drag to select · Ctrl/Cmd+A all · Shift+arrows extend · '
+    'right-click for the toolbar · Esc clears',
+    style: Theme.of(context).textTheme.bodySmall,
+  );
 
   /// A live, side-by-side preview of what the two Copy buttons produce for the
   /// current selection — the whole point of [MarkdownMarkupFormatter] is that
@@ -184,10 +191,16 @@ class _LoremTabState extends State<LoremTab> {
     final markdown = c?.getText(_markupFormatter) ?? '';
     return LayoutBuilder(
       builder: (context, constraints) {
-        final plainPanel =
-            _previewPanel('Plain (default)', plain, accent: false);
-        final mdPanel =
-            _previewPanel('Copy as Markdown', markdown, accent: true);
+        final plainPanel = _previewPanel(
+          'Plain (default)',
+          plain,
+          accent: false,
+        );
+        final mdPanel = _previewPanel(
+          'Copy as Markdown',
+          markdown,
+          accent: true,
+        );
         if (constraints.maxWidth > 620) {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,11 +212,7 @@ class _LoremTabState extends State<LoremTab> {
           );
         }
         return Column(
-          children: <Widget>[
-            plainPanel,
-            const SizedBox(height: 8),
-            mdPanel,
-          ],
+          children: <Widget>[plainPanel, const SizedBox(height: 8), mdPanel],
         );
       },
     );
@@ -231,9 +240,9 @@ class _LoremTabState extends State<LoremTab> {
           Text(
             title,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: accent ? scheme.primary : scheme.onSurfaceVariant,
-                ),
+              fontWeight: FontWeight.bold,
+              color: accent ? scheme.primary : scheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 6),
           ConstrainedBox(
@@ -257,90 +266,95 @@ class _LoremTabState extends State<LoremTab> {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: <Widget>[
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _label('Markdown A — custom toolbar (right-click / '
-                      'long-press for "Copy as Markdown" & "Copy LOUD")'),
-                  MarkdownSelectionScope(
-                    controller: _a,
-                    contextMenuBuilder: _loudContextMenu,
-                    child: MarkdownWidget(markdown: _docA, documentId: 'A'),
-                  ),
-                  const Divider(height: 40),
-                  _label('Markdown B — custom selection color '
-                      '(selecting one clears the other)'),
-                  MarkdownSelectionScope(
-                    controller: _b,
-                    selectionColor: Colors.amber.withValues(alpha: 0.4),
-                    child: MarkdownWidget(markdown: _docB, documentId: 'B'),
-                  ),
-                  const Divider(height: 40),
-                  _label(
-                      'Plain SelectableText — resets with the Markdown ones'),
-                  SelectionArea(
-                    key: ValueKey<int>(_plainEpoch),
-                    onSelectionChanged: (content) {
-                      if ((content?.plainText ?? '').isNotEmpty) {
-                        _group.clearExternal();
-                      }
-                    },
-                    child: const Text(_loremPlain,
-                        style: TextStyle(fontSize: 16, height: 1.4)),
-                  ),
-                ],
+    children: <Widget>[
+      Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _label(
+                'Markdown A — custom toolbar (right-click / '
+                'long-press for "Copy as Markdown" & "Copy LOUD")',
               ),
-            ),
+              MarkdownSelectionScope(
+                controller: _a,
+                contextMenuBuilder: _loudContextMenu,
+                child: MarkdownWidget(markdown: _docA, documentId: 'A'),
+              ),
+              const Divider(height: 40),
+              _label(
+                'Markdown B — custom selection color '
+                '(selecting one clears the other)',
+              ),
+              MarkdownSelectionScope(
+                controller: _b,
+                selectionColor: Colors.amber.withValues(alpha: 0.4),
+                child: MarkdownWidget(markdown: _docB, documentId: 'B'),
+              ),
+              const Divider(height: 40),
+              _label('Plain SelectableText — resets with the Markdown ones'),
+              SelectionArea(
+                key: ValueKey<int>(_plainEpoch),
+                onSelectionChanged: (content) {
+                  if ((content?.plainText ?? '').isNotEmpty) {
+                    _group.clearExternal();
+                  }
+                },
+                child: const Text(
+                  _loremPlain,
+                  style: TextStyle(fontSize: 16, height: 1.4),
+                ),
+              ),
+            ],
           ),
-          Material(
-            elevation: 8,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+        ),
+      ),
+      Material(
+        elevation: 8,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  _mdActive
+                      ? 'Live preview — "Copy as Markdown" keeps the '
+                            'structure that plain copy flattens:'
+                      : 'Select any Markdown above to preview & copy it '
+                            'two ways:',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                _mdActive ? _preview() : _hint(),
+                const SizedBox(height: 10),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: <Widget>[
-                    Text(
-                      _mdActive
-                          ? 'Live preview — "Copy as Markdown" keeps the '
-                              'structure that plain copy flattens:'
-                          : 'Select any Markdown above to preview & copy it '
-                              'two ways:',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    OutlinedButton.icon(
+                      onPressed: _mdActive
+                          ? () => _copy(formatter: _markupFormatter)
+                          : null,
+                      icon: const Icon(Icons.data_object),
+                      label: const Text('Copy as Markdown'),
                     ),
-                    const SizedBox(height: 10),
-                    _mdActive ? _preview() : _hint(),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: <Widget>[
-                        OutlinedButton.icon(
-                          onPressed: _mdActive
-                              ? () => _copy(formatter: _markupFormatter)
-                              : null,
-                          icon: const Icon(Icons.data_object),
-                          label: const Text('Copy as Markdown'),
-                        ),
-                        FilledButton.icon(
-                          onPressed: _mdActive ? _copy : null,
-                          icon: const Icon(Icons.copy),
-                          label: const Text('Copy'),
-                        ),
-                      ],
+                    FilledButton.icon(
+                      onPressed: _mdActive ? _copy : null,
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copy'),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 }

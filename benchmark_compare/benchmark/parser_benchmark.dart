@@ -111,8 +111,8 @@ class _MarkdownPkgBenchmark extends BenchmarkBase {
   void run() {
     // A fresh Document per parse — exactly how flutter_markdown uses the
     // package on every rebuild (Document is single-use / stateful).
-    final nodes = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored)
-        .parse(input);
+    final nodes =
+        md.Document(extensionSet: md.ExtensionSet.gitHubFlavored).parse(input);
     _sink ^= nodes.length;
   }
 }
