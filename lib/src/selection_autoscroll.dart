@@ -39,6 +39,7 @@ final class MarkdownSelectionAutoscrollConfig {
     this.topPad = 0,
     this.bottomPad = 0,
     this.useMediaQueryPadding = true,
+    this.useHostUnionGate = true,
     this.targetResolver,
   })  : assert(edgeZone > 0),
         assert(maxVelocity >= 0),
@@ -71,6 +72,21 @@ final class MarkdownSelectionAutoscrollConfig {
   /// [targetResolver] reports its own [MarkdownAutoscrollViewport.padding].
   final bool useMediaQueryPadding;
 
+  /// Whether the union of mounted selectable bodies gates each direction.
+  ///
+  /// True (the default) suits markdown that is an *island* inside a larger
+  /// scrollable: a body that fits inside the padded viewport never drives the
+  /// far page chrome, and a direction hard-stops once the union is flush with
+  /// that edge.
+  ///
+  /// Set it false when the markdown bodies **are** the scrolling content and
+  /// the host only builds what is visible — a chat viewport that mounts no
+  /// cache extent has a union barely larger than the viewport, so the gate
+  /// would veto a drag that should keep paging through history. The scroll
+  /// surface then decides on its own, through
+  /// [MarkdownAutoscrollTarget.canScroll] and the delta it reports applying.
+  final bool useHostUnionGate;
+
   /// Resolves the scroll surface a selection drag drives.
   ///
   /// Null (the default) uses the nearest ancestor [Scrollable] — the sliver
@@ -92,6 +108,7 @@ final class MarkdownSelectionAutoscrollConfig {
           other.topPad == topPad &&
           other.bottomPad == bottomPad &&
           other.useMediaQueryPadding == useMediaQueryPadding &&
+          other.useHostUnionGate == useHostUnionGate &&
           // A resolver closure can only be compared by identity; a host that
           // builds one inline gets a new object every build, which is why the
           // scope never invalidates a cached surface mid-drag.
@@ -105,6 +122,7 @@ final class MarkdownSelectionAutoscrollConfig {
         topPad,
         bottomPad,
         useMediaQueryPadding,
+        useHostUnionGate,
         targetResolver,
       );
 
@@ -116,6 +134,7 @@ final class MarkdownSelectionAutoscrollConfig {
     double? topPad,
     double? bottomPad,
     bool? useMediaQueryPadding,
+    bool? useHostUnionGate,
     MarkdownAutoscrollTargetResolver? targetResolver,
   }) =>
       MarkdownSelectionAutoscrollConfig(
@@ -126,6 +145,7 @@ final class MarkdownSelectionAutoscrollConfig {
         bottomPad: bottomPad ?? this.bottomPad,
         useMediaQueryPadding:
             useMediaQueryPadding ?? this.useMediaQueryPadding,
+        useHostUnionGate: useHostUnionGate ?? this.useHostUnionGate,
         targetResolver: targetResolver ?? this.targetResolver,
       );
 }
@@ -595,10 +615,13 @@ MarkdownAutoscrollResult applyMarkdownSelectionAutoscroll({
   final clipTopLocal = paddedTop - bounds.top;
 
   // Host still has content to reveal past each pad edge (or sits entirely
-  // off-screen past that edge — drag must be able to pull it back).
-  final canTowardStart = hostUnionTopGlobalY < paddedTop - 0.5 ||
+  // off-screen past that edge — drag must be able to pull it back). Hosts whose
+  // bodies *are* the scrolling content opt out and let the target decide.
+  final canTowardStart = !config.useHostUnionGate ||
+      hostUnionTopGlobalY < paddedTop - 0.5 ||
       hostUnionBottomGlobalY <= paddedTop + 0.5;
-  final canTowardEnd = hostUnionBottomGlobalY > paddedBottom + 0.5 ||
+  final canTowardEnd = !config.useHostUnionGate ||
+      hostUnionBottomGlobalY > paddedBottom + 0.5 ||
       hostUnionTopGlobalY >= paddedBottom - 0.5;
 
   var velocity = markdownAutoscrollVelocity(

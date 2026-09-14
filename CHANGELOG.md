@@ -199,7 +199,13 @@ extension points or reach into a default block painter's fields. Ordinary
 - **FIXED**: The scroll surface is resolved **once per drag** and cached. It
   used to walk the whole element subtree twice on every autoscroll frame (to
   find the surface's element, then the nearest `Scrollable`).
-- **ADDED**: `MarkdownSelectionAutoscrollConfig.copyWith`.
+- **ADDED**: `MarkdownSelectionAutoscrollConfig.useHostUnionGate` (default
+  `true`, the existing behaviour). Turn it off when the markdown bodies **are**
+  the scrolling content and the host builds only what is visible: such a host's
+  mounted union is barely larger than the viewport, so the gate would veto a
+  drag that should keep paging through history. The target's `canScroll` and
+  the delta it reports applying are then the only stops.
+- **ADDED**: `MarkdownSelectionAutoscrollConfig.copyWith`, `==` / `hashCode`.
 
 ### Selection engine rework
 - **ADDED**: Edge-zone autoscroll while dragging (body / handle / long-press)

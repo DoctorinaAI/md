@@ -232,6 +232,13 @@ Statics: `MarkdownSelectionScope.of/maybeOf` (→ controller), `stateOf` (→ st
   **once per drag** (with the scope context, the `BuildContext` of the markdown
   surface under the pointer, the pointer position and the config) and caches the
   result, so a resolver may walk the element tree without a per-frame cost.
+  The **host-union gate** (`useHostUnionGate`, default on) suits markdown that is
+  an island inside a larger scrollable: a body that fits inside the padded
+  viewport never drives the far page chrome. Turn it off when the markdown
+  bodies *are* the scrolling content and the host builds only what is visible —
+  that union is barely larger than the viewport and would veto paging through
+  history; the target's `canScroll` then decides alone.
+
   `MarkdownCallbackAutoscrollTarget` assembles a target from three closures:
 
   ```dart

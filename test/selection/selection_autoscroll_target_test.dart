@@ -323,6 +323,74 @@ void main() {
       expect(t.deltas, isEmpty);
     });
 
+    test('useHostUnionGate false lets the target decide instead', () {
+      final gated = makeTarget();
+      // Host union ends mid-viewport: with the gate on, nothing to reveal.
+      expect(
+        run(
+          gated.target,
+          bounds.bottom - 3,
+          hostTop: bounds.top + 10,
+          hostBottom: bounds.top + 100,
+        ),
+        MarkdownAutoscrollResult.suppressed,
+      );
+
+      // A chat viewport that builds only what is visible opts out: its own
+      // `canScroll` is the authority.
+      var offset = 0.0;
+      final ungated = MarkdownCallbackAutoscrollTarget(
+        viewportOf: () =>
+            const MarkdownAutoscrollViewport(globalBounds: bounds),
+        onScrollDelta: (delta) {
+          offset += delta;
+          return delta;
+        },
+      );
+      expect(
+        applyMarkdownSelectionAutoscroll(
+          globalPosition: Offset(10, bounds.bottom - 3),
+          target: ungated,
+          config: _config.copyWith(useHostUnionGate: false),
+          lastTimestamp: null,
+          storeTimestamp: (_) {},
+          hostUnionTopGlobalY: bounds.top + 10,
+          hostUnionBottomGlobalY: bounds.top + 100,
+        ),
+        MarkdownAutoscrollResult.scrolled,
+      );
+      expect(offset, greaterThan(0));
+    });
+
+    test('useHostUnionGate false still stops on a flush target', () {
+      var offset = 0.0;
+      final target = MarkdownCallbackAutoscrollTarget(
+        viewportOf: () =>
+            const MarkdownAutoscrollViewport(globalBounds: bounds),
+        canScrollAt: ({required forward}) => false,
+        onScrollDelta: (delta) {
+          offset += delta;
+          return delta;
+        },
+      );
+      final session = MarkdownAutoscrollSession();
+      expect(
+        applyMarkdownSelectionAutoscroll(
+          globalPosition: Offset(10, bounds.bottom - 3),
+          target: target,
+          config: _config.copyWith(useHostUnionGate: false),
+          lastTimestamp: null,
+          storeTimestamp: (_) {},
+          hostUnionTopGlobalY: -1000,
+          hostUnionBottomGlobalY: 5000,
+          session: session,
+        ),
+        MarkdownAutoscrollResult.suppressed,
+      );
+      expect(offset, 0);
+      expect(session.isDisarmedTowardEnd, isTrue);
+    });
+
     test('a disabled config never resolves a target', () {
       var asked = 0;
       final target = MarkdownCallbackAutoscrollTarget(
