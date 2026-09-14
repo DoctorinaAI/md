@@ -38,9 +38,14 @@ extension points or reach into a default block painter's fields. Ordinary
   `Consolas`. **Android, Fuchsia, Linux and web keep `'monospace'`** — they
   resolve it natively, so rendering there is unchanged from 0.2.0.
 - **ADDED**: `kMonospaceFontFamily` (platform-resolved) and
-  `kMonospaceFontFamilyFallback`. There is still no theme-level knob for the
-  monospace face; a host that needs a bundled font has to go through
-  `MarkdownThemeData.builder` / `SyntaxHighlighter.baseStyleFor`.
+  `kMonospaceFontFamilyFallback` — the defaults behind the theme fields below.
+- **ADDED**: `MarkdownThemeData.monospaceFontFamily` /
+  `monospaceFontFamilyFallback` (+ the `effectiveMonospace…` getters) to pin a
+  bundled face. One knob covers both inline `` `code` `` and fenced blocks;
+  before this there was no supported way to change the fenced-block face at all
+  — `BlockPainter$Code` built its style from a static global, so overriding
+  `textStyleFor` moved inline code only and left fences behind. An empty
+  fallback list is honoured (it means "no fallbacks"), not treated as unset.
 
 ### Quote / alert nested fenced code
 - **FIXED**: Fenced code (` ```lang ` / `~~~`) inside a blockquote or GitHub

@@ -199,7 +199,10 @@ Styling: `textStyle`, per-level `h1Style..h6Style` (+ cached `headingStyleFor`),
 `textStyleFor(MD$Style)` (cached mapping of the bitmask → bold/italic/underline/
 strikethrough/monospace + highlight/monospace backgrounds + link color),
 `linkColor`/`linkStyle`, `surfaceColor` (code/table/quote backgrounds),
-`highlightBackgroundColor`, `monospaceBackgroundColor`, `dividerColor`,
+`highlightBackgroundColor`, `monospaceBackgroundColor`,
+`monospaceFontFamily`/`monospaceFontFamilyFallback` (null → the
+platform-resolved `kMonospaceFontFamily`; one knob for both inline `` `code` ``
+and fenced blocks), `dividerColor`,
 `alertColors` (+ built-in GitHub palette fallback via `alertColorFor`),
 `textDirection`, `textScaler`, and `onLinkTap`.
 

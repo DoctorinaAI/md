@@ -353,6 +353,69 @@ void main() => group('MarkdownThemeData', () {
           }
         });
 
+        test('a host face overrides the platform default everywhere', () {
+          // Both the inline span styles and BlockPainter$Code read the
+          // effective getters, so one knob covers `code` and ``` fences.
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            monospaceFontFamily: 'JetBrains Mono',
+            monospaceFontFamilyFallback: const <String>['Fira Code'],
+          );
+
+          expect(theme.effectiveMonospaceFontFamily, 'JetBrains Mono');
+          expect(
+            theme.effectiveMonospaceFontFamilyFallback,
+            const <String>['Fira Code'],
+          );
+
+          final inline = theme.textStyleFor(MD$Style.monospace);
+          expect(inline.fontFamily, 'JetBrains Mono');
+          expect(inline.fontFamilyFallback, const <String>['Fira Code']);
+        });
+
+        test('an override survives on every platform', () {
+          for (final platform in TargetPlatform.values) {
+            debugDefaultTargetPlatformOverride = platform;
+            try {
+              final theme = MarkdownThemeData(
+                textStyle: const TextStyle(fontSize: 14),
+                monospaceFontFamily: 'JetBrains Mono',
+              );
+              expect(
+                theme.textStyleFor(MD$Style.monospace).fontFamily,
+                'JetBrains Mono',
+                reason: '$platform',
+              );
+              // Fallbacks stay on the shared chain unless overridden too.
+              expect(
+                theme.effectiveMonospaceFontFamilyFallback,
+                kMonospaceFontFamilyFallback,
+                reason: '$platform',
+              );
+            } finally {
+              debugDefaultTargetPlatformOverride = null;
+            }
+          }
+        });
+
+        test('an empty fallback list is honored, not treated as unset', () {
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            monospaceFontFamilyFallback: const <String>[],
+          );
+          expect(theme.effectiveMonospaceFontFamilyFallback, isEmpty);
+          expect(
+            theme.textStyleFor(MD$Style.monospace).fontFamilyFallback,
+            isEmpty,
+          );
+        });
+
+        test('copyWith carries the override', () {
+          final theme = MarkdownThemeData(textStyle: const TextStyle())
+              .copyWith(monospaceFontFamily: 'Fira Code');
+          expect(theme.effectiveMonospaceFontFamily, 'Fira Code');
+        });
+
         testWidgets('a fenced block renders with the same family',
             (tester) async {
           debugDefaultTargetPlatformOverride = TargetPlatform.macOS;

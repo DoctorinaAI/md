@@ -90,6 +90,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.surfaceColor = const Color.fromARGB(255, 235, 235, 235),
     this.highlightBackgroundColor = const Color(0x40FF5722),
     this.monospaceBackgroundColor = const Color(0x409E9E9E),
+    this.monospaceFontFamily,
+    this.monospaceFontFamilyFallback,
     this.dividerColor,
     this.alertColors,
     this.blockFilter,
@@ -119,6 +121,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
+    String? monospaceFontFamily,
+    List<String>? monospaceFontFamilyFallback,
     Color? dividerColor,
     Map<MD$AlertType, Color>? alertColors,
     bool Function(MD$Block block)? blockFilter,
@@ -151,6 +155,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
           highlightBackgroundColor ?? theme.colorScheme.errorContainer,
       monospaceBackgroundColor:
           monospaceBackgroundColor ?? theme.colorScheme.surfaceContainerHigh,
+      monospaceFontFamily: monospaceFontFamily,
+      monospaceFontFamilyFallback: monospaceFontFamilyFallback,
       dividerColor: dividerColor ?? theme.dividerColor.withValues(alpha: 0.12),
       alertColors: alertColors,
       blockFilter: blockFilter,
@@ -210,6 +216,30 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// The color to use for the background of monospace text.
   final Color? monospaceBackgroundColor;
+
+  /// Font family for inline `` `code` `` and fenced blocks.
+  ///
+  /// Null (the default) resolves [kMonospaceFontFamily] for the host platform.
+  /// Set it to pin a bundled face (`JetBrains Mono`, `Fira Code`, …) —
+  /// [effectiveMonospaceFontFamily] is what both the inline span styles and
+  /// [BlockPainter$Code] actually read.
+  final String? monospaceFontFamily;
+
+  /// Families tried after [monospaceFontFamily].
+  ///
+  /// Null (the default) uses [kMonospaceFontFamilyFallback]. Pass an empty
+  /// list to disable fallbacks entirely (a bundled face with full coverage).
+  final List<String>? monospaceFontFamilyFallback;
+
+  /// The monospace family in effect: [monospaceFontFamily], else the
+  /// platform-resolved [kMonospaceFontFamily].
+  String get effectiveMonospaceFontFamily =>
+      monospaceFontFamily ?? kMonospaceFontFamily;
+
+  /// The monospace fallbacks in effect: [monospaceFontFamilyFallback], else
+  /// [kMonospaceFontFamilyFallback].
+  List<String> get effectiveMonospaceFontFamilyFallback =>
+      monospaceFontFamilyFallback ?? kMonospaceFontFamilyFallback;
 
   /// The color to use for the divider.
   final Color? dividerColor;
@@ -343,12 +373,13 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
             },
             // The CSS generic `'monospace'` does not resolve on Apple or
             // Windows; [kMonospaceFontFamily] substitutes a real face there
-            // and keeps the generic everywhere it already worked.
+            // and keeps the generic everywhere it already worked. A host that
+            // bundles its own face sets [monospaceFontFamily].
             fontFamily: style.contains(MD$Style.monospace)
-                ? kMonospaceFontFamily
+                ? effectiveMonospaceFontFamily
                 : null,
             fontFamilyFallback: style.contains(MD$Style.monospace)
-                ? kMonospaceFontFamilyFallback
+                ? effectiveMonospaceFontFamilyFallback
                 : null,
             color: switch (style) {
               var s when s.contains(MD$Style.link) => linkColor,
@@ -387,6 +418,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
+    String? monospaceFontFamily,
+    List<String>? monospaceFontFamilyFallback,
     Color? dividerColor,
     Map<MD$AlertType, Color>? alertColors,
     bool Function(MD$Block block)? blockFilter,
@@ -414,6 +447,9 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
             highlightBackgroundColor ?? this.highlightBackgroundColor,
         monospaceBackgroundColor:
             monospaceBackgroundColor ?? this.monospaceBackgroundColor,
+        monospaceFontFamily: monospaceFontFamily ?? this.monospaceFontFamily,
+        monospaceFontFamilyFallback:
+            monospaceFontFamilyFallback ?? this.monospaceFontFamilyFallback,
         dividerColor: dividerColor ?? this.dividerColor,
         alertColors: alertColors ?? this.alertColors,
         blockFilter: blockFilter ?? this.blockFilter,
@@ -451,6 +487,12 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
           highlightBackgroundColor, other?.highlightBackgroundColor, t),
       monospaceBackgroundColor: Color.lerp(
           monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
+      // A font family cannot be interpolated — snap at the midpoint.
+      monospaceFontFamily:
+          t < 0.5 ? monospaceFontFamily : other?.monospaceFontFamily,
+      monospaceFontFamilyFallback: t < 0.5
+          ? monospaceFontFamilyFallback
+          : other?.monospaceFontFamilyFallback,
       dividerColor: Color.lerp(dividerColor, other?.dividerColor, t),
       alertColors: t < 0.5 ? alertColors : other?.alertColors,
       blockFilter: t < 0.5 ? blockFilter : other?.blockFilter,
