@@ -13,7 +13,14 @@ import 'parser/parser_test.dart' as parser_test;
 import 'parser/regression_test.dart' as regression_test;
 import 'parser/streaming_test.dart' as streaming_test;
 import 'selection/markup_formatter_test.dart' as markup_formatter_test;
+import 'selection/selection_autoscroll_target_test.dart'
+    as selection_autoscroll_target_test;
 import 'selection/selection_autoscroll_test.dart' as selection_autoscroll_test;
+import 'selection/selection_chrome_test.dart' as selection_chrome_test;
+import 'selection/selection_host_gates_test.dart' as selection_host_gates_test;
+import 'selection/selection_nested_blocks_test.dart'
+    as selection_nested_blocks_test;
+import 'selection/selection_registry_test.dart' as selection_registry_test;
 import 'selection/selection_handle_endpoints_test.dart'
     as selection_handle_endpoints_test;
 import 'selection/selection_handles_test.dart' as selection_handles_test;
@@ -44,6 +51,11 @@ void main() => group('Unit', () {
       selection_handles_test.main();
       selection_handle_endpoints_test.main();
       selection_autoscroll_test.main();
+      selection_autoscroll_target_test.main();
+      selection_host_gates_test.main();
+      selection_registry_test.main();
+      selection_chrome_test.main();
+      selection_nested_blocks_test.main();
       line_clamp_test.main();
       render_test.main();
       widget_test.main();

@@ -2,6 +2,7 @@
 
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
@@ -23,6 +24,12 @@ import 'package:flutter/widgets.dart';
 ///
 /// After a hard stop, [MarkdownAutoscrollSession] disarms that direction until
 /// the pointer leaves and re-enters the band (arming gate).
+///
+/// The scroll surface itself is abstract: see [MarkdownAutoscrollTarget]. By
+/// default the nearest ancestor [Scrollable] is driven, but a host with its
+/// own scroll protocol (a custom anchored chat viewport, a `RenderBox` that
+/// moves children itself, a nested transform) supplies [targetResolver]
+/// instead. Nothing in the band / gate math touches `ScrollPosition`.
 final class MarkdownSelectionAutoscrollConfig {
   /// Creates an autoscroll config.
   const MarkdownSelectionAutoscrollConfig({
@@ -32,6 +39,7 @@ final class MarkdownSelectionAutoscrollConfig {
     this.topPad = 0,
     this.bottomPad = 0,
     this.useMediaQueryPadding = true,
+    this.targetResolver,
   })  : assert(edgeZone > 0),
         assert(maxVelocity >= 0),
         assert(topPad >= 0),
@@ -58,7 +66,303 @@ final class MarkdownSelectionAutoscrollConfig {
   /// When true, [MediaQuery.padding] / [MediaQuery.viewPadding] are added to
   /// [topPad]/[bottomPad] so the edge zone starts before handles disappear
   /// under app chrome.
+  ///
+  /// Only consulted by the built-in [Scrollable] resolver — a custom
+  /// [targetResolver] reports its own [MarkdownAutoscrollViewport.padding].
   final bool useMediaQueryPadding;
+
+  /// Resolves the scroll surface a selection drag drives.
+  ///
+  /// Null (the default) uses the nearest ancestor [Scrollable] — the sliver
+  /// protocol. Supply a resolver to drive any other scroll implementation;
+  /// return null from it to leave a given drag un-scrolled.
+  ///
+  /// The resolver is called at most once per drag (the scope caches the
+  /// target until the drag ends or the target reports no usable viewport), so
+  /// it may do element-tree work without a per-frame cost.
+  final MarkdownAutoscrollTargetResolver? targetResolver;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MarkdownSelectionAutoscrollConfig &&
+          other.enabled == enabled &&
+          other.edgeZone == edgeZone &&
+          other.maxVelocity == maxVelocity &&
+          other.topPad == topPad &&
+          other.bottomPad == bottomPad &&
+          other.useMediaQueryPadding == useMediaQueryPadding &&
+          // A resolver closure can only be compared by identity; a host that
+          // builds one inline gets a new object every build, which is why the
+          // scope never invalidates a cached surface mid-drag.
+          identical(other.targetResolver, targetResolver);
+
+  @override
+  int get hashCode => Object.hash(
+        enabled,
+        edgeZone,
+        maxVelocity,
+        topPad,
+        bottomPad,
+        useMediaQueryPadding,
+        targetResolver,
+      );
+
+  /// A copy with the given fields replaced.
+  MarkdownSelectionAutoscrollConfig copyWith({
+    bool? enabled,
+    double? edgeZone,
+    double? maxVelocity,
+    double? topPad,
+    double? bottomPad,
+    bool? useMediaQueryPadding,
+    MarkdownAutoscrollTargetResolver? targetResolver,
+  }) =>
+      MarkdownSelectionAutoscrollConfig(
+        enabled: enabled ?? this.enabled,
+        edgeZone: edgeZone ?? this.edgeZone,
+        maxVelocity: maxVelocity ?? this.maxVelocity,
+        topPad: topPad ?? this.topPad,
+        bottomPad: bottomPad ?? this.bottomPad,
+        useMediaQueryPadding:
+            useMediaQueryPadding ?? this.useMediaQueryPadding,
+        targetResolver: targetResolver ?? this.targetResolver,
+      );
+}
+
+/// Signature for resolving the [MarkdownAutoscrollTarget] of a selection drag.
+///
+/// Return null to leave the drag un-scrolled.
+typedef MarkdownAutoscrollTargetResolver = MarkdownAutoscrollTarget? Function(
+  MarkdownAutoscrollRequest request,
+);
+
+/// What the scope knows about a drag when it asks for a scroll target.
+@immutable
+final class MarkdownAutoscrollRequest {
+  /// Creates a resolver request.
+  const MarkdownAutoscrollRequest({
+    required this.scopeContext,
+    required this.globalPosition,
+    required this.config,
+    this.contentContext,
+  });
+
+  /// Context of the `MarkdownSelectionScope` that owns the drag.
+  ///
+  /// This sits **above** any scrollable the scope wraps, so
+  /// `Scrollable.maybeOf(scopeContext)` does *not* find it — use
+  /// [contentContext] (or your own handle) to reach a descendant viewport.
+  final BuildContext scopeContext;
+
+  /// Context of the mounted markdown surface under [globalPosition] (or the
+  /// first mounted one when the pointer is outside every surface), when the
+  /// scope could resolve it. Null when no surface is mounted.
+  ///
+  /// This is the useful context for `Scrollable.maybeOf`: it is a *descendant*
+  /// of the list that scrolls the markdown bodies.
+  final BuildContext? contentContext;
+
+  /// Current global pointer position of the drag.
+  final Offset globalPosition;
+
+  /// The config the drag runs under.
+  final MarkdownSelectionAutoscrollConfig config;
+}
+
+/// Visible geometry of a scroll surface, in global coordinates.
+@immutable
+final class MarkdownAutoscrollViewport {
+  /// Creates a viewport description.
+  const MarkdownAutoscrollViewport({
+    required this.globalBounds,
+    this.padding = EdgeInsets.zero,
+  });
+
+  /// Global bounds of the visible scroll viewport.
+  final Rect globalBounds;
+
+  /// Inset from [globalBounds] where the activation bands start.
+  ///
+  /// Use it for chrome that overlaps the viewport (a translucent app bar, a
+  /// composer, the system status / gesture bars) so the band begins before a
+  /// handle disappears underneath.
+  final EdgeInsets padding;
+
+  /// [globalBounds] deflated by [padding] (may be empty / inverted when the
+  /// padding exceeds the viewport).
+  Rect get paddedGlobalBounds => Rect.fromLTRB(
+        globalBounds.left + padding.left,
+        globalBounds.top + padding.top,
+        globalBounds.right - padding.right,
+        globalBounds.bottom - padding.bottom,
+      );
+
+  /// Whether the padded band has any vertical room to work with.
+  bool get isUsable =>
+      !globalBounds.hasNaN &&
+      globalBounds.isFinite &&
+      paddedGlobalBounds.height > 0;
+
+  @override
+  String toString() =>
+      'MarkdownAutoscrollViewport($globalBounds, padding: $padding)';
+}
+
+/// A scroll surface that markdown selection autoscroll can drive.
+///
+/// Implement it to adapt any scroll protocol — the sliver
+/// [Scrollable]/[ScrollPosition] pair (see
+/// [MarkdownScrollableAutoscrollTarget]), an anchored chat viewport that owns
+/// its own pixel offset, a `PageView`, a transform-based canvas.
+///
+/// All deltas are **screen-space content movement**, never scroll-offset
+/// deltas: positive moves content up so material below the bottom edge comes
+/// into view. Adapters flip the sign for reverse axes / inverted anchors.
+abstract interface class MarkdownAutoscrollTarget {
+  /// Current visible geometry, or null when the surface cannot be driven
+  /// right now (detached, unmounted, zero-sized). Read once per frame.
+  MarkdownAutoscrollViewport? get viewport;
+
+  /// Whether [applyScrollDelta] can still move content in this direction.
+  ///
+  /// [forward] true asks about a **positive** delta (content moves up,
+  /// revealing what lies below the viewport bottom); false asks about a
+  /// negative delta.
+  bool canScroll({required bool forward});
+
+  /// Moves content by [delta] logical pixels of screen-space movement.
+  ///
+  /// A positive [delta] moves content up (reveals what is below the bottom
+  /// edge); a negative [delta] moves content down. Returns the delta actually
+  /// applied — return `0` when already flush so the drag hard-stops and the
+  /// direction disarms.
+  double applyScrollDelta(double delta);
+}
+
+/// A [MarkdownAutoscrollTarget] assembled from closures.
+///
+/// The fastest way to adopt a custom scroll implementation without writing a
+/// class:
+///
+/// ```dart
+/// MarkdownSelectionAutoscrollConfig(
+///   targetResolver: (request) => MarkdownCallbackAutoscrollTarget(
+///     viewportOf: () {
+///       final box = viewportKey.currentContext?.findRenderObject();
+///       if (box is! RenderBox || !box.hasSize) return null;
+///       return MarkdownAutoscrollViewport(
+///         globalBounds: box.localToGlobal(Offset.zero) & box.size,
+///         padding: const EdgeInsets.symmetric(vertical: 8),
+///       );
+///     },
+///     // `scrollBy` is anchor-relative: positive reveals *older* messages,
+///     // the opposite of screen-space movement.
+///     onScrollDelta: (delta) {
+///       chatScrollController.scrollBy(-delta);
+///       return delta;
+///     },
+///     canScrollAt: ({required forward}) =>
+///         forward ? !chatScrollController.isAtTail.value : !dataSource.reachedOldest,
+///   ),
+/// )
+/// ```
+final class MarkdownCallbackAutoscrollTarget implements MarkdownAutoscrollTarget {
+  /// Creates a closure-backed target.
+  ///
+  /// [canScrollAt] defaults to "always allowed" — [onScrollDelta] returning a
+  /// delta smaller than half a pixel is then what hard-stops the drag.
+  const MarkdownCallbackAutoscrollTarget({
+    required MarkdownAutoscrollViewport? Function() viewportOf,
+    required double Function(double delta) onScrollDelta,
+    bool Function({required bool forward})? canScrollAt,
+  })  : _viewportOf = viewportOf,
+        _onScrollDelta = onScrollDelta,
+        _canScrollAt = canScrollAt;
+
+  final MarkdownAutoscrollViewport? Function() _viewportOf;
+  final double Function(double delta) _onScrollDelta;
+  final bool Function({required bool forward})? _canScrollAt;
+
+  @override
+  MarkdownAutoscrollViewport? get viewport => _viewportOf();
+
+  @override
+  bool canScroll({required bool forward}) =>
+      _canScrollAt?.call(forward: forward) ?? true;
+
+  @override
+  double applyScrollDelta(double delta) => _onScrollDelta(delta);
+}
+
+/// The built-in [MarkdownAutoscrollTarget] for the sliver protocol: drives the
+/// [ScrollPosition] of a [ScrollableState] with `jumpTo`.
+///
+/// Handles reverse axes ([AxisDirection.up] / [AxisDirection.left]) so callers
+/// always speak screen-space deltas.
+final class MarkdownScrollableAutoscrollTarget
+    implements MarkdownAutoscrollTarget {
+  /// Wraps [scrollable], insetting the activation bands by [padding].
+  const MarkdownScrollableAutoscrollTarget(
+    this.scrollable, {
+    this.padding = EdgeInsets.zero,
+  });
+
+  /// The scrollable being driven.
+  final ScrollableState scrollable;
+
+  /// Inset applied to [MarkdownAutoscrollViewport.padding].
+  final EdgeInsets padding;
+
+  /// Whether the [ScrollPosition] is ready to be read / driven.
+  bool get _positionReady {
+    if (!scrollable.mounted) return false;
+    final position = scrollable.position;
+    return position.hasPixels && position.hasContentDimensions;
+  }
+
+  /// Whether a positive screen-space delta grows `ScrollPosition.pixels`.
+  bool get _axisMatchesScreen => switch (scrollable.axisDirection) {
+        AxisDirection.down || AxisDirection.right => true,
+        AxisDirection.up || AxisDirection.left => false,
+      };
+
+  @override
+  MarkdownAutoscrollViewport? get viewport {
+    if (!_positionReady) return null;
+    final box = scrollable.context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize || !box.attached) return null;
+    return MarkdownAutoscrollViewport(
+      globalBounds: box.localToGlobal(Offset.zero) & box.size,
+      padding: padding,
+    );
+  }
+
+  @override
+  bool canScroll({required bool forward}) {
+    if (!_positionReady) return false;
+    final position = scrollable.position;
+    final towardMax = _axisMatchesScreen == forward;
+    return towardMax
+        ? position.pixels < position.maxScrollExtent - precisionErrorTolerance
+        : position.pixels > position.minScrollExtent + precisionErrorTolerance;
+  }
+
+  @override
+  double applyScrollDelta(double delta) {
+    if (!_positionReady) return 0;
+    final position = scrollable.position;
+    final signed = _axisMatchesScreen ? delta : -delta;
+    final before = position.pixels;
+    final next = (before + signed).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    final applied = next - before;
+    if (applied.abs() < 0.5) return 0;
+    position.jumpTo(next);
+    return _axisMatchesScreen ? applied : -applied;
+  }
 }
 
 /// Per-drag arming state for the host-union autoscroll gate.
@@ -187,44 +491,23 @@ double markdownAutoscrollVelocityInViewport({
   return (top, bottom);
 }
 
-/// Applies one autoscroll step to the nearest ancestor [Scrollable] of
-/// [context].
+/// Builds the built-in sliver target for [context]: the nearest [Scrollable]
+/// (or [context]'s own scrollable), padded from config + MediaQuery + the
+/// screen chrome that sits *outside* the viewport.
 ///
-/// [hostUnionTopGlobalY] / [hostUnionBottomGlobalY] are the global Y bounds of
-/// the union of mounted selectable bodies under the selection host. Bands use
-/// the padded viewport; the host union only gates / hard-stops each direction.
-MarkdownAutoscrollResult applyMarkdownSelectionAutoscroll({
-  required Offset globalPosition,
+/// Returns null when [context] is unusable or has no enclosing [Scrollable].
+MarkdownScrollableAutoscrollTarget? resolveMarkdownScrollableAutoscrollTarget({
   required BuildContext? context,
   required MarkdownSelectionAutoscrollConfig config,
-  required Duration? lastTimestamp,
-  required void Function(Duration?) storeTimestamp,
-  required double hostUnionTopGlobalY,
-  required double hostUnionBottomGlobalY,
-  MarkdownAutoscrollSession? session,
 }) {
-  void clear() => storeTimestamp(null);
-
-  if (!config.enabled || context == null || !context.mounted) {
-    clear();
-    return MarkdownAutoscrollResult.idle;
-  }
+  if (context == null || !context.mounted) return null;
   final scrollable = _scrollableFor(context);
-  if (scrollable == null) {
-    clear();
-    return MarkdownAutoscrollResult.idle;
-  }
+  if (scrollable == null || !scrollable.mounted) return null;
   final position = scrollable.position;
-  if (!position.hasPixels || !position.hasContentDimensions) {
-    clear();
-    return MarkdownAutoscrollResult.idle;
-  }
+  if (!position.hasPixels || !position.hasContentDimensions) return null;
 
-  final box = scrollable.context.findRenderObject() as RenderBox?;
-  if (box == null || !box.hasSize) {
-    clear();
-    return MarkdownAutoscrollResult.idle;
-  }
+  final box = scrollable.context.findRenderObject();
+  if (box is! RenderBox || !box.hasSize || !box.attached) return null;
 
   final (topPad, bottomPad) = resolveMarkdownAutoscrollPads(
     config: config,
@@ -253,18 +536,63 @@ MarkdownAutoscrollResult applyMarkdownSelectionAutoscroll({
     }
   }
 
-  final viewportOriginY = box.localToGlobal(Offset.zero).dy;
-  final viewportHeight = box.size.height;
-  final localY = globalPosition.dy - viewportOriginY;
+  return MarkdownScrollableAutoscrollTarget(
+    scrollable,
+    padding: EdgeInsets.only(top: resolvedTop, bottom: resolvedBottom),
+  );
+}
 
-  final paddedTop = viewportOriginY + resolvedTop;
-  final paddedBottom = viewportOriginY + viewportHeight - resolvedBottom;
-  final clipHeight = paddedBottom - paddedTop;
-  if (clipHeight <= 0) {
+/// Applies one autoscroll step to [target] (or, when [target] is null, to the
+/// nearest ancestor [Scrollable] of [context]).
+///
+/// [hostUnionTopGlobalY] / [hostUnionBottomGlobalY] are the global Y bounds of
+/// the union of mounted selectable bodies under the selection host. Bands use
+/// the padded viewport; the host union only gates / hard-stops each direction.
+MarkdownAutoscrollResult applyMarkdownSelectionAutoscroll({
+  required Offset globalPosition,
+  required MarkdownSelectionAutoscrollConfig config,
+  required Duration? lastTimestamp,
+  required void Function(Duration?) storeTimestamp,
+  required double hostUnionTopGlobalY,
+  required double hostUnionBottomGlobalY,
+  BuildContext? context,
+  MarkdownAutoscrollTarget? target,
+  MarkdownAutoscrollSession? session,
+}) {
+  void clear() => storeTimestamp(null);
+
+  if (!config.enabled || config.maxVelocity <= 0) {
+    // A zero max velocity can never move content; without this the
+    // past-the-outer-band branch below would hand back `scrolled` forever and
+    // keep the caller's frame ticker spinning on a drag that never scrolls.
+    clear();
+    return MarkdownAutoscrollResult.idle;
+  }
+
+  final resolved = target ??
+      resolveMarkdownScrollableAutoscrollTarget(
+        context: context,
+        config: config,
+      );
+  if (resolved == null) {
+    clear();
+    return MarkdownAutoscrollResult.idle;
+  }
+
+  final viewport = resolved.viewport;
+  if (viewport == null || !viewport.isUsable) {
     session?.reset();
     clear();
     return MarkdownAutoscrollResult.idle;
   }
+
+  final bounds = viewport.globalBounds;
+  final padded = viewport.paddedGlobalBounds;
+  final paddedTop = padded.top;
+  final paddedBottom = padded.bottom;
+  final clipHeight = padded.height;
+  final localY = globalPosition.dy - bounds.top;
+  final clipTopLocal = paddedTop - bounds.top;
 
   // Host still has content to reveal past each pad edge (or sits entirely
   // off-screen past that edge — drag must be able to pull it back).
@@ -273,7 +601,6 @@ MarkdownAutoscrollResult applyMarkdownSelectionAutoscroll({
   final canTowardEnd = hostUnionBottomGlobalY > paddedBottom + 0.5 ||
       hostUnionTopGlobalY >= paddedBottom - 0.5;
 
-  final clipTopLocal = resolvedTop;
   var velocity = markdownAutoscrollVelocity(
     localY: localY,
     clipTopLocalY: clipTopLocal,
@@ -312,12 +639,6 @@ MarkdownAutoscrollResult applyMarkdownSelectionAutoscroll({
     return MarkdownAutoscrollResult.suppressed;
   }
 
-  // Reverse axes: positive velocity should still mean "toward maxScrollExtent".
-  velocity = switch (scrollable.axisDirection) {
-    AxisDirection.down || AxisDirection.right => velocity,
-    AxisDirection.up || AxisDirection.left => -velocity,
-  };
-
   final previous = lastTimestamp;
   final now = _autoscrollNow(previous);
   storeTimestamp(now);
@@ -329,18 +650,19 @@ MarkdownAutoscrollResult applyMarkdownSelectionAutoscroll({
     return MarkdownAutoscrollResult.scrolled;
   }
 
-  final before = position.pixels;
-  final next = (before + delta).clamp(
-    position.minScrollExtent,
-    position.maxScrollExtent,
-  );
-  if ((next - before).abs() < 0.5) {
+  if (!resolved.canScroll(forward: !towardStart)) {
     session?.disarm(towardStart: towardStart);
     clear();
     return MarkdownAutoscrollResult.suppressed;
   }
 
-  position.jumpTo(next);
+  final applied = resolved.applyScrollDelta(delta);
+  if (applied.abs() < 0.5) {
+    session?.disarm(towardStart: towardStart);
+    clear();
+    return MarkdownAutoscrollResult.suppressed;
+  }
+
   return MarkdownAutoscrollResult.scrolled;
 }
 

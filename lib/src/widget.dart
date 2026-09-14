@@ -68,12 +68,20 @@ class MarkdownWidget extends LeafRenderObjectWidget {
     BuildContext context,
     MarkdownRenderObject renderObject,
   ) {
+    // Rewire the selection registry FIRST: a recycled element (a virtualized
+    // chat list reusing a slot) changes [documentId] and [markdown] together,
+    // and [update]'s registry write must land on the incoming id — not
+    // overwrite the outgoing document's model with this one's body.
     renderObject
+      ..updateSelection(
+        _resolveController(context),
+        documentId,
+        markdown: markdown,
+      )
       ..update(
         markdown: markdown,
         theme: _resolveTheme(context),
         cursorResolver: cursorResolver,
-      )
-      ..updateSelection(_resolveController(context), documentId);
+      );
   }
 }

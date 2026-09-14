@@ -72,7 +72,7 @@ class MarkdownRenderObject extends RenderBox
 
   bool _disposed = false;
 
-  void _attachController() {
+  void _attachController({Markdown? markdown}) {
     final controller = _controller;
     final id = _documentId;
     if (controller == null || id == null) return;
@@ -81,7 +81,11 @@ class MarkdownRenderObject extends RenderBox
       // Mounted surfaces must exist in the registry so [rangeFor] / ordering
       // can resolve them. AppMarkdown also putDocuments; this heals races where
       // the RO attaches before (or without) an app-level registration.
-      controller.putDocument(id, _painter.markdown);
+      //
+      // [markdown] is the model of the *incoming* document when a recycled
+      // element is rewired onto another id — [_painter] still holds the
+      // outgoing one until [update] runs.
+      controller.putDocument(id, markdown ?? _painter.markdown);
       controller.attachSurface(this);
     }
   }
@@ -96,16 +100,26 @@ class MarkdownRenderObject extends RenderBox
 
   /// Wires (or rewires) this render object to a selection [controller] under
   /// [documentId]. Passing a null controller makes it non-selectable (inert).
+  ///
+  /// [markdown] is the model the *incoming* [documentId] should be healed with.
+  /// It matters when a list recycles this render object from one message onto
+  /// another: the painter still holds the outgoing model at that point, and
+  /// registering it under the incoming id would overwrite that document's
+  /// registry entry with the wrong body.
+  ///
+  /// Must run **before** [update] on a rewire so the registry write that
+  /// [update] performs lands on the new id.
   @meta.internal
   void updateSelection(
     MarkdownSelectionController? controller,
-    Object? documentId,
-  ) {
+    Object? documentId, {
+    Markdown? markdown,
+  }) {
     if (identical(controller, _controller) && documentId == _documentId) return;
     _detachController();
     _controller = controller;
     _documentId = documentId;
-    _attachController();
+    _attachController(markdown: markdown);
     if (attached) {
       markNeedsCompositingBitsUpdate();
       markNeedsPaint();

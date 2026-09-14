@@ -325,15 +325,47 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
 /// Whether [local] (text-painter coordinates) lies inside any glyph line box
 /// of [painter]'s full rendered range.
 bool _painterHitsGlyphBoxes(TextPainter painter, Offset local) {
-  final plain = painter.plainText;
-  if (plain.isEmpty) return false;
-  final boxes = painter.getBoxesForSelection(
-    TextSelection(baseOffset: 0, extentOffset: plain.length),
-  );
-  for (final box in boxes) {
-    if (box.toRect().contains(local)) return true;
+  for (final rect in _glyphBoxesOf(painter)) {
+    if (rect.contains(local)) return true;
   }
   return false;
+}
+
+/// Cached glyph boxes of one [TextPainter] layout.
+final class _GlyphBoxes {
+  const _GlyphBoxes(this.size, this.text, this.rects);
+
+  final Size size;
+  final String text;
+  final List<Rect> rects;
+}
+
+/// Glyph boxes are re-read on **every hover event** (I-beam / link cursor) and
+/// on every glyph-tight hit test. `getBoxesForSelection` over a whole block
+/// allocates one box per run per line, so a long fenced code block would
+/// rebuild thousands of rects per mouse move without this cache.
+///
+/// Keyed on the painter; invalidated when its laid-out size or plain text
+/// changes. [TextPainter.plainText] is memoised by the painter itself, so the
+/// identity check is O(1).
+final Expando<_GlyphBoxes> _glyphBoxCache = Expando<_GlyphBoxes>('glyphBoxes');
+
+List<Rect> _glyphBoxesOf(TextPainter painter) {
+  final plain = painter.plainText;
+  if (plain.isEmpty) return const <Rect>[];
+  final size = painter.size;
+  final cached = _glyphBoxCache[painter];
+  if (cached != null && cached.size == size && identical(cached.text, plain)) {
+    return cached.rects;
+  }
+  final rects = <Rect>[
+    for (final box in painter.getBoxesForSelection(
+      TextSelection(baseOffset: 0, extentOffset: plain.length),
+    ))
+      box.toRect(),
+  ];
+  _glyphBoxCache[painter] = _GlyphBoxes(size, plain, rects);
+  return rects;
 }
 
 /// Whether the span under a text-local [local] point in [painter] carries a tap

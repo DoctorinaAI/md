@@ -207,10 +207,59 @@ Statics: `MarkdownSelectionScope.of/maybeOf` (→ controller), `stateOf` (→ st
 - **Edge autoscroll:** while dragging a non-collapsed selection (mouse pan, long-
   press move, or handle drag) near the **visible clip** of the host union
   (mounted selectable bodies ∩ padded viewport),
-  `applyMarkdownSelectionAutoscroll` jumps the scrollable. A `Ticker` keeps
+  `applyMarkdownSelectionAutoscroll` moves the scroll surface. A `Ticker` keeps
   scrolling while the pointer stays in-band and the host-union edge is not yet
   flush; it pauses on hard-stop / leave-band / arming-gate. Configure via
   `MarkdownSelectionScope.autoscroll` (default `edgeZone: 48`).
+
+  **The scroll surface is abstract.** Nothing in the band / gate math touches
+  `ScrollPosition`; it all runs against a `MarkdownAutoscrollTarget`:
+
+  | Member | Meaning |
+  |---|---|
+  | `MarkdownAutoscrollViewport? get viewport` | visible global bounds + the inset where the bands start; `null` disables the drag |
+  | `bool canScroll({required bool forward})` | can a positive (`forward`) / negative delta still move content? |
+  | `double applyScrollDelta(double delta)` | move content by **screen-space** pixels (positive = content up, revealing what is below); return the delta actually applied (`0` hard-stops and disarms that direction) |
+
+  `MarkdownScrollableAutoscrollTarget` is the built-in adapter for the sliver
+  protocol and is used when no resolver is set; it flips the sign for reverse
+  axes (`AxisDirection.up` / `.left`) so callers always speak screen space.
+
+  A host with its own scroll implementation — an anchored chat viewport that
+  owns its pixel offset, a `RenderBox` that positions children itself, a
+  transform-based canvas — supplies
+  `MarkdownSelectionAutoscrollConfig.targetResolver` instead. The scope calls it
+  **once per drag** (with the scope context, the `BuildContext` of the markdown
+  surface under the pointer, the pointer position and the config) and caches the
+  result, so a resolver may walk the element tree without a per-frame cost.
+  `MarkdownCallbackAutoscrollTarget` assembles a target from three closures:
+
+  ```dart
+  MarkdownSelectionScope(
+    controller: controller,
+    autoscroll: MarkdownSelectionAutoscrollConfig(
+      targetResolver: (request) => MarkdownCallbackAutoscrollTarget(
+        viewportOf: () {
+          final box = viewportKey.currentContext?.findRenderObject();
+          if (box is! RenderBox || !box.hasSize) return null;
+          return MarkdownAutoscrollViewport(
+            globalBounds: box.localToGlobal(Offset.zero) & box.size,
+            padding: const EdgeInsets.only(top: 8, bottom: 72), // composer
+          );
+        },
+        canScrollAt: ({required forward}) =>
+            forward ? !chat.isAtTail.value : !chat.reachedOldest,
+        // This host's `scrollBy` is anchor-relative: a positive value reveals
+        // *older* messages, the opposite of screen-space movement.
+        onScrollDelta: (delta) {
+          chat.scrollBy(-delta);
+          return delta;
+        },
+      ),
+    ),
+    child: child,
+  );
+  ```
 - **Cursor:** the `MarkdownWidget` render object is a `MouseTrackerAnnotation`; it
   shows the click (hand) cursor over an actionable link (a span with a tap
   recognizer, detected on hover via `handleEvent` → `markNeedsPaint` so
