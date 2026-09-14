@@ -184,6 +184,42 @@ void main() {
       expect(markdownBlockRenderedText(quote), contains('x'));
     });
 
+    testWidgets('a custom theme builder also builds nested children',
+        (tester) async {
+      final seen = <String>[];
+      final theme = MarkdownThemeData(
+        textStyle: const TextStyle(fontSize: 10, height: 2),
+        builder: (block, theme) {
+          seen.add(block.type);
+          return null; // fall back to the default painter
+        },
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 400,
+              child: MarkdownWidget(
+                markdown: Markdown.fromString(_quoteWithFence),
+                theme: theme,
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(seen, contains('quote'));
+      expect(
+        seen,
+        contains('code'),
+        reason: 'a host that swaps the code painter expects it inside > too',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     test('the markup formatter round-trips a nested fence', () {
       final md = Markdown.fromString(_quoteWithFence);
       final controller = MarkdownSelectionController()

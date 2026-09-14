@@ -45,6 +45,9 @@ extension points or reach into a default block painter's fields. Ordinary
   when present.
 - **FIXED**: Prose nested inside a quote (paragraphs/lists/headings beside a
   fence) uses `quoteStyle` again; code/table chrome keeps the document theme.
+- **FIXED**: Nested children route through `MarkdownThemeData.builder` like
+  top-level blocks. A host that replaces the code painter (a fence with a copy
+  button, say) was silently getting the default one inside `> …`.
 
 ### Glyph-tight hit testing
 - **CHANGED**: Hover I-beam and link hit-testing use rendered **line/glyph

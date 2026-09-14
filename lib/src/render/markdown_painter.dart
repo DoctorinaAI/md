@@ -65,6 +65,17 @@ class MarkdownPainter {
   /// index whenever a `blockFilter` drops blocks).
   List<int> _sourceIndices = const <int>[];
 
+  /// Builds a block nested inside a quote / alert body.
+  ///
+  /// Routes through [MarkdownThemeData.builder] like a top-level block does —
+  /// a host that replaces the code painter (a fence with a copy button, say)
+  /// expects the same painter inside `> …` as outside it.
+  static BlockPainter _nestedBlockBuilder(
+    MD$Block block,
+    MarkdownThemeData theme,
+  ) =>
+      theme.builder?.call(block, theme) ?? _defaultBlockBuilder(block, theme);
+
   static BlockPainter _defaultBlockBuilder(
     MD$Block block,
     MarkdownThemeData theme,
@@ -85,7 +96,7 @@ class MarkdownPainter {
           theme: theme,
           children: [
             for (final child in q.blocks)
-              _defaultBlockBuilder(
+              _nestedBlockBuilder(
                 child,
                 BlockPainter$Quote.inheritFrom(theme, child),
               ),
@@ -114,7 +125,7 @@ class MarkdownPainter {
           spans: a.spans,
           theme: theme,
           children: [
-            for (final child in a.blocks) _defaultBlockBuilder(child, theme),
+            for (final child in a.blocks) _nestedBlockBuilder(child, theme),
           ],
         ),
         spacer: (s) => BlockPainter$Spacer(
