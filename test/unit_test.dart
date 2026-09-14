@@ -4,6 +4,7 @@ import 'parser/block_test.dart' as block_test;
 import 'parser/edge_cases_test.dart' as edge_cases_test;
 import 'parser/gfm_test.dart' as gfm_test;
 import 'parser/golden_test.dart' as golden_test;
+import 'line_clamp/line_clamp_test.dart' as line_clamp_test;
 import 'nodes/nodes_test.dart' as nodes_test;
 import 'parser/inline_test.dart' as inline_test;
 import 'parser/math_test.dart' as math_test;
@@ -38,6 +39,7 @@ void main() => group('Unit', () {
       selection_widget_test.main();
       selection_keyboard_test.main();
       selection_handles_test.main();
+      line_clamp_test.main();
       render_test.main();
       widget_test.main();
     });

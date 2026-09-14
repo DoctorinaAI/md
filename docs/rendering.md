@@ -198,6 +198,21 @@ strikethrough/monospace + highlight/monospace backgrounds + link color),
 `alertColors` (+ built-in GitHub palette fallback via `alertColorFor`),
 `textDirection`, `textScaler`, and `onLinkTap`.
 
+## Measuring a line budget
+
+The renderer has no `maxLines`. `clampMarkdownToLines(markdown:, theme:,
+maxWidth:, maxLines:)` lays the document out on a throwaway `MarkdownPainter`
+and returns a `MarkdownLineClamp(height, clampedHeight)`: `clampedHeight` ends
+on a line boundary, so a host can clip to it without showing half a line.
+
+It is a **full layout per call** — cache the result, do not call it from
+`build` on every frame.
+
+Line counting comes from `MarkdownPainter.textLineBottoms()`: runs sharing a
+bottom edge (a table row's cells, a list bullet and its first line) count once,
+and blocks with no text (`MD$Spacer`, `MD$Divider`) add height without spending
+a line.
+
 ## Public vs internal
 
 Public (in `flutter_md.dart`'s `show` list): the framework
