@@ -1,3 +1,36 @@
+## Unreleased
+
+### Monospace font resolution
+- **FIXED**: Inline `` `code` `` and fenced blocks pick a monospace family the
+  host platform can actually resolve. Flutter hands the family straight to the
+  platform font manager, and CoreText (iOS / macOS) and DirectWrite (Windows)
+  do not know the CSS generic `'monospace'` — code silently rendered in the
+  proportional body face there. Those two now get `Menlo` / `Consolas`.
+  **Android, Fuchsia, Linux and web keep `'monospace'`**, so the primary face
+  there is unchanged. Note that on web it is unchanged but still wrong:
+  CanvasKit / skwasm reach no system fonts, so no family name resolves there
+  and code has always rendered in the proportional default. Bundling a
+  monospace asset and pointing `monospaceFontFamily` at it is the only fix,
+  and that is a host decision.
+- **CHANGED**: code spans now carry a `fontFamilyFallback` on every platform:
+  the monospace chain followed by whatever `textStyle` already carried. A
+  monospace face covers Latin and little else, so the body face's chain is
+  appended rather than replaced — a host's CJK / emoji coverage keeps working
+  inside `` `code` `` and fenced blocks.
+- **ADDED**: `MarkdownThemeData.monospaceFontFamily` /
+  `monospaceFontFamilyFallback` to pin a bundled face. Both default to the
+  platform-resolved chain above and are resolved once, in the constructor. One
+  knob covers both inline `` `code` `` and fenced blocks — there was previously
+  no supported way to change the fenced-block face at all: `BlockPainter$Code`
+  built its style in a static method reading a global, so even overriding
+  `textStyleFor` moved inline code only. An empty fallback list means "no
+  monospace fallbacks", not "unset" — `textStyle`'s own chain still applies.
+- **CHANGED**: `MarkdownThemeData.mergeTheme` resolves the default face from
+  `ThemeData.platform` rather than the global `defaultTargetPlatform`, so an
+  app that adapts its Material theme to another platform gets that platform's
+  face. `ThemeData.platform` defaults to `defaultTargetPlatform`, so this only
+  moves for an app that deliberately overrode it.
+
 ## 0.2.0
 
 > **Upgrading from 0.0.x?** See the
