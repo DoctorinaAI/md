@@ -41,6 +41,17 @@ void main() => group('StreamingMarkdownParser', () {
         'quote-multi': '> a\n> b\n> c',
         'alert-note': '> [!NOTE]\n> Body of the note.\n\nafter',
         'alert-warning': '> [!WARNING]\n> Careful now.\n> Second line.',
+        // Fenced code inside a quote / alert re-enters the decoder to parse
+        // the body as nested blocks. The chat streams into exactly this, so
+        // every mid-fence prefix has to agree with a batch parse.
+        'quote-fence':
+            '> intro\n> ```dart\n> void main() {}\n> ```\n> outro\n\nafter',
+        'quote-fence-unclosed': '> intro\n> ```\n> still going',
+        'quote-fence-tilde': '> a\n> ~~~\n> x\n> ~~~\n> b',
+        'quote-fence-empty': '> ```\n> ```\n\nafter',
+        'quote-fence-nested-quote': '> > inner\n> ```\n> code\n> ```',
+        'alert-fence':
+            '> [!NOTE]\n> body\n> ```sh\n> echo hi\n> ```\n\nafter',
         'code-closed': '```dart\nvoid main() {}\n```\n\nafter code',
         'code-tilde': '~~~\nplain\n~~~\n\nafter',
         'code-unclosed': '```dart\nline 1\nline 2\nstill going',
