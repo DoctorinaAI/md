@@ -240,6 +240,10 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   /// Coalesces post-frame handle-overlay syncs deferred off layout/build.
   bool _overlaySyncScheduled = false;
 
+  /// Coalesces post-frame [MarkdownSelectionScope.onSelectionChanged] delivery
+  /// for controller notifications that land during build / layout.
+  bool _selectionChangedNotifyScheduled = false;
+
   /// Ancestor observer (e.g. [Scaffold]) so the toolbar follows parent scrolls
   /// when this scope is a scrollable *child*, not an ancestor.
   ScrollNotificationObserverState? _scrollNotificationObserver;
@@ -353,6 +357,31 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     }
   }
 
+  /// Delivers [sel] to [MarkdownSelectionScope.onSelectionChanged].
+  ///
+  /// The controller can notify from inside build / layout: a streaming
+  /// `putDocument` runs from `MarkdownWidget.updateRenderObject` and may
+  /// reconcile the range away, and a deferred `removeDocument` flushes from
+  /// `RenderObject.detach`. Hosts routinely `setState` from this callback, so
+  /// a synchronous call there throws "setState() called during build".
+  /// Coalesce to the end of the frame and deliver the settled selection.
+  void _notifySelectionChanged(MarkdownSelection? sel) {
+    if (widget.onSelectionChanged == null) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase != SchedulerPhase.persistentCallbacks &&
+        phase != SchedulerPhase.midFrameMicrotasks) {
+      widget.onSelectionChanged?.call(sel);
+      return;
+    }
+    if (_selectionChangedNotifyScheduled) return;
+    _selectionChangedNotifyScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _selectionChangedNotifyScheduled = false;
+      if (!mounted) return;
+      widget.onSelectionChanged?.call(controller.selection);
+    });
+  }
+
   void _applySelectionColor() {
     controller.selectionColor = widget.selectionColor ??
         DefaultSelectionStyle.of(context).selectionColor;
@@ -362,7 +391,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     final sel = controller.selection;
     if (sel != _lastSelection) {
       _lastSelection = sel;
-      widget.onSelectionChanged?.call(sel);
+      _notifySelectionChanged(sel);
       // Selection moved — on mobile, drop a frozen right-click anchor so
       // the toolbar tracks the live selection bounds instead. On desktop,
       // preserve the user's secondary-click anchor.

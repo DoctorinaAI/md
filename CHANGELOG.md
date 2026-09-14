@@ -139,6 +139,12 @@ extension points or reach into a default block painter's fields. Ordinary
 - **FIXED**: Documents sharing an `order` could swap places on any re-sort
   (`List.sort` is not stable), silently reversing extracted text. Ties now break
   on registration sequence.
+- **FIXED**: `MarkdownSelectionScope.onSelectionChanged` fired synchronously
+  from inside build / layout — a streaming `putDocument` reconciling the range
+  away (from `MarkdownWidget.updateRenderObject`) or a deferred
+  `removeDocument` flushing from `RenderObject.detach` threw
+  "setState() called during build" in any host that rebuilds from the callback.
+  Delivery is now coalesced to the end of the frame in those phases.
 
 ### Selection chrome (SelectionArea parity)
 - **ADDED**: Read-only selection chrome on the controller /

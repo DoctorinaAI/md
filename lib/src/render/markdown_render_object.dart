@@ -60,11 +60,17 @@ class MarkdownRenderObject extends RenderBox
   final LayerHandle<LeaderLayer> _startHandleLayer = LayerHandle<LeaderLayer>();
   final LayerHandle<LeaderLayer> _endHandleLayer = LayerHandle<LeaderLayer>();
 
-  /// Whether this surface currently owns a start and/or end handle leader.
-  @visibleForTesting
-  bool get debugHasSelectionHandleLeaders =>
+  /// Whether [paint] will push a start and/or end [LeaderLayer] this frame.
+  ///
+  /// Drives [alwaysNeedsCompositing]; keep it in lockstep with the conditions
+  /// in [paint] or a leader can be pushed without a composited layer for it.
+  bool get _pushesHandleLeaderLayers =>
       (_startHandleLink != null && _startHandleLocal != null) ||
       (_endHandleLink != null && _endHandleLocal != null);
+
+  /// Whether this surface currently owns a start and/or end handle leader.
+  @visibleForTesting
+  bool get debugHasSelectionHandleLeaders => _pushesHandleLeaderLayers;
 
   void _onSelectionChange() {
     if (!_disposed) markNeedsPaint();
@@ -337,7 +343,7 @@ class MarkdownRenderObject extends RenderBox
   bool get isRepaintBoundary => _controller != null;
 
   @override
-  bool get alwaysNeedsCompositing => debugHasSelectionHandleLeaders;
+  bool get alwaysNeedsCompositing => _pushesHandleLeaderLayers;
 
   @override
   bool get sizedByParent => false;

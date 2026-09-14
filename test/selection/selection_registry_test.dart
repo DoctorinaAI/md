@@ -379,4 +379,101 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('host notification safety', () {
+    testWidgets(
+        'removeDocument flush during unmount does not crash a host that '
+        'setStates from onSelectionChanged', (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(id: 'd', model: Markdown.fromString('Body text')),
+        ]);
+      addTearDown(controller.dispose);
+
+      var show = true;
+      var changes = 0;
+      late StateSetter set;
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(builder: (context, setState) {
+            set = setState;
+            return MarkdownSelectionScope(
+              controller: controller,
+              onSelectionChanged: (_) => setState(() => changes++),
+              child: show
+                  ? const Align(
+                      alignment: Alignment.topLeft,
+                      child: SizedBox(width: 400, child: _Doc('d')),
+                    )
+                  : const SizedBox.shrink(),
+            );
+          }),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      controller.selectAll();
+      await tester.pumpAndSettle();
+      expect(controller.selection, isNotNull);
+
+      // App drops the document while the surface is still mounted, then the
+      // widget unmounts in the same frame — the deferred remove flushes from
+      // RenderObject.detach, inside layout.
+      controller.removeDocument('d');
+      set(() => show = false);
+      await tester.pumpAndSettle();
+
+      expect(controller.selection, isNull);
+      expect(changes, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a streaming model update that reconciles the selection does '
+        'not crash a host that setStates from onSelectionChanged',
+        (tester) async {
+      var model = Markdown.fromString('Hello streaming world');
+      final controller = MarkdownSelectionController(
+        reconciliation: const MarkdownReconciliationPolicy.clearOnChange(),
+      )..setDocuments(
+            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: model)]);
+      addTearDown(controller.dispose);
+
+      var changes = 0;
+      late StateSetter set;
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(builder: (context, setState) {
+            set = setState;
+            return MarkdownSelectionScope(
+              controller: controller,
+              onSelectionChanged: (_) => setState(() => changes++),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: 400,
+                  child: MarkdownWidget(markdown: model, documentId: 'd'),
+                ),
+              ),
+            );
+          }),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      controller.selectAll();
+      await tester.pumpAndSettle();
+      expect(controller.selection, isNotNull);
+      changes = 0;
+
+      // A streaming token arrives: MarkdownWidget.updateRenderObject pushes the
+      // new model into the registry during build, reconciliation drops the
+      // range, and the host is notified mid-build.
+      set(() => model = Markdown.fromString('Hello streaming world!'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+  });
 }
