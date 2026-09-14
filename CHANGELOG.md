@@ -29,24 +29,6 @@ extension points or reach into a default block painter's fields. Ordinary
   `markdown:`. `@meta.internal`, but `MarkdownWidget` subclasses that call it
   must now invoke it **before** `update` (see the registry fix below).
 
-### Monospace font resolution
-- **FIXED**: Inline `` `code` `` and fenced blocks pick a monospace family that
-  the host platform can actually resolve (`kMonospaceFontFamily`, then
-  `kMonospaceFontFamilyFallback`). CoreText (iOS / macOS) and DirectWrite
-  (Windows) do not know the CSS generic `'monospace'`, so code silently
-  rendered in the proportional body face there; those two now get `Menlo` /
-  `Consolas`. **Android, Fuchsia, Linux and web keep `'monospace'`** — they
-  resolve it natively, so rendering there is unchanged from 0.2.0.
-- **ADDED**: `kMonospaceFontFamily` (platform-resolved) and
-  `kMonospaceFontFamilyFallback` — the defaults behind the theme fields below.
-- **ADDED**: `MarkdownThemeData.monospaceFontFamily` /
-  `monospaceFontFamilyFallback` (+ the `effectiveMonospace…` getters) to pin a
-  bundled face. One knob covers both inline `` `code` `` and fenced blocks;
-  before this there was no supported way to change the fenced-block face at all
-  — `BlockPainter$Code` built its style from a static global, so overriding
-  `textStyleFor` moved inline code only and left fences behind. An empty
-  fallback list is honoured (it means "no fallbacks"), not treated as unset.
-
 ### Quote / alert nested fenced code
 - **FIXED**: Fenced code (` ```lang ` / `~~~`) inside a blockquote or GitHub
   alert is re-parsed as nested `MD$Code` in `MD$Quote.blocks` /
@@ -122,12 +104,6 @@ extension points or reach into a default block painter's fields. Ordinary
   `MarkdownPainter.localBoxesForRange` — fast query returning content-local
   bounding boxes for an arbitrary character range within a block, directly from
   cached block painters without re-layout.
-
-### Line clamp
-- **ADDED**: `clampMarkdownToLines` / `MarkdownLineClamp` — painter-measured
-  height for the first N visual text lines at a given width (line-boundary cut;
-  spacers/dividers add height without spending the line budget). Callers size a
-  clipped box; the renderer itself has no line budget.
 
 ### Registry / multi-body selection
 - **FIXED**: `removeDocument` defers while a surface for that id is mounted

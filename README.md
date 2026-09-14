@@ -488,12 +488,6 @@ MarkdownTheme(
     linkStyle: const TextStyle(
       decoration: TextDecoration.underline,
     ),
-    // Monospace face for inline `code` AND fenced blocks. Leave it unset to
-    // get a family the host platform can actually resolve: `monospace` on
-    // Android / Linux / web, Menlo on iOS + macOS, Consolas on Windows
-    // (CoreText and DirectWrite do not know the CSS generic, so code would
-    // otherwise render in the proportional body face there).
-    monospaceFontFamily: 'JetBrains Mono',
     // Per-type accent colors for GitHub alert blocks
     alertColors: const {
       MD$AlertType.warning: Color(0xFF9A6700),

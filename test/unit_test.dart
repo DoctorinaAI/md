@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'highlight/highlight_test.dart' as highlight_test;
-import 'line_clamp/line_clamp_test.dart' as line_clamp_test;
 import 'nodes/nodes_test.dart' as nodes_test;
 import 'parser/block_test.dart' as block_test;
 import 'parser/edge_cases_test.dart' as edge_cases_test;
@@ -56,7 +55,6 @@ void main() => group('Unit', () {
       selection_registry_test.main();
       selection_chrome_test.main();
       selection_nested_blocks_test.main();
-      line_clamp_test.main();
       render_test.main();
       widget_test.main();
     });
