@@ -215,7 +215,8 @@ void main() => group('MarkdownThemeData', () {
         ///
         /// Reset via try/finally rather than `addTearDown` — the framework's
         /// `debugAssertAllFoundationVarsUnset` check runs first. The theme is
-        /// rebuilt inside the override because `textStyleFor` memoises.
+        /// rebuilt inside the override because the family is resolved once,
+        /// in the constructor.
         (String?, List<String>?) familyOn(TargetPlatform platform) {
           debugDefaultTargetPlatformOverride = platform;
           try {
@@ -282,9 +283,9 @@ void main() => group('MarkdownThemeData', () {
             monospaceFontFamilyFallback: const <String>['Fira Code'],
           );
 
-          expect(theme.effectiveMonospaceFontFamily, 'JetBrains Mono');
+          expect(theme.monospaceFontFamily, 'JetBrains Mono');
           expect(
-            theme.effectiveMonospaceFontFamilyFallback,
+            theme.monospaceFontFamilyFallback,
             const <String>['Fira Code'],
           );
 
@@ -308,8 +309,8 @@ void main() => group('MarkdownThemeData', () {
               );
               // Fallbacks stay on the shared chain unless overridden too.
               expect(
-                theme.effectiveMonospaceFontFamilyFallback,
-                kMonospaceFontFamilyFallback,
+                theme.monospaceFontFamilyFallback,
+                base().monospaceFontFamilyFallback,
                 reason: '$platform',
               );
             } finally {
@@ -323,7 +324,7 @@ void main() => group('MarkdownThemeData', () {
             textStyle: const TextStyle(fontSize: 14),
             monospaceFontFamilyFallback: const <String>[],
           );
-          expect(theme.effectiveMonospaceFontFamilyFallback, isEmpty);
+          expect(theme.monospaceFontFamilyFallback, isEmpty);
           expect(
             theme.textStyleFor(MD$Style.monospace).fontFamilyFallback,
             isEmpty,
@@ -335,14 +336,14 @@ void main() => group('MarkdownThemeData', () {
           // ThemeExtension here; DoctorinaAI/md#27 narrows it.
           final theme = MarkdownThemeData(textStyle: const TextStyle())
               .copyWith(monospaceFontFamily: 'Fira Code') as MarkdownThemeData;
-          expect(theme.effectiveMonospaceFontFamily, 'Fira Code');
+          expect(theme.monospaceFontFamily, 'Fira Code');
         });
 
         testWidgets('a fenced block renders with the same family',
             (tester) async {
           debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
           try {
-            expect(kMonospaceFontFamily, 'Menlo');
+            expect(base().monospaceFontFamily, 'Menlo');
             await tester.pumpWidget(MaterialApp(
               home: Align(
                 alignment: Alignment.topLeft,

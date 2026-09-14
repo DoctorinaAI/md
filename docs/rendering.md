@@ -195,9 +195,10 @@ Styling: `textStyle`, per-level `h1Style..h6Style` (+ cached `headingStyleFor`),
 strikethrough/monospace + highlight/monospace backgrounds + link color),
 `linkColor`/`linkStyle`, `surfaceColor` (code/table/quote backgrounds),
 `highlightBackgroundColor`, `monospaceBackgroundColor`,
-`monospaceFontFamily`/`monospaceFontFamilyFallback` (null → the
-platform-resolved `kMonospaceFontFamily`; one knob for both inline `` `code` ``
-and fenced blocks), `dividerColor`,
+`monospaceFontFamily`/`monospaceFontFamilyFallback` (platform-resolved by
+default — `monospace` on Android/Fuchsia/Linux/web, `Menlo` on iOS/macOS,
+`Consolas` on Windows; one knob for both inline `` `code` `` and fenced
+blocks), `dividerColor`,
 `alertColors` (+ built-in GitHub palette fallback via `alertColorFor`),
 `textDirection`, `textScaler`, and `onLinkTap`.
 

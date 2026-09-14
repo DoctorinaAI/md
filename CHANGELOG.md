@@ -7,17 +7,19 @@
   do not know the CSS generic `'monospace'` — code silently rendered in the
   proportional body face there. Those two now get `Menlo` / `Consolas`.
   **Android, Fuchsia, Linux and web keep `'monospace'`**: they resolve it
-  natively, so rendering there is unchanged.
-- **ADDED**: `kMonospaceFontFamily` (platform-resolved) and
-  `kMonospaceFontFamilyFallback` (ends in `'monospace'`, so a platform missing
-  its primary face still lands on a real monospace one).
+  natively, so the primary face there is unchanged.
+- **CHANGED**: code spans now carry a `fontFamilyFallback` on every platform.
+  It **replaces** any `fontFamilyFallback` set on `textStyle`, so a host that
+  relied on that chain for scripts the monospace face does not cover (CJK,
+  emoji) must repeat it in `monospaceFontFamilyFallback`.
 - **ADDED**: `MarkdownThemeData.monospaceFontFamily` /
-  `monospaceFontFamilyFallback`, plus the `effectiveMonospace…` getters, to pin
-  a bundled face. One knob covers both inline `` `code` `` and fenced blocks —
-  there was previously no supported way to change the fenced-block face at all:
-  `BlockPainter$Code` built its style in a static method reading a global, so
-  even overriding `textStyleFor` moved inline code only. An empty fallback list
-  means "no fallbacks", not "unset".
+  `monospaceFontFamilyFallback` to pin a bundled face. Both default to the
+  platform-resolved chain above and are resolved once, in the constructor. One
+  knob covers both inline `` `code` `` and fenced blocks — there was previously
+  no supported way to change the fenced-block face at all: `BlockPainter$Code`
+  built its style in a static method reading a global, so even overriding
+  `textStyleFor` moved inline code only. An empty fallback list means "no
+  fallbacks", not "unset".
 
 ## 0.2.0
 

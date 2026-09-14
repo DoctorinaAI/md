@@ -41,8 +41,8 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
     MarkdownThemeData theme,
   ) {
     final baseStyle = theme.textStyle.copyWith(
-      fontFamily: theme.effectiveMonospaceFontFamily,
-      fontFamilyFallback: theme.effectiveMonospaceFontFamilyFallback,
+      fontFamily: theme.monospaceFontFamily,
+      fontFamilyFallback: theme.monospaceFontFamilyFallback,
       fontSize: theme.textStyle.fontSize ?? kDefaultFontSize,
     );
     final highlighter = theme.highlighter;
