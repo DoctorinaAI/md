@@ -197,8 +197,9 @@ strikethrough/monospace + highlight/monospace backgrounds + link color),
 `highlightBackgroundColor`, `monospaceBackgroundColor`,
 `monospaceFontFamily`/`monospaceFontFamilyFallback` (platform-resolved by
 default — `monospace` on Android/Fuchsia/Linux/web, `Menlo` on iOS/macOS,
-`Consolas` on Windows; one knob for both inline `` `code` `` and fenced
-blocks), `dividerColor`,
+`Consolas` on Windows, from `ThemeData.platform` under `mergeTheme`; one knob
+for both inline `` `code` `` and fenced blocks, and `textStyle`'s own fallback
+chain is appended after it), `dividerColor`,
 `alertColors` (+ built-in GitHub palette fallback via `alertColorFor`),
 `textDirection`, `textScaler`, and `onLinkTap`.
 

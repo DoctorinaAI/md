@@ -42,7 +42,7 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
   ) {
     final baseStyle = theme.textStyle.copyWith(
       fontFamily: theme.monospaceFontFamily,
-      fontFamilyFallback: theme.monospaceFontFamilyFallback,
+      fontFamilyFallback: theme.monospaceFallbackChain,
       fontSize: theme.textStyle.fontSize ?? kDefaultFontSize,
     );
     final highlighter = theme.highlighter;

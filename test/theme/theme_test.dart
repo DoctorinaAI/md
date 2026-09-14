@@ -331,6 +331,54 @@ void main() => group('MarkdownThemeData', () {
           );
         });
 
+        test('an empty fallback list falls through to the body chain', () {
+          // "No monospace fallbacks" means exactly that — it does not also
+          // throw away the coverage the host put on textStyle.
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontFamilyFallback: <String>['Noto Sans SC'],
+            ),
+            monospaceFontFamilyFallback: const <String>[],
+          );
+          expect(
+            theme.textStyleFor(MD$Style.monospace).fontFamilyFallback,
+            const <String>['Noto Sans SC'],
+          );
+        });
+
+        test("the body face's fallback chain is appended, not replaced", () {
+          // A monospace face covers Latin and little else. Before this was
+          // appended, a host chain carrying CJK / emoji coverage was dropped
+          // for code spans only — on every platform, generic or not.
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontFamily: 'Inter',
+              fontFamilyFallback: <String>['Noto Sans SC', 'Noto Color Emoji'],
+            ),
+            monospaceFontFamily: 'JetBrains Mono',
+            monospaceFontFamilyFallback: const <String>['Fira Code'],
+          );
+
+          const expected = <String>[
+            'Fira Code',
+            'Noto Sans SC',
+            'Noto Color Emoji',
+          ];
+          // Monospace faces still win wherever they have the glyph.
+          expect(theme.monospaceFallbackChain, expected);
+          expect(
+            theme.textStyleFor(MD$Style.monospace).fontFamilyFallback,
+            expected,
+          );
+          // A non-monospace span is untouched by any of this.
+          expect(
+            theme.textStyleFor(MD$Style.bold).fontFamilyFallback,
+            const <String>['Noto Sans SC', 'Noto Color Emoji'],
+          );
+        });
+
         test('copyWith carries the override', () {
           // The cast is only needed because copyWith still returns the base
           // ThemeExtension here; DoctorinaAI/md#27 narrows it.
@@ -339,7 +387,39 @@ void main() => group('MarkdownThemeData', () {
           expect(theme.monospaceFontFamily, 'Fira Code');
         });
 
-        testWidgets('a fenced block renders with the same family',
+        test('a fenced block uses the same family and chain', () {
+          // BlockPainter$Code builds its base style in a static method, so it
+          // used to be the half that no theme knob could move. Read the
+          // painter's own span rather than trusting that it shares the code
+          // path with textStyleFor.
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontFamilyFallback: <String>['Noto Sans SC'],
+            ),
+            monospaceFontFamily: 'JetBrains Mono',
+            monospaceFontFamilyFallback: const <String>['Fira Code'],
+          );
+          final painter = BlockPainter$Code(
+            text: 'void main() {}',
+            language: 'dart',
+            theme: theme,
+          );
+
+          final style = painter.painter.text?.style;
+          expect(style?.fontFamily, 'JetBrains Mono');
+          expect(
+            style?.fontFamilyFallback,
+            const <String>['Fira Code', 'Noto Sans SC'],
+          );
+          expect(
+            style?.fontFamily,
+            theme.textStyleFor(MD$Style.monospace).fontFamily,
+            reason: 'inline code and fences must not drift apart',
+          );
+        });
+
+        testWidgets('a fenced block renders on the platform default',
             (tester) async {
           debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
           try {
@@ -360,6 +440,42 @@ void main() => group('MarkdownThemeData', () {
             ));
             await tester.pumpAndSettle();
             expect(tester.takeException(), isNull);
+          } finally {
+            debugDefaultTargetPlatformOverride = null;
+          }
+        });
+
+        testWidgets('mergeTheme follows ThemeData.platform', (tester) async {
+          // An app that adapts its Material theme to another platform is
+          // stating which platform it is imitating; the global
+          // defaultTargetPlatform is not that answer.
+          debugDefaultTargetPlatformOverride = TargetPlatform.android;
+          try {
+            expect(
+              MarkdownThemeData.mergeTheme(
+                ThemeData(platform: TargetPlatform.iOS),
+              ).monospaceFontFamily,
+              'Menlo',
+            );
+            expect(
+              MarkdownThemeData.mergeTheme(
+                ThemeData(platform: TargetPlatform.windows),
+              ).monospaceFontFamily,
+              'Consolas',
+            );
+            // Unset, ThemeData.platform *is* defaultTargetPlatform.
+            expect(
+              MarkdownThemeData.mergeTheme(ThemeData()).monospaceFontFamily,
+              'monospace',
+            );
+            // An explicit face still wins over both.
+            expect(
+              MarkdownThemeData.mergeTheme(
+                ThemeData(platform: TargetPlatform.iOS),
+                monospaceFontFamily: 'JetBrains Mono',
+              ).monospaceFontFamily,
+              'JetBrains Mono',
+            );
           } finally {
             debugDefaultTargetPlatformOverride = null;
           }

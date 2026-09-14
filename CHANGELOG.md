@@ -8,10 +8,11 @@
   proportional body face there. Those two now get `Menlo` / `Consolas`.
   **Android, Fuchsia, Linux and web keep `'monospace'`**: they resolve it
   natively, so the primary face there is unchanged.
-- **CHANGED**: code spans now carry a `fontFamilyFallback` on every platform.
-  It **replaces** any `fontFamilyFallback` set on `textStyle`, so a host that
-  relied on that chain for scripts the monospace face does not cover (CJK,
-  emoji) must repeat it in `monospaceFontFamilyFallback`.
+- **CHANGED**: code spans now carry a `fontFamilyFallback` on every platform:
+  the monospace chain followed by whatever `textStyle` already carried. A
+  monospace face covers Latin and little else, so the body face's chain is
+  appended rather than replaced — a host's CJK / emoji coverage keeps working
+  inside `` `code` `` and fenced blocks.
 - **ADDED**: `MarkdownThemeData.monospaceFontFamily` /
   `monospaceFontFamilyFallback` to pin a bundled face. Both default to the
   platform-resolved chain above and are resolved once, in the constructor. One
@@ -19,7 +20,12 @@
   no supported way to change the fenced-block face at all: `BlockPainter$Code`
   built its style in a static method reading a global, so even overriding
   `textStyleFor` moved inline code only. An empty fallback list means "no
-  fallbacks", not "unset".
+  monospace fallbacks", not "unset" — `textStyle`'s own chain still applies.
+- **CHANGED**: `MarkdownThemeData.mergeTheme` resolves the default face from
+  `ThemeData.platform` rather than the global `defaultTargetPlatform`, so an
+  app that adapts its Material theme to another platform gets that platform's
+  face. `ThemeData.platform` defaults to `defaultTargetPlatform`, so this only
+  moves for an app that deliberately overrode it.
 
 ## 0.2.0
 
