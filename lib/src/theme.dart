@@ -1,5 +1,7 @@
 import 'dart:collection';
 
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../flutter_md.dart';
@@ -21,19 +23,48 @@ typedef MarkdownCursorResolver = MouseCursor? Function(
   MD$Block? block,
 );
 
-/// Primary system monospace face for inline/`code` and fenced blocks.
+/// Primary monospace face for inline `` `code` `` and fenced blocks, chosen for
+/// the host platform.
 ///
-/// Prefer a real family over the CSS generic `'monospace'`, which Flutter does
-/// not map on most platforms (so spans fall back to the body proportional
-/// font).
-const String kMonospaceFontFamily = 'Menlo';
+/// Flutter passes the family straight to the platform font manager, and only
+/// some of them know the CSS generic `'monospace'`: Android's font config and
+/// fontconfig on Linux resolve it, CoreText (iOS / macOS) and DirectWrite
+/// (Windows) do not — there a `'monospace'` span silently falls back to the
+/// proportional body face, so inline code stops looking like code.
+///
+/// So a real system family is substituted on exactly those two platforms, and
+/// every other target keeps the generic it already resolved. Web keeps it too:
+/// its renderer has no access to arbitrary system fonts, so naming one could
+/// not help and the generic is what the browser (or the Noto fallback) is able
+/// to answer.
+///
+/// [kMonospaceFontFamilyFallback] follows, ending in `'monospace'` again, so a
+/// platform whose primary is missing still lands on a real monospace face.
+String get kMonospaceFontFamily {
+  if (kIsWeb) return 'monospace';
+  return switch (defaultTargetPlatform) {
+    // Ships with every iOS / macOS release; SF Mono is not user-installable.
+    TargetPlatform.iOS || TargetPlatform.macOS => 'Menlo',
+    // Ships with Windows since Vista.
+    TargetPlatform.windows => 'Consolas',
+    TargetPlatform.android ||
+    TargetPlatform.fuchsia ||
+    TargetPlatform.linux =>
+      'monospace',
+  };
+}
 
-/// Fallbacks after [kMonospaceFontFamily] (Android maps `'monospace'`).
+/// Families tried after [kMonospaceFontFamily], for a platform whose primary
+/// face is missing (a trimmed Linux image, a custom Android ROM).
+///
+/// Ends in the CSS generic so anything that resolves it still gets a real
+/// monospace face rather than the proportional default.
 const List<String> kMonospaceFontFamilyFallback = <String>[
-  'Monaco',
-  'Consolas',
+  'Menlo', // Apple
+  'Consolas', // Windows
+  'DejaVu Sans Mono', // Linux
+  'Roboto Mono', // Android
   'Courier New',
-  'Courier',
   'monospace',
 ];
 
@@ -310,8 +341,9 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
                 TextDecoration.lineThrough,
               _ => null,
             },
-            // CSS generic `'monospace'` does not resolve on most Flutter
-            // targets (notably Apple); use a real system stack instead.
+            // The CSS generic `'monospace'` does not resolve on Apple or
+            // Windows; [kMonospaceFontFamily] substitutes a real face there
+            // and keeps the generic everywhere it already worked.
             fontFamily: style.contains(MD$Style.monospace)
                 ? kMonospaceFontFamily
                 : null,

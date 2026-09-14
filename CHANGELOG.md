@@ -23,17 +23,24 @@ extension points or reach into a default block painter's fields. Ordinary
   `hitsSelectableGlyphs`, `isLinkAtGlobal`, `caretRectFor`,
   `localBoxesForRange`, `hasSelectionHandleLeaders` and
   `clearSelectionHandleLayersIfLinked`. Custom surfaces must implement them.
-- **CHANGED**: Inline `` `code` `` and fenced blocks resolve a real monospace
-  family stack (`kMonospaceFontFamily` = `Menlo`, then
-  `kMonospaceFontFamilyFallback`) instead of the CSS generic `'monospace'`,
-  which Flutter does not map on most targets (spans silently fell back to the
-  body proportional font). Metrics of existing code spans change. Override
-  `MarkdownThemeData.textStyleFor` / `codeStyle` to pin a different face.
 - **CHANGED**: `MarkdownThemeData.copyWith` returns `MarkdownThemeData` instead
   of `ThemeExtension<MarkdownThemeData>` (callers gain, overriders must narrow).
 - **CHANGED**: `MarkdownRenderObject.updateSelection` takes an optional
   `markdown:`. `@meta.internal`, but `MarkdownWidget` subclasses that call it
   must now invoke it **before** `update` (see the registry fix below).
+
+### Monospace font resolution
+- **FIXED**: Inline `` `code` `` and fenced blocks pick a monospace family that
+  the host platform can actually resolve (`kMonospaceFontFamily`, then
+  `kMonospaceFontFamilyFallback`). CoreText (iOS / macOS) and DirectWrite
+  (Windows) do not know the CSS generic `'monospace'`, so code silently
+  rendered in the proportional body face there; those two now get `Menlo` /
+  `Consolas`. **Android, Fuchsia, Linux and web keep `'monospace'`** — they
+  resolve it natively, so rendering there is unchanged from 0.2.0.
+- **ADDED**: `kMonospaceFontFamily` (platform-resolved) and
+  `kMonospaceFontFamilyFallback`. There is still no theme-level knob for the
+  monospace face; a host that needs a bundled font has to go through
+  `MarkdownThemeData.builder` / `SyntaxHighlighter.baseStyleFor`.
 
 ### Quote / alert nested fenced code
 - **FIXED**: Fenced code (` ```lang ` / `~~~`) inside a blockquote or GitHub
