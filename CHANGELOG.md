@@ -1,3 +1,24 @@
+## Unreleased
+
+### Monospace font resolution
+- **FIXED**: Inline `` `code` `` and fenced blocks pick a monospace family the
+  host platform can actually resolve. Flutter hands the family straight to the
+  platform font manager, and CoreText (iOS / macOS) and DirectWrite (Windows)
+  do not know the CSS generic `'monospace'` — code silently rendered in the
+  proportional body face there. Those two now get `Menlo` / `Consolas`.
+  **Android, Fuchsia, Linux and web keep `'monospace'`**: they resolve it
+  natively, so rendering there is unchanged.
+- **ADDED**: `kMonospaceFontFamily` (platform-resolved) and
+  `kMonospaceFontFamilyFallback` (ends in `'monospace'`, so a platform missing
+  its primary face still lands on a real monospace one).
+- **ADDED**: `MarkdownThemeData.monospaceFontFamily` /
+  `monospaceFontFamilyFallback`, plus the `effectiveMonospace…` getters, to pin
+  a bundled face. One knob covers both inline `` `code` `` and fenced blocks —
+  there was previously no supported way to change the fenced-block face at all:
+  `BlockPainter$Code` built its style in a static method reading a global, so
+  even overriding `textStyleFor` moved inline code only. An empty fallback list
+  means "no fallbacks", not "unset".
+
 ## 0.2.0
 
 > **Upgrading from 0.0.x?** See the

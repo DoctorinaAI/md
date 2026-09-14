@@ -1,9 +1,58 @@
 import 'dart:collection';
 
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../flutter_md.dart';
 import 'highlight/engine.dart';
+
+/// Primary monospace face for inline `` `code` `` and fenced blocks, chosen for
+/// the host platform.
+///
+/// Flutter passes the family straight to the platform font manager, and only
+/// some of them know the CSS generic `'monospace'`: Android's font config and
+/// fontconfig on Linux resolve it, CoreText (iOS / macOS) and DirectWrite
+/// (Windows) do not — there a `'monospace'` span silently falls back to the
+/// proportional body face, so inline code stops looking like code.
+///
+/// So a real system family is substituted on exactly those two platforms, and
+/// every other target keeps the generic it already resolved. Web keeps it too:
+/// its renderer has no access to arbitrary system fonts, so naming one could
+/// not help and the generic is what the browser (or the Noto fallback) is able
+/// to answer.
+///
+/// [kMonospaceFontFamilyFallback] follows, ending in `'monospace'` again, so a
+/// platform whose primary is missing still lands on a real monospace face.
+///
+/// Override per theme with [MarkdownThemeData.monospaceFontFamily].
+String get kMonospaceFontFamily {
+  if (kIsWeb) return 'monospace';
+  return switch (defaultTargetPlatform) {
+    // Ships with every iOS / macOS release; SF Mono is not user-installable.
+    TargetPlatform.iOS || TargetPlatform.macOS => 'Menlo',
+    // Ships with Windows since Vista.
+    TargetPlatform.windows => 'Consolas',
+    TargetPlatform.android ||
+    TargetPlatform.fuchsia ||
+    TargetPlatform.linux =>
+      'monospace',
+  };
+}
+
+/// Families tried after [kMonospaceFontFamily], for a platform whose primary
+/// face is missing (a trimmed Linux image, a custom Android ROM).
+///
+/// Ends in the CSS generic so anything that resolves it still gets a real
+/// monospace face rather than the proportional default.
+const List<String> kMonospaceFontFamilyFallback = <String>[
+  'Menlo', // Apple
+  'Consolas', // Windows
+  'DejaVu Sans Mono', // Linux
+  'Roboto Mono', // Android
+  'Courier New',
+  'monospace',
+];
 
 /// {@template markdown_theme_data}
 /// Theme data for Markdown widgets.
@@ -27,6 +76,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.surfaceColor = const Color.fromARGB(255, 235, 235, 235),
     this.highlightBackgroundColor = const Color(0x40FF5722),
     this.monospaceBackgroundColor = const Color(0x409E9E9E),
+    this.monospaceFontFamily,
+    this.monospaceFontFamilyFallback,
     this.dividerColor,
     this.alertColors,
     this.blockFilter,
@@ -55,6 +106,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
+    String? monospaceFontFamily,
+    List<String>? monospaceFontFamilyFallback,
     Color? dividerColor,
     Map<MD$AlertType, Color>? alertColors,
     bool Function(MD$Block block)? blockFilter,
@@ -86,6 +139,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
           highlightBackgroundColor ?? theme.colorScheme.errorContainer,
       monospaceBackgroundColor:
           monospaceBackgroundColor ?? theme.colorScheme.surfaceContainerHigh,
+      monospaceFontFamily: monospaceFontFamily,
+      monospaceFontFamilyFallback: monospaceFontFamilyFallback,
       dividerColor: dividerColor ?? theme.dividerColor.withValues(alpha: 0.12),
       alertColors: alertColors,
       blockFilter: blockFilter,
@@ -144,6 +199,30 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
 
   /// The color to use for the background of monospace text.
   final Color? monospaceBackgroundColor;
+
+  /// Font family for inline `` `code` `` and fenced blocks.
+  ///
+  /// Null (the default) resolves [kMonospaceFontFamily] for the host platform.
+  /// Set it to pin a bundled face (`JetBrains Mono`, `Fira Code`, …) —
+  /// [effectiveMonospaceFontFamily] is what both the inline span styles and
+  /// [BlockPainter$Code] actually read.
+  final String? monospaceFontFamily;
+
+  /// Families tried after [monospaceFontFamily].
+  ///
+  /// Null (the default) uses [kMonospaceFontFamilyFallback]. Pass an empty
+  /// list to disable fallbacks entirely (a bundled face with full coverage).
+  final List<String>? monospaceFontFamilyFallback;
+
+  /// The monospace family in effect: [monospaceFontFamily], else the
+  /// platform-resolved [kMonospaceFontFamily].
+  String get effectiveMonospaceFontFamily =>
+      monospaceFontFamily ?? kMonospaceFontFamily;
+
+  /// The monospace fallbacks in effect: [monospaceFontFamilyFallback], else
+  /// [kMonospaceFontFamilyFallback].
+  List<String> get effectiveMonospaceFontFamilyFallback =>
+      monospaceFontFamilyFallback ?? kMonospaceFontFamilyFallback;
 
   /// The color to use for the divider.
   final Color? dividerColor;
@@ -267,7 +346,16 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
                 TextDecoration.lineThrough,
               _ => null,
             },
-            fontFamily: style.contains(MD$Style.monospace) ? 'monospace' : null,
+            // The CSS generic `'monospace'` does not resolve on Apple or
+            // Windows; [kMonospaceFontFamily] substitutes a real face there
+            // and keeps the generic everywhere it already worked. A host that
+            // bundles its own face sets [monospaceFontFamily].
+            fontFamily: style.contains(MD$Style.monospace)
+                ? effectiveMonospaceFontFamily
+                : null,
+            fontFamilyFallback: style.contains(MD$Style.monospace)
+                ? effectiveMonospaceFontFamilyFallback
+                : null,
             color: switch (style) {
               var s when s.contains(MD$Style.link) => linkColor,
               _ => null,
@@ -305,6 +393,8 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     Color? surfaceColor,
     Color? highlightBackgroundColor,
     Color? monospaceBackgroundColor,
+    String? monospaceFontFamily,
+    List<String>? monospaceFontFamilyFallback,
     Color? dividerColor,
     Map<MD$AlertType, Color>? alertColors,
     bool Function(MD$Block block)? blockFilter,
@@ -331,6 +421,9 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
             highlightBackgroundColor ?? this.highlightBackgroundColor,
         monospaceBackgroundColor:
             monospaceBackgroundColor ?? this.monospaceBackgroundColor,
+        monospaceFontFamily: monospaceFontFamily ?? this.monospaceFontFamily,
+        monospaceFontFamilyFallback:
+            monospaceFontFamilyFallback ?? this.monospaceFontFamilyFallback,
         dividerColor: dividerColor ?? this.dividerColor,
         alertColors: alertColors ?? this.alertColors,
         blockFilter: blockFilter ?? this.blockFilter,
@@ -367,6 +460,12 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
           highlightBackgroundColor, other?.highlightBackgroundColor, t),
       monospaceBackgroundColor: Color.lerp(
           monospaceBackgroundColor, other?.monospaceBackgroundColor, t),
+      // A font family cannot be interpolated — snap at the midpoint.
+      monospaceFontFamily:
+          t < 0.5 ? monospaceFontFamily : other?.monospaceFontFamily,
+      monospaceFontFamilyFallback: t < 0.5
+          ? monospaceFontFamilyFallback
+          : other?.monospaceFontFamilyFallback,
       dividerColor: Color.lerp(dividerColor, other?.dividerColor, t),
       alertColors: t < 0.5 ? alertColors : other?.alertColors,
       blockFilter: t < 0.5 ? blockFilter : other?.blockFilter,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -206,6 +207,161 @@ void main() => group('MarkdownThemeData', () {
               MarkdownTheme(data: base(), child: const SizedBox());
           expect(a.updateShouldNotify(same), isFalse);
           expect(a.updateShouldNotify(different), isTrue);
+        });
+      });
+
+      group('Monospace family', () {
+        /// Reads the resolved inline-code family under [platform].
+        ///
+        /// Reset via try/finally rather than `addTearDown` — the framework's
+        /// `debugAssertAllFoundationVarsUnset` check runs first. The theme is
+        /// rebuilt inside the override because `textStyleFor` memoises.
+        (String?, List<String>?) familyOn(TargetPlatform platform) {
+          debugDefaultTargetPlatformOverride = platform;
+          try {
+            final style = base().textStyleFor(MD$Style.monospace);
+            return (style.fontFamily, style.fontFamilyFallback);
+          } finally {
+            debugDefaultTargetPlatformOverride = null;
+          }
+        }
+
+        test('keeps the CSS generic where the platform resolves it', () {
+          // Android's font config and fontconfig on Linux both map
+          // `monospace`; substituting a named face there could only make the
+          // result worse than 0.2.x.
+          for (final platform in const <TargetPlatform>[
+            TargetPlatform.android,
+            TargetPlatform.fuchsia,
+            TargetPlatform.linux,
+          ]) {
+            expect(familyOn(platform).$1, 'monospace', reason: '$platform');
+          }
+        });
+
+        test('substitutes a real face where the generic does not resolve', () {
+          // CoreText and DirectWrite do not know `monospace`, so inline code
+          // silently fell back to the proportional body face.
+          expect(familyOn(TargetPlatform.iOS).$1, 'Menlo');
+          expect(familyOn(TargetPlatform.macOS).$1, 'Menlo');
+          expect(familyOn(TargetPlatform.windows).$1, 'Consolas');
+        });
+
+        test('every platform falls back through the generic last', () {
+          for (final platform in TargetPlatform.values) {
+            final (family, fallback) = familyOn(platform);
+            expect(fallback, isNotNull, reason: '$platform');
+            expect(fallback!.last, 'monospace', reason: '$platform');
+            expect(
+              fallback.contains(family) || family == 'monospace',
+              isTrue,
+              reason: '$platform primary must also appear in the chain',
+            );
+          }
+        });
+
+        test('non-monospace spans keep the body face', () {
+          for (final platform in TargetPlatform.values) {
+            debugDefaultTargetPlatformOverride = platform;
+            try {
+              final style = base().textStyleFor(MD$Style.bold);
+              expect(style.fontFamily, isNull, reason: '$platform');
+              expect(style.fontFamilyFallback, isNull, reason: '$platform');
+            } finally {
+              debugDefaultTargetPlatformOverride = null;
+            }
+          }
+        });
+
+        test('a host face overrides the platform default everywhere', () {
+          // Both the inline span styles and BlockPainter$Code read the
+          // effective getters, so one knob covers `code` and ``` fences.
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            monospaceFontFamily: 'JetBrains Mono',
+            monospaceFontFamilyFallback: const <String>['Fira Code'],
+          );
+
+          expect(theme.effectiveMonospaceFontFamily, 'JetBrains Mono');
+          expect(
+            theme.effectiveMonospaceFontFamilyFallback,
+            const <String>['Fira Code'],
+          );
+
+          final inline = theme.textStyleFor(MD$Style.monospace);
+          expect(inline.fontFamily, 'JetBrains Mono');
+          expect(inline.fontFamilyFallback, const <String>['Fira Code']);
+        });
+
+        test('an override survives on every platform', () {
+          for (final platform in TargetPlatform.values) {
+            debugDefaultTargetPlatformOverride = platform;
+            try {
+              final theme = MarkdownThemeData(
+                textStyle: const TextStyle(fontSize: 14),
+                monospaceFontFamily: 'JetBrains Mono',
+              );
+              expect(
+                theme.textStyleFor(MD$Style.monospace).fontFamily,
+                'JetBrains Mono',
+                reason: '$platform',
+              );
+              // Fallbacks stay on the shared chain unless overridden too.
+              expect(
+                theme.effectiveMonospaceFontFamilyFallback,
+                kMonospaceFontFamilyFallback,
+                reason: '$platform',
+              );
+            } finally {
+              debugDefaultTargetPlatformOverride = null;
+            }
+          }
+        });
+
+        test('an empty fallback list is honored, not treated as unset', () {
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            monospaceFontFamilyFallback: const <String>[],
+          );
+          expect(theme.effectiveMonospaceFontFamilyFallback, isEmpty);
+          expect(
+            theme.textStyleFor(MD$Style.monospace).fontFamilyFallback,
+            isEmpty,
+          );
+        });
+
+        test('copyWith carries the override', () {
+          // The cast is only needed because copyWith still returns the base
+          // ThemeExtension here; DoctorinaAI/md#27 narrows it.
+          final theme = MarkdownThemeData(textStyle: const TextStyle())
+              .copyWith(monospaceFontFamily: 'Fira Code') as MarkdownThemeData;
+          expect(theme.effectiveMonospaceFontFamily, 'Fira Code');
+        });
+
+        testWidgets('a fenced block renders with the same family',
+            (tester) async {
+          debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+          try {
+            expect(kMonospaceFontFamily, 'Menlo');
+            await tester.pumpWidget(MaterialApp(
+              home: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: 400,
+                  child: MarkdownWidget(
+                    markdown: Markdown.fromString(
+                      '```dart\nvoid main() {}\n```',
+                    ),
+                    theme: base(),
+                  ),
+                ),
+              ),
+            ));
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+          } finally {
+            debugDefaultTargetPlatformOverride = null;
+          }
         });
       });
     });
