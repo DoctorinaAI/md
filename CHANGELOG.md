@@ -6,8 +6,12 @@
   platform font manager, and CoreText (iOS / macOS) and DirectWrite (Windows)
   do not know the CSS generic `'monospace'` — code silently rendered in the
   proportional body face there. Those two now get `Menlo` / `Consolas`.
-  **Android, Fuchsia, Linux and web keep `'monospace'`**: they resolve it
-  natively, so the primary face there is unchanged.
+  **Android, Fuchsia, Linux and web keep `'monospace'`**, so the primary face
+  there is unchanged. Note that on web it is unchanged but still wrong:
+  CanvasKit / skwasm reach no system fonts, so no family name resolves there
+  and code has always rendered in the proportional default. Bundling a
+  monospace asset and pointing `monospaceFontFamily` at it is the only fix,
+  and that is a host decision.
 - **CHANGED**: code spans now carry a `fontFamilyFallback` on every platform:
   the monospace chain followed by whatever `textStyle` already carried. A
   monospace face covers Latin and little else, so the body face's chain is

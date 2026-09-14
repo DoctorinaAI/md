@@ -17,10 +17,14 @@ import 'highlight/engine.dart';
 /// proportional body face, so inline code stops looking like code.
 ///
 /// So a real system family is substituted on exactly those two platforms, and
-/// every other target keeps the generic it already resolved. Web keeps it too:
-/// its renderer has no access to arbitrary system fonts, so naming one could
-/// not help and the generic is what the browser (or the Noto fallback) is able
-/// to answer.
+/// every other target keeps the generic it already resolved.
+///
+/// Web keeps the generic as well, but not because it works: CanvasKit and
+/// skwasm reach no system fonts at all, so `'monospace'` resolves no better
+/// than `'Courier New'` or a name nobody has — measured in a browser, all
+/// three lay out identically to the default proportional face. Naming a
+/// family cannot fix that; only bundling a monospace asset and setting
+/// [MarkdownThemeData.monospaceFontFamily] to it can.
 String _defaultMonospaceFontFamily(TargetPlatform platform) {
   if (kIsWeb) return 'monospace';
   return switch (platform) {
