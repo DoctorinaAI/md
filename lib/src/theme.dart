@@ -1,7 +1,6 @@
 import 'dart:collection';
 
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../flutter_md.dart';
