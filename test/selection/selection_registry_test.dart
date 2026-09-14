@@ -380,6 +380,97 @@ void main() {
     });
   });
 
+  group('controller lifecycle', () {
+    testWidgets('disposing the controller after the surfaces unmount is safe',
+        (tester) async {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+            id: 'd',
+            model: Markdown.fromString('Body text'),
+          ),
+        ]);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: MarkdownSelectionScope(
+            controller: controller,
+            child: const Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(width: 400, child: _Doc('d')),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pumpAndSettle();
+      controller.dispose();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    test('a group keeps one selection across controllers', () {
+      final group = MarkdownSelectionGroup();
+      final a = MarkdownSelectionController(group: group)
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+            id: 'a',
+            model: Markdown.fromString('Alpha body'),
+          ),
+        ]);
+      final b = MarkdownSelectionController(group: group)
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+            id: 'b',
+            model: Markdown.fromString('Bravo body'),
+          ),
+        ]);
+      addTearDown(a.dispose);
+      addTearDown(b.dispose);
+
+      a.selectAll();
+      expect(a.selection, isNotNull);
+      b.selectAll();
+      expect(b.selection, isNotNull);
+      expect(a.selection, isNull, reason: 'the group claims exclusivity');
+    });
+
+    test('moveSelectionEdgeToGlobal with no mounted surface is a no-op', () {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(
+            id: 'd',
+            model: Markdown.fromString('Body text'),
+          ),
+        ]);
+      addTearDown(controller.dispose);
+      controller.selectAll();
+      final before = controller.selection;
+
+      controller.moveSelectionEdgeToGlobal(
+        const Offset(10, 10),
+        isStart: true,
+      );
+
+      expect(controller.selection, before);
+    });
+
+    test('selectAll over an empty leading document does not throw', () {
+      final controller = MarkdownSelectionController()
+        ..setDocuments(<MarkdownDocumentRef>[
+          MarkdownDocumentRef(id: 'e', model: Markdown.fromString('')),
+          MarkdownDocumentRef(id: 'd', model: Markdown.fromString('Body')),
+        ]);
+      addTearDown(controller.dispose);
+
+      controller.selectAll();
+
+      expect(controller.getText(), isNotNull);
+    });
+  });
+
   group('host notification safety', () {
     testWidgets(
         'removeDocument flush during unmount does not crash a host that '

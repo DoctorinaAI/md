@@ -77,4 +77,39 @@ void main() => group('clampMarkdownToLines', () {
         expect(result.height, 0);
         expect(result.overflows, isFalse);
       });
+
+      test('a negative budget keeps nothing', () {
+        final result = clamp('one\ntwo', -5);
+
+        expect(result.clampedHeight, 0);
+        expect(result.overflows, isTrue);
+      });
+
+      test('table rows count as one line each', () {
+        const source = '| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |';
+        final all = clamp(source, 100);
+        final two = clamp(source, 2);
+
+        expect(all.overflows, isFalse);
+        expect(two.overflows, isTrue);
+        expect(two.clampedHeight, greaterThan(0));
+        expect(two.clampedHeight, lessThan(all.height));
+      });
+
+      test('a quote with a nested fence counts its child lines', () {
+        const source = '> intro\n> ```\n> one\n> two\n> ```\n> outro';
+        final all = clamp(source, 100);
+        final two = clamp(source, 2);
+
+        expect(all.height, greaterThan(0));
+        expect(two.clampedHeight, greaterThan(0));
+        expect(two.clampedHeight, lessThan(all.height));
+      });
+
+      test('a zero measuring width does not throw', () {
+        final result = clamp('hello world', 2, width: 0);
+
+        expect(result.height, greaterThanOrEqualTo(0));
+        expect(result.clampedHeight, greaterThanOrEqualTo(0));
+      });
     });
