@@ -143,8 +143,7 @@ final class MarkdownSelectionAutoscrollConfig {
         maxVelocity: maxVelocity ?? this.maxVelocity,
         topPad: topPad ?? this.topPad,
         bottomPad: bottomPad ?? this.bottomPad,
-        useMediaQueryPadding:
-            useMediaQueryPadding ?? this.useMediaQueryPadding,
+        useMediaQueryPadding: useMediaQueryPadding ?? this.useMediaQueryPadding,
         useHostUnionGate: useHostUnionGate ?? this.useHostUnionGate,
         targetResolver: targetResolver ?? this.targetResolver,
       );
@@ -287,7 +286,8 @@ abstract interface class MarkdownAutoscrollTarget {
 ///   ),
 /// )
 /// ```
-final class MarkdownCallbackAutoscrollTarget implements MarkdownAutoscrollTarget {
+final class MarkdownCallbackAutoscrollTarget
+    implements MarkdownAutoscrollTarget {
   /// Creates a closure-backed target.
   ///
   /// [canScrollAt] defaults to "always allowed" — [onScrollDelta] returning a

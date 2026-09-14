@@ -104,8 +104,7 @@ void main() {
       expect(text, contains('Outro line after the fence'));
     });
 
-    testWidgets(
-        'the painter fragments agree with markdownBlockRenderedText',
+    testWidgets('the painter fragments agree with markdownBlockRenderedText',
         (tester) async {
       // The whole selection layer indexes a block by
       // `markdownBlockRenderedText`; the painter must expose exactly that

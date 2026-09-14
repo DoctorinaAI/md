@@ -417,8 +417,7 @@ void main() {
   });
 
   group('MarkdownScrollableAutoscrollTarget', () {
-    testWidgets('drives a forward list toward maxScrollExtent',
-        (tester) async {
+    testWidgets('drives a forward list toward maxScrollExtent', (tester) async {
       final controller = ScrollController();
       await tester.pumpWidget(
         Directionality(

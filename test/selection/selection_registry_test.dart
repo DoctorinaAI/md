@@ -12,8 +12,8 @@ class _Doc extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = MarkdownSelectionScope.of(context);
-    final model = markdown ??
-        controller.documents.firstWhere((d) => d.id == id).model;
+    final model =
+        markdown ?? controller.documents.firstWhere((d) => d.id == id).model;
     return MarkdownWidget(markdown: model, documentId: id);
   }
 }
@@ -171,8 +171,7 @@ void main() {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       const _Doc('d', key: ValueKey('first')),
-                      if (showSecond)
-                        const _Doc('d', key: ValueKey('second')),
+                      if (showSecond) const _Doc('d', key: ValueKey('second')),
                     ],
                   ),
                 ),
@@ -232,8 +231,7 @@ void main() {
       expect(controller.getText(), 'Never registered by the app');
     });
 
-    testWidgets(
-        'recycling a widget onto another id keeps both models intact',
+    testWidgets('recycling a widget onto another id keeps both models intact',
         (tester) async {
       final a = Markdown.fromString('Alpha body');
       final b = Markdown.fromString('Bravo body');
@@ -520,14 +518,15 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a streaming model update that reconciles the selection does '
+    testWidgets(
+        'a streaming model update that reconciles the selection does '
         'not crash a host that setStates from onSelectionChanged',
         (tester) async {
       var model = Markdown.fromString('Hello streaming world');
       final controller = MarkdownSelectionController(
         reconciliation: const MarkdownReconciliationPolicy.clearOnChange(),
       )..setDocuments(
-            <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: model)]);
+          <MarkdownDocumentRef>[MarkdownDocumentRef(id: 'd', model: model)]);
       addTearDown(controller.dispose);
 
       var changes = 0;

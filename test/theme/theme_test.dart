@@ -288,5 +288,4 @@ void main() => group('MarkdownThemeData', () {
           expect(a.updateShouldNotify(different), isTrue);
         });
       });
-
     });
