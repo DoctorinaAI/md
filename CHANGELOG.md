@@ -1,5 +1,16 @@
 ## Unreleased
 
+### Quote / alert nested fenced code
+- **FIXED**: Fenced code (` ```lang ` / `~~~`) inside a blockquote or GitHub
+  alert is re-parsed as nested `MD$Code` in `MD$Quote.blocks` /
+  `MD$Alert.blocks`, instead of being consumed as inline monospace by backtick
+  pairing (` `` ` + monospace + ` `` `).
+- **ADDED**: Optional `blocks` on `MD$Quote` / `MD$Alert` (empty for leaf
+  inline bodies). Render and `markdownBlockRenderedText` walk nested children
+  when present.
+- **FIXED**: Prose nested inside a quote (paragraphs/lists/headings beside a
+  fence) uses `quoteStyle` again; code/table chrome keeps the document theme.
+
 ### Glyph-tight hit testing
 - **CHANGED**: Hover I-beam and link hit-testing use rendered **line/glyph
   boxes**, not the full max-width layout of a paragraph. Empty horizontal
@@ -30,6 +41,15 @@
 - **ADDED**: `MarkdownSelectionScope.ownsSelectionChrome` — optional host gate
   so only the scope that owns the selection’s document paints handles/toolbar
   when several scopes share one controller (chat per-body mounts).
+- **FIXED**: Disabled / non-owning sibling scopes no longer clear handle
+  leaders on every shared-controller surface. Clearing is scoped to leaders
+  that reference that scope’s own `LayerLink`s, so chat dual mounts keep
+  handles after non-collapsed range commits (including repeated handle-drag
+  settles).
+- **ADDED**: `MarkdownSelectionSurface.hasSelectionHandleLeaders`,
+  `clearSelectionHandleLayersIfLinked`, and
+  `MarkdownSelectionScopeState.selectionHandleLeadersAttached` for observing
+  coherent handle-leader attachment across multi-scope hosts.
 - **CHANGED**: Flipping `enabled` from false → true with an existing
   non-collapsed range restores handles; when `toolbarWanted` is set, restores
   the toolbar. While disabled, the scope stays inert for chrome (no toolbar /

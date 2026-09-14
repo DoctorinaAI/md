@@ -25,8 +25,12 @@ bool get _isDesktopPlatform => switch (defaultTargetPlatform) {
 String markdownBlockRenderedText(MD$Block block) => block.map<String>(
       paragraph: (p) => _spans(p.spans),
       heading: (h) => _spans(h.spans),
-      quote: (q) => _spans(q.spans),
-      alert: (a) => _spans(a.spans),
+      quote: (q) => q.blocks.isEmpty
+          ? _spans(q.spans)
+          : _nestedBlocksRenderedText(q.blocks),
+      alert: (a) => a.blocks.isEmpty
+          ? _spans(a.spans)
+          : _nestedBlocksRenderedText(a.blocks),
       code: (c) => c.text,
       list: (l) {
         final parts = <String>[];
@@ -40,6 +44,15 @@ String markdownBlockRenderedText(MD$Block block) => block.map<String>(
       divider: (_) => '',
       spacer: (_) => '',
     );
+
+String _nestedBlocksRenderedText(List<MD$Block> blocks) {
+  final parts = <String>[];
+  for (final block in blocks) {
+    final text = markdownBlockRenderedText(block);
+    if (text.isNotEmpty) parts.add(text);
+  }
+  return parts.join('\n');
+}
 
 String _spans(List<MD$Span> spans) {
   final buffer = StringBuffer();
@@ -324,9 +337,15 @@ final class MarkdownMarkupFormatter implements MarkdownSelectionFormatter {
     return seg.block.map<String>(
       paragraph: (p) => _spans(p.spans),
       heading: (h) => '${'#' * h.level.clamp(1, 6)} ${_spans(h.spans)}',
-      quote: (q) => _prefixLines(_spans(q.spans), '> '),
+      quote: (q) => _prefixLines(
+        q.blocks.isEmpty
+            ? _spans(q.spans)
+            : _nestedBlocksRenderedText(q.blocks),
+        '> ',
+      ),
       alert: (a) =>
-          '> [!${a.alert.marker}]\n${_prefixLines(_spans(a.spans), '> ')}',
+          // ignore: lines_longer_than_80_chars
+          '> [!${a.alert.marker}]\n${_prefixLines(a.blocks.isEmpty ? _spans(a.spans) : _nestedBlocksRenderedText(a.blocks), '> ')}',
       code: (c) => '```${c.language ?? ''}\n${c.text}\n```',
       list: (l) => _list(l.items, 0),
       table: _table,
@@ -537,6 +556,17 @@ abstract interface class MarkdownSelectionSurface {
     Offset? endLocal,
   });
 
+  /// Whether this surface currently paints any selection-handle leader layers.
+  bool get hasSelectionHandleLeaders;
+
+  /// Clears handle leaders only when they currently reference [startLink] /
+  /// [endLink]. Leaves foreign leaders intact so sibling scopes that share one
+  /// controller cannot strip each other's chrome.
+  void clearSelectionHandleLayersIfLinked({
+    required LayerLink startLink,
+    required LayerLink endLink,
+  });
+
   /// Requests a repaint of just the selection highlight (e.g. after a color
   /// change). Safe to call during a build phase (schedules paint, not build).
   void repaintSelection();
@@ -636,8 +666,10 @@ class MarkdownSelectionController extends ChangeNotifier {
   set selectionColor(Color? value) {
     if (value == _selectionColor) return;
     _selectionColor = value;
-    for (final surface in _surfaces.values) {
-      surface.repaintSelection();
+    for (final stack in _surfaceStacks.values) {
+      for (final surface in stack) {
+        surface.repaintSelection();
+      }
     }
   }
 
@@ -649,8 +681,19 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// size and show up during drags.
   final Map<Object, int> _indexById = <Object, int>{};
 
-  final Map<Object, MarkdownSelectionSurface> _surfaces =
-      <Object, MarkdownSelectionSurface>{};
+  /// Per-document attach stack. Several render objects may register under the
+  /// same [MarkdownSelectionSurface.documentId] at once (crossfade, recycle,
+  /// overlapping mounts). A single-slot map would let a later attach overwrite
+  /// the earlier surface and then clear the entry on detach, leaving the
+  /// surviving mount unhittable until remount. Oldest attach stays primary.
+  final Map<Object, List<MarkdownSelectionSurface>> _surfaceStacks =
+      <Object, List<MarkdownSelectionSurface>>{};
+
+  MarkdownSelectionSurface? _surfaceFor(Object documentId) {
+    final stack = _surfaceStacks[documentId];
+    if (stack == null || stack.isEmpty) return null;
+    return stack.first;
+  }
 
   /// Ids whose [removeDocument] was deferred because a surface is still
   /// mounted. Flushed in [detachSurface]; cancelled by a later [putDocument].
@@ -688,7 +731,7 @@ class MarkdownSelectionController extends ChangeNotifier {
     if (sel == null || sel.isCollapsed) return null;
     final pos = base ? sel.base : sel.extent;
     final affinity = base ? _baseAffinity : _extentAffinity;
-    final surface = _surfaces[pos.documentId];
+    final surface = _surfaceFor(pos.documentId);
     if (surface == null) return null;
     final local = surface.caretRectFor(pos, affinity);
     if (local == null) return null;
@@ -821,7 +864,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// When a surface for [id] is still mounted, the remove is deferred until
   /// [detachSurface] so hit-testing cannot outlive the registry entry.
   void removeDocument(Object id) {
-    if (_surfaces.containsKey(id)) {
+    if (_surfaceStacks.containsKey(id)) {
       _pendingRemoveIds.add(id);
       return;
     }
@@ -889,8 +932,19 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   /// Registers a mounted [surface] for hit-testing. Called on RenderObject
   /// attach.
+  ///
+  /// Several surfaces may share one [MarkdownSelectionSurface.documentId].
+  /// They stack in attach order; the oldest remains the primary hit-test
+  /// target so a later overlapping mount cannot clear the entry when it
+  /// detaches and leave an earlier mount unhittable.
   void attachSurface(MarkdownSelectionSurface surface) {
-    _surfaces[surface.documentId] = surface;
+    final stack = _surfaceStacks.putIfAbsent(
+      surface.documentId,
+      () => <MarkdownSelectionSurface>[],
+    );
+    if (!stack.contains(surface)) {
+      stack.add(surface);
+    }
     // Do not read globalBounds here — attach runs before layout; localToGlobal
     // throws "not in the same render tree" / NEEDS-LAYOUT.
   }
@@ -898,16 +952,22 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// Unregisters a [surface]. Called on RenderObject detach/dispose.
   void detachSurface(MarkdownSelectionSurface surface) {
     final id = surface.documentId;
-    if (identical(_surfaces[id], surface)) {
-      _surfaces.remove(id);
-      if (_pendingRemoveIds.contains(id)) {
-        _forceRemoveDocument(id);
-      }
+    final stack = _surfaceStacks[id];
+    if (stack == null) return;
+    stack.remove(surface);
+    if (stack.isNotEmpty) return;
+    _surfaceStacks.remove(id);
+    if (_pendingRemoveIds.contains(id)) {
+      _forceRemoveDocument(id);
     }
   }
 
-  /// The currently mounted surfaces.
-  Iterable<MarkdownSelectionSurface> get mountedSurfaces => _surfaces.values;
+  /// The currently mounted primary surfaces (oldest attach per document id).
+  Iterable<MarkdownSelectionSurface> get mountedSurfaces sync* {
+    for (final stack in _surfaceStacks.values) {
+      if (stack.isNotEmpty) yield stack.first;
+    }
+  }
 
   /// Maps a global point to a logical position by asking mounted surfaces.
   ///
@@ -948,7 +1008,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// padding / empty line gutter; I-beam stays glyph-tight via
   /// [hitsSelectableGlyphs] / `isSelectableAtLocal`.
   bool hitsSelectableContent(Offset globalPosition) {
-    for (final surface in _surfaces.values) {
+    for (final surface in mountedSurfaces) {
       final bounds = surface.globalBounds;
       if (!bounds.isEmpty && bounds.contains(globalPosition)) return true;
     }
@@ -957,7 +1017,7 @@ class MarkdownSelectionController extends ChangeNotifier {
 
   /// Whether [globalPosition] lies over rendered glyph ink (tight line boxes).
   bool hitsSelectableGlyphs(Offset globalPosition) {
-    for (final surface in _surfaces.values) {
+    for (final surface in mountedSurfaces) {
       if (surface.hitsSelectableGlyphs(globalPosition)) return true;
     }
     return false;
@@ -966,7 +1026,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   /// Whether [globalPosition] lies over a tappable link or fenced copy chrome
   /// (desktop header / mobile bottom bar) on any mounted surface.
   bool isLinkAtGlobal(Offset globalPosition) {
-    for (final surface in _surfaces.values) {
+    for (final surface in mountedSurfaces) {
       if (surface.isLinkAtGlobal(globalPosition)) return true;
     }
     return false;
@@ -984,7 +1044,7 @@ class MarkdownSelectionController extends ChangeNotifier {
   }) {
     MarkdownSelectionSurface? nearest;
     var bestDistance = double.infinity;
-    for (final surface in _surfaces.values) {
+    for (final surface in mountedSurfaces) {
       final bounds = surface.globalBounds;
       // A zero-area surface (an empty document, or one that lays out to zero
       // width/height) has nothing to select and would invert the clamp below.
@@ -1441,7 +1501,7 @@ class MarkdownSelectionController extends ChangeNotifier {
     if (startDoc < 0 || endDoc < 0) return const <Rect>[];
     final out = <Rect>[];
     for (var d = startDoc; d <= endDoc; d++) {
-      final surface = _surfaces[_docs[d].id];
+      final surface = _surfaceFor(_docs[d].id);
       if (surface == null) continue;
       out.addAll(surface.globalSelectionRects());
     }
@@ -1465,8 +1525,8 @@ class MarkdownSelectionController extends ChangeNotifier {
     final sel = _selection;
     if (sel == null || sel.isCollapsed) return null;
 
-    MarkdownSelectionSurface? startSurface = _surfaces[sel.base.documentId];
-    MarkdownSelectionSurface? endSurface = _surfaces[sel.extent.documentId];
+    MarkdownSelectionSurface? startSurface = _surfaceFor(sel.base.documentId);
+    MarkdownSelectionSurface? endSurface = _surfaceFor(sel.extent.documentId);
     Rect? startLocal = startSurface?.caretRectFor(sel.base, _baseAffinity);
     Rect? endLocal = endSurface?.caretRectFor(sel.extent, _extentAffinity);
 
@@ -1557,7 +1617,7 @@ class MarkdownSelectionController extends ChangeNotifier {
 
     if (forStartEdge) {
       for (var d = startDoc; d <= endDoc; d++) {
-        final surface = _surfaces[_docs[d].id];
+        final surface = _surfaceFor(_docs[d].id);
         if (surface == null) continue;
         final locals = surface.localSelectionRects();
         if (locals.isEmpty) continue;
@@ -1574,7 +1634,7 @@ class MarkdownSelectionController extends ChangeNotifier {
       }
     } else {
       for (var d = endDoc; d >= startDoc; d--) {
-        final surface = _surfaces[_docs[d].id];
+        final surface = _surfaceFor(_docs[d].id);
         if (surface == null) continue;
         final locals = surface.localSelectionRects();
         if (locals.isEmpty) continue;

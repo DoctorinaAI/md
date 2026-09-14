@@ -73,6 +73,9 @@ onto a live render object, **implemented by `MarkdownRenderObject`**:
   queried directly from cached block painters without re-layout
 - `setSelectionHandleLayers({startLink, startLocal, endLink, endLocal})` — the
   handle `LayerLink`s the surface paints so the overlay's handles follow content
+- `hasSelectionHandleLeaders` — whether any handle leaders are currently attached
+- `clearSelectionHandleLayersIfLinked({startLink, endLink})` — clear leaders only
+  when they reference those links (sibling scopes sharing a controller)
 - `repaintSelection()` — repaint just the highlight; safe during build
 
 The controller keeps a `Map<Object, MarkdownSelectionSurface>` keyed by
@@ -129,7 +132,9 @@ hit-testing (the space `TextPainter.getPositionForOffset` indexes). A selectable
 block painter's `renderedText`/fragment offsets **must** match it:
 
 - paragraph/heading/quote/alert → concatenated span text. **Alert = body only;
-  the title contributes nothing.**
+  the title contributes nothing.** When `MD$Quote.blocks` / `MD$Alert.blocks` is
+  non-empty (fenced code inside `>`), rendered text is the nested children's
+  rendered texts joined with `\n`.
 - code → raw `text`.
 - **list** → items depth-first, joined by `'\n'` unconditionally (one line per
   item, even empty ones); checkbox glyphs contribute nothing.
@@ -153,7 +158,8 @@ not clear the range so a host viewport can steal focus without dismissing),
 chat viewport keeps taps; focus loss also retains the range),
 `ownsSelectionChrome` (optional host gate: return true only for document ids
 this scope may paint handles/toolbar for — chat per-body mounts share one
-controller and must not each paint a duplicate handle pair),
+controller and must not each paint a duplicate handle pair; non-owning /
+disabled siblings clear only their own handle leaders, never foreign ones),
 `canStartSelectionAt`
 (optional host gate: return false so link/code chrome taps are not claimed by
 the scope), `selectionColor`, `contextMenuBuilder` (null ⇒ no toolbar),

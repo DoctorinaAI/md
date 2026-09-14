@@ -223,6 +223,26 @@ class MarkdownRenderObject extends RenderBox
     markNeedsPaint();
   }
 
+  @override
+  bool get hasSelectionHandleLeaders =>
+      _startHandleLink != null || _endHandleLink != null;
+
+  @override
+  void clearSelectionHandleLayersIfLinked({
+    required LayerLink startLink,
+    required LayerLink endLink,
+  }) {
+    final clearStart = identical(_startHandleLink, startLink);
+    final clearEnd = identical(_endHandleLink, endLink);
+    if (!clearStart && !clearEnd) return;
+    setSelectionHandleLayers(
+      startLink: clearStart ? null : _startHandleLink,
+      startLocal: clearStart ? null : _startHandleLocal,
+      endLink: clearEnd ? null : _endHandleLink,
+      endLocal: clearEnd ? null : _endHandleLocal,
+    );
+  }
+
   void _clearSelectionHandleLayers() {
     _startHandleLink = null;
     _startHandleLocal = null;

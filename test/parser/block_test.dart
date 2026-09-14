@@ -62,6 +62,45 @@ void main() => group('Block parsing', () {
                 isA<MD$Span>().having((s) => s.style, 'style', MD$Style.bold)),
           );
         });
+
+        test('fenced code inside a quote is a nested MD\$Code', () {
+          final q = _blocks(
+            '> ```yaml\n'
+            '> webview_flutter: ^4.0.7\n'
+            '> ```',
+          ).single as MD$Quote;
+          expect(q.spans, isEmpty);
+          expect(q.blocks, hasLength(1));
+          final code = q.blocks.single as MD$Code;
+          expect(code.language, 'yaml');
+          expect(code.text, 'webview_flutter: ^4.0.7');
+          expect(
+            q.spans.where((s) => s.style.contains(MD$Style.monospace)),
+            isEmpty,
+          );
+        });
+
+        test('tilde fence inside a quote is nested code', () {
+          final q = _blocks('> ~~~\n> hi\n> ~~~').single as MD$Quote;
+          expect(q.blocks.single, isA<MD$Code>());
+          expect((q.blocks.single as MD$Code).text, 'hi');
+        });
+
+        test('prose plus fenced code inside a quote', () {
+          final q = _blocks(
+            '> before\n'
+            '> ```\n'
+            '> code\n'
+            '> ```\n'
+            '> after',
+          ).single as MD$Quote;
+          expect(q.blocks.whereType<MD$Paragraph>(), hasLength(2));
+          expect(q.blocks.whereType<MD$Code>(), hasLength(1));
+          expect(
+            (q.blocks.whereType<MD$Code>().single).text,
+            'code',
+          );
+        });
       });
 
       group('Fenced code', () {

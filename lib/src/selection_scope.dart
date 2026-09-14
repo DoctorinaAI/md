@@ -129,10 +129,12 @@ class MarkdownSelectionScope extends StatefulWidget {
   /// Optional host gate for which document ids this scope may paint handles /
   /// toolbar for.
   ///
-  /// When several scopes share one [controller] (chat per-body mounts), only
-  /// the scope that owns the selection’s document should show chrome — otherwise
-  /// each enabled scope paints a duplicate handle pair. Null means this scope
-  /// may show chrome for any non-collapsed selection (single-scope hosts).
+  /// When several scopes share one [controller], only the scope that owns the
+  /// selection’s document should show chrome — otherwise each enabled scope
+  /// paints a duplicate handle pair. Disabled / non-owning siblings dispose
+  /// only their own overlay and leaders; they must not strip leaders belonging
+  /// to the owning scope. Null means this scope may show chrome for any
+  /// non-collapsed selection (single-scope hosts).
   final bool Function(Object documentId)? ownsSelectionChrome;
 
   /// The selection highlight color. Defaults to the ambient
@@ -140,7 +142,9 @@ class MarkdownSelectionScope extends StatefulWidget {
   final Color? selectionColor;
 
   /// Builds the context menu (toolbar). Defaults to an adaptive Copy /
-  /// Select-all toolbar; pass null to disable the toolbar entirely.
+  /// Select-all toolbar; pass null to disable the toolbar **and** omit the
+  /// secondary-tap recognizer so an enclosing host can own right-click
+  /// without competing in the gesture arena.
   final MarkdownSelectionContextMenuBuilder? contextMenuBuilder;
 
   /// Magnifier configuration for touch selection/handle drags. Defaults to the
@@ -284,10 +288,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (oldWidget.selectionColor != widget.selectionColor) {
       _applySelectionColor();
     }
-    // Host may enable the scope after arming a subject / range (chat mobile
-    // message-then-text). Sync handles and restore the toolbar when chrome
-    // becomes eligible. Disabling clears visible chrome but keeps
-    // [toolbarWanted] so a later enable can restore.
+    // Host may enable the scope after arming a subject / range. Sync handles
+    // and restore the toolbar when chrome becomes eligible. Disabling clears
+    // visible chrome but keeps [toolbarWanted] so a later enable can restore.
     if (oldWidget.enabled != widget.enabled) {
       if (widget.enabled) {
         _syncOverlay();
@@ -525,24 +528,16 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   }
 
   /// Assigns the two handle leader layers to their owning surfaces (and clears
-  /// them everywhere else) in a single pass, so nothing repaints needlessly.
-  void _applyHandles(MarkdownHandleEndpoints? e) {
-    final startSurface = e?.startSurface;
-    final endSurface = e?.endSurface;
-    final startLocal = switch (e) {
-      null => null,
-      final endpoints => Offset(
-          endpoints.startLocal.left,
-          endpoints.startLocal.bottom,
-        ),
-    };
-    final endLocal = switch (e) {
-      null => null,
-      final endpoints => Offset(
-          endpoints.endLocal.right,
-          endpoints.endLocal.bottom,
-        ),
-    };
+  /// them on every other mounted surface) in a single pass, so nothing
+  /// repaints needlessly.
+  ///
+  /// Only the scope that currently owns chrome should call this. Sibling
+  /// scopes that share the controller clear via [_clearOwnHandleLeaders].
+  void _applyHandles(MarkdownHandleEndpoints e) {
+    final startSurface = e.startSurface;
+    final endSurface = e.endSurface;
+    final startLocal = Offset(e.startLocal.left, e.startLocal.bottom);
+    final endLocal = Offset(e.endLocal.right, e.endLocal.bottom);
     for (final surface in controller.mountedSurfaces) {
       final isStart = identical(surface, startSurface);
       final isEnd = identical(surface, endSurface);
@@ -555,8 +550,22 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     }
   }
 
+  /// Drops leaders that currently reference this scope's [LayerLink]s only.
+  ///
+  /// Sibling scopes that share one controller must not clear foreign leaders.
+  /// Identity-filtered clear keeps the owning scope's handle attachment intact
+  /// while this scope tears down its own overlay.
+  void _clearOwnHandleLeaders() {
+    for (final surface in controller.mountedSurfaces) {
+      surface.clearSelectionHandleLayersIfLinked(
+        startLink: _startHandleLink,
+        endLink: _endHandleLink,
+      );
+    }
+  }
+
   void _clearHandles() {
-    _applyHandles(null);
+    _clearOwnHandleLeaders();
     _selectionOverlay?.hide();
     _selectionOverlay?.dispose();
     _selectionOverlay = null;
@@ -1047,6 +1056,20 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
 
   /// Whether the toolbar is currently visible.
   bool get toolbarIsVisible => _contextMenuController.isShown;
+  
+  /// Whether start/end handle leader layers are attached for the live
+  /// selection endpoints.
+  ///
+  /// False when the range is missing or collapsed, or leaders are not linked
+  /// on the endpoint surfaces. Useful for hosts that mount one scope per
+  /// document on a shared controller and need to observe handle attachment.
+  bool get selectionHandleLeadersAttached {
+    return switch (controller.selectionHandleEndpoints()) {
+      null => false,
+      final endpoints => endpoints.startSurface.hasSelectionHandleLeaders &&
+          endpoints.endSurface.hasSelectionHandleLeaders,
+    };
+  }
 
   /// Shows the context toolbar. [location] anchors it at a point (e.g. the
   /// right-click position); otherwise it anchors to the selection.
@@ -1555,18 +1578,23 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
           ..onDragUpdate = _handleDragUpdate
           ..onDragEnd = ((_) => _onBodyDragEnd()),
       ),
-      // Secondary-only (any device): right-click opens the context toolbar.
-      // Distinct type key so it can coexist with other recognizers in the
-      // map.
-      _SecondaryTapGestureRecognizer:
+    };
+
+    // Secondary-only (any device): right-click opens the context toolbar.
+    // Distinct type key so it can coexist with other recognizers in the
+    // map. Omit when [contextMenuBuilder] is null so an enclosing host
+    // (e.g. chat viewport message menu) can own the full-slot secondary
+    // without competing in the gesture arena.
+    if (widget.contextMenuBuilder != null) {
+      map[_SecondaryTapGestureRecognizer] =
           GestureRecognizerFactoryWithHandlers<_SecondaryTapGestureRecognizer>(
         () => _SecondaryTapGestureRecognizer(),
         (recognizer) => recognizer
           ..onSecondaryTapDown =
               ((d) => _lastSecondaryTapDown = d.globalPosition)
           ..onSecondaryTapUp = _handleSecondaryTapUp,
-      ),
-    };
+      );
+    }
 
     if (!widget.enableTouchGestures) return map;
 
@@ -1577,8 +1605,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     // / scrollable page does not steal edge swipes on chrome. With an
     // active selection, eagerly wins horizontal drag (blocks dismissible);
     // otherwise yields to competing [HorizontalDragGestureRecognizer]s.
-    // Chat hosts set [enableTouchConsecutiveTaps] false so taps stay with
-    // the viewport while long-press below still owns continuous text entry.
+    // Hosts may set [enableTouchConsecutiveTaps] false so taps stay with an
+    // enclosing gesture owner while long-press below still owns continuous
+    // text entry.
     if (widget.enableTouchConsecutiveTaps) {
       map[_ContentGatedTapAndHorizontalDragGestureRecognizer] =
           GestureRecognizerFactoryWithHandlers<

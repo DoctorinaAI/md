@@ -715,6 +715,47 @@ void main() {
     });
 
     testWidgets(
+        'null contextMenuBuilder omits secondary recognizer '
+        '(no toolbar on right-click)', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(
+                id: 'd', model: Markdown.fromString('Hello selectable world')),
+          ]);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: MarkdownSelectionScope(
+                controller: controller,
+                contextMenuBuilder: null,
+                child: const Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(width: 400, child: _Doc('d')),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+        await tester.tapAt(tl + const Offset(40, 8),
+            buttons: kSecondaryButton);
+        await tester.pumpAndSettle();
+
+        final state = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope));
+        expect(state.toolbarIsVisible, isFalse);
+        expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
+        expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets(
         'secondary-click on an active selection keeps the range '
         'and shows toolbar', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;
@@ -921,14 +962,12 @@ void main() {
         expect(boxes, isNotEmpty);
         final glyph = boxes.first;
         final gutterLocal = Offset(glyph.right + 80, glyph.center.dy);
-        final gutterGlobal =
-            (surface as RenderBox).localToGlobal(gutterLocal);
+        final gutterGlobal = (surface as RenderBox).localToGlobal(gutterLocal);
         expect(controller.hitsSelectableContent(gutterGlobal), isTrue);
         expect(controller.hitsSelectableGlyphs(gutterGlobal), isFalse);
 
         // Establish a ranged selection on the glyphs.
-        final glyphGlobal =
-            (surface as RenderBox).localToGlobal(glyph.center);
+        final glyphGlobal = (surface as RenderBox).localToGlobal(glyph.center);
         await _clicks(tester, glyphGlobal, 2);
         expect(controller.getText(), isNotEmpty);
         expect(controller.selection!.isCollapsed, isFalse);
@@ -2373,8 +2412,7 @@ void main() {
           greaterThan(glyph.right + 80),
           reason: 'surface must be wider than the short line',
         );
-        final gutterGlobal =
-            (surface as RenderBox).localToGlobal(gutterLocal);
+        final gutterGlobal = (surface as RenderBox).localToGlobal(gutterLocal);
 
         expect(
           controller.hitsSelectableContent(gutterGlobal),
@@ -2808,7 +2846,8 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(controller.selection, isNull,
-              reason: 'touch double-tap must not enter when consecutive taps off');
+              reason:
+                  'touch double-tap must not enter when consecutive taps off');
 
           final gesture = await tester.startGesture(pos);
           await tester.pump(kLongPressTimeout + kPressTimeout);

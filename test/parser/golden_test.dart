@@ -133,11 +133,23 @@ void _serializeBlock(MD$Block block, StringBuffer out, int depth) {
     },
     quote: (q) {
       out.writeln('${pad}Q indent=${q.indent}');
-      _serializeSpans(q.spans, out, depth + 1);
+      if (q.blocks.isEmpty) {
+        _serializeSpans(q.spans, out, depth + 1);
+      } else {
+        for (final child in q.blocks) {
+          _serializeBlock(child, out, depth + 1);
+        }
+      }
     },
     alert: (a) {
       out.writeln('${pad}ALERT ${a.alert.name}');
-      _serializeSpans(a.spans, out, depth + 1);
+      if (a.blocks.isEmpty) {
+        _serializeSpans(a.spans, out, depth + 1);
+      } else {
+        for (final child in a.blocks) {
+          _serializeBlock(child, out, depth + 1);
+        }
+      }
     },
     code: (c) {
       out.writeln('${pad}CODE lang=${_q(c.language ?? '')} '

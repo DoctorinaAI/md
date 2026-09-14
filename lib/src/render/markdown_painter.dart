@@ -83,6 +83,13 @@ class MarkdownPainter {
           spans: q.spans,
           indent: q.indent,
           theme: theme,
+          children: [
+            for (final child in q.blocks)
+              _defaultBlockBuilder(
+                child,
+                BlockPainter$Quote.inheritFrom(theme, child),
+              ),
+          ],
         ),
         code: (c) => BlockPainter$Code(
           language: c.language,
@@ -106,6 +113,9 @@ class MarkdownPainter {
           alert: a.alert,
           spans: a.spans,
           theme: theme,
+          children: [
+            for (final child in a.blocks) _defaultBlockBuilder(child, theme),
+          ],
         ),
         spacer: (s) => BlockPainter$Spacer(
           count: s.count,

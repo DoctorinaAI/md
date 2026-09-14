@@ -24,7 +24,8 @@ typedef MarkdownCursorResolver = MouseCursor? Function(
 /// Primary system monospace face for inline/`code` and fenced blocks.
 ///
 /// Prefer a real family over the CSS generic `'monospace'`, which Flutter does
-/// not map on most platforms (so spans fall back to the body proportional font).
+/// not map on most platforms (so spans fall back to the body proportional 
+/// font).
 const String kMonospaceFontFamily = 'Menlo';
 
 /// Fallbacks after [kMonospaceFontFamily] (Android maps `'monospace'`).

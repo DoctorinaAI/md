@@ -307,8 +307,12 @@ String _sig(Markdown md) {
 String _blockSig(MD$Block block) => block.map(
       paragraph: (p) => 'P|${_spans(p.spans)}',
       heading: (h) => 'H${h.level}|${_spans(h.spans)}',
-      quote: (q) => 'Q${q.indent}|${_spans(q.spans)}',
-      alert: (a) => 'A[${a.alert.marker}]|${_spans(a.spans)}',
+      quote: (q) => q.blocks.isEmpty
+          ? 'Q${q.indent}|${_spans(q.spans)}'
+          : 'Q${q.indent}|{${q.blocks.map(_blockSig).join(',')}}',
+      alert: (a) => a.blocks.isEmpty
+          ? 'A[${a.alert.marker}]|${_spans(a.spans)}'
+          : 'A[${a.alert.marker}]|{${a.blocks.map(_blockSig).join(',')}}',
       code: (c) => 'C[${c.language}]<<${c.text}>>',
       list: (l) => 'L|${l.items.map(_itemSig).join(';')}',
       divider: (_) => 'DIV',

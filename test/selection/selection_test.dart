@@ -25,6 +25,9 @@ class _FakeSurface implements MarkdownSelectionSurface {
   bool hitsSelectableGlyphs(Offset globalPosition) => false;
 
   @override
+  bool isLinkAtGlobal(Offset globalPosition) => false;
+
+  @override
   Rect? caretRectFor(MarkdownPosition position, TextAffinity affinity) => null;
 
   @override
@@ -50,6 +53,15 @@ class _FakeSurface implements MarkdownSelectionSurface {
     Offset? startLocal,
     LayerLink? endLink,
     Offset? endLocal,
+  }) {}
+
+  @override
+  bool get hasSelectionHandleLeaders => false;
+
+  @override
+  void clearSelectionHandleLayersIfLinked({
+    required LayerLink startLink,
+    required LayerLink endLink,
   }) {}
 
   @override
@@ -107,6 +119,13 @@ void main() {
           .blocks
           .firstWhere((b) => b.type == 'list');
       expect(markdownBlockRenderedText(emptyLead), '\nDone');
+
+      final quotedCode = Markdown.fromString(
+        '> ```dart\n'
+        '> print(1);\n'
+        '> ```',
+      ).blocks.single;
+      expect(markdownBlockRenderedText(quotedCode), 'print(1);');
     });
 
     test('cross-document extraction with default formatter', () {

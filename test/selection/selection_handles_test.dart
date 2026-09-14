@@ -311,7 +311,8 @@ void main() {
       final left = firstLine.map((b) => b.left).reduce((a, b) => a < b ? a : b);
       final right =
           firstLine.map((b) => b.right).reduce((a, b) => a > b ? a : b);
-      // Select across the first visual line's glyphs (not empty max-width gutter).
+      // Select across the first visual line's glyphs (not empty max-width 
+      // gutter).
       await _mouseDrag(
         tester,
         box.localToGlobal(Offset(left + 2, lineY)),
@@ -470,6 +471,112 @@ void main() {
           expect(controller.getText(), contains('Message number 0'));
           expect(controller.selectionHandleEndpoints(), isNotNull);
           expect(find.byType(CompositedTransformFollower), findsWidgets);
+          expect(tester.takeException(), isNull);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+
+    testWidgets(
+      'sibling ownsSelectionChrome scopes keep leaders after settles',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        try {
+          final a = Markdown.fromString('Hello selectable world and more');
+          final b = Markdown.fromString('Second document body text here');
+          final controller = MarkdownSelectionController()
+            ..setDocuments(<MarkdownDocumentRef>[
+              MarkdownDocumentRef(id: 'a', model: a),
+              MarkdownDocumentRef(id: 'b', model: b),
+            ]);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData(platform: TargetPlatform.android),
+              home: Scaffold(
+                body: Column(
+                  children: [
+                    MarkdownSelectionScope(
+                      controller: controller,
+                      ownsSelectionChrome: (id) => id == 'a',
+                      contextMenuBuilder: (context, state) =>
+                          AdaptiveTextSelectionToolbar.buttonItems(
+                        buttonItems: const [],
+                        anchors: state.contextMenuAnchors,
+                      ),
+                      child: MarkdownWidget(
+                        markdown: a,
+                        documentId: 'a',
+                        controller: controller,
+                      ),
+                    ),
+                    // Disabled sibling still listens on the shared controller —
+                    // must not strip leaders belonging to scope A.
+                    MarkdownSelectionScope(
+                      controller: controller,
+                      enabled: false,
+                      ownsSelectionChrome: (id) => id == 'b',
+                      child: MarkdownWidget(
+                        markdown: b,
+                        documentId: 'b',
+                        controller: controller,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          controller.selectAll();
+          // Keep selection on document a only.
+          final text = markdownBlockRenderedText(a.blocks.first);
+          controller.selection = MarkdownSelection(
+            base: const MarkdownPosition(
+              documentId: 'a',
+              blockIndex: 0,
+              offset: 0,
+            ),
+            extent: MarkdownPosition(
+              documentId: 'a',
+              blockIndex: 0,
+              offset: text.length,
+            ),
+          );
+          controller.toolbarWanted = true;
+          await tester.pumpAndSettle();
+
+          final owner = tester.state<MarkdownSelectionScopeState>(
+            find.byType(MarkdownSelectionScope).first,
+          );
+          expect(owner.selectionHandleLeadersAttached, isTrue);
+          expect(find.byType(CompositedTransformFollower), findsNWidgets(2));
+
+          final tl = tester.getTopLeft(find.byType(MarkdownWidget).first);
+          controller.moveSelectionEdgeToGlobal(
+            tl + const Offset(140, 12),
+            isStart: false,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            owner.selectionHandleLeadersAttached,
+            isTrue,
+            reason: 'first non-collapsed settle must keep handle leaders',
+          );
+
+          controller.moveSelectionEdgeToGlobal(
+            tl + const Offset(90, 12),
+            isStart: false,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            owner.selectionHandleLeadersAttached,
+            isTrue,
+            reason: 'second settle must keep handle leaders (dual-scope)',
+          );
+          expect(controller.selection!.isCollapsed, isFalse);
           expect(tester.takeException(), isNull);
         } finally {
           debugDefaultTargetPlatformOverride = null;
