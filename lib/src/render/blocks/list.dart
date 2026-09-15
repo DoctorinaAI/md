@@ -19,11 +19,17 @@ class _ListItemMetrics {
     required this.bulletPainter,
     required this.contentPainter,
     required this.offset,
+    required this.contentOffset,
   });
 
   final TextPainter bulletPainter;
   final TextPainter contentPainter;
+
+  /// Block-local top-left of the bullet.
   final Offset offset;
+
+  /// Block-local top-left of the item content.
+  final Offset contentOffset;
 
   late final double height =
       math.max(bulletPainter.height, contentPainter.height);
@@ -76,8 +82,7 @@ class BlockPainter$List
 
   InlineSpan? _getSpanForPosition(Offset localPosition) {
     for (final metrics in _painters) {
-      final contentOffset =
-          metrics.offset + Offset(metrics.bulletPainter.width, 0);
+      final contentOffset = metrics.contentOffset;
       final contentRect = contentOffset & metrics.contentPainter.size;
       if (contentRect.contains(localPosition)) {
         final painterPosition = localPosition - contentOffset;
@@ -118,6 +123,8 @@ class BlockPainter$List
 
     double currentHeight = 0;
     double maxContentWidth = 0;
+    // Right-to-left lists put the bullet on the right, content to its left.
+    final rtl = theme.textDirection == TextDirection.rtl && width.isFinite;
 
     void layoutItems(List<MD$ListItem> items, int level) {
       final indent = _baseIndent + level * _levelIndent;
@@ -143,10 +150,17 @@ class BlockPainter$List
           textScaler: theme.textScaler,
         )..layout(maxWidth: math.max(0, width - indent - bulletPainter.width));
 
+        final bulletX = rtl ? width - indent - bulletPainter.width : indent;
         final metrics = _ListItemMetrics(
           bulletPainter: bulletPainter,
           contentPainter: contentPainter,
-          offset: Offset(indent, currentHeight),
+          offset: Offset(bulletX, currentHeight),
+          contentOffset: Offset(
+            rtl
+                ? math.max(bulletX - contentPainter.width, 0)
+                : indent + bulletPainter.width,
+            currentHeight,
+          ),
         );
         _painters.add(metrics);
 
@@ -172,8 +186,11 @@ class BlockPainter$List
     var textPos = 0;
     for (final metrics in _painters) {
       if (frags.isNotEmpty) textPos += 1; // the '\n' item separator
-      final origin = metrics.offset + Offset(metrics.bulletPainter.width, 0);
-      frags.add(SelectableFragment(metrics.contentPainter, origin, textPos));
+      frags.add(SelectableFragment(
+        metrics.contentPainter,
+        metrics.contentOffset,
+        textPos,
+      ));
       textPos += metrics.contentPainter.plainText.length;
     }
     _fragments = frags;
@@ -182,13 +199,10 @@ class BlockPainter$List
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
+    final dy = Offset(0, offset);
     for (final metrics in _painters) {
-      final bulletOffset = metrics.offset + Offset(0, offset);
-      metrics.bulletPainter.paint(canvas, bulletOffset);
-
-      final contentOffset =
-          bulletOffset + Offset(metrics.bulletPainter.width, 0);
-      metrics.contentPainter.paint(canvas, contentOffset);
+      metrics.bulletPainter.paint(canvas, metrics.offset + dy);
+      metrics.contentPainter.paint(canvas, metrics.contentOffset + dy);
     }
   }
 

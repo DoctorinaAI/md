@@ -18,6 +18,8 @@ class BlockPainter$Paragraph
     implements BlockPainter {
   @override
   TextPainter get selectionPainter => painter;
+  @override
+  Offset get selectionOrigin => Offset(_dx, 0);
 
   /// Creates a paragraph painter for [spans], styled by [theme].
   BlockPainter$Paragraph({
@@ -43,20 +45,32 @@ class BlockPainter$Paragraph
   Size get size => _size;
   Size _size = Size.zero;
 
+  /// Block-local x where the glyphs are painted: `0` for left-to-right text,
+  /// or the offset that puts right-to-left text against the right edge.
+  double _dx = 0;
+
   /// Last span hit by the tap down event.
   TextSpan? _lastSpan;
 
   @override
   void handleTapDown(PointerDownEvent event) {
     _lastSpan = null; // Reset the span on tap down.
-    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    final span = hitTestInlineSpanWithPointerEvent(
+      event,
+      painter,
+      origin: selectionOrigin,
+    );
     if (span case TextSpan textSpan) _lastSpan = textSpan;
   }
 
   @override
   void handleTapUp(PointerUpEvent event) {
     if (_lastSpan == null) return; // No span was hit on tap down.
-    final span = hitTestInlineSpanWithPointerEvent(event, painter);
+    final span = hitTestInlineSpanWithPointerEvent(
+      event,
+      painter,
+      origin: selectionOrigin,
+    );
     if (span != null && _lastSpan == span) {
       // If the span is the same as the one hit on tap down,
       // call the tap recognizer.
@@ -72,6 +86,9 @@ class BlockPainter$Paragraph
       minWidth: 0,
       maxWidth: width,
     );
+    _dx = theme.textDirection == TextDirection.rtl && width.isFinite
+        ? (width - painter.width).clamp(0.0, width)
+        : 0.0;
     return _size = painter.size;
   }
 
@@ -81,7 +98,7 @@ class BlockPainter$Paragraph
     if (size.width < _size.width) return;
     painter.paint(
       canvas,
-      Offset(0, offset),
+      Offset(_dx, offset),
     );
   }
 

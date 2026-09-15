@@ -65,7 +65,7 @@ class BlockPainter$Alert
   /// Padding around the alert's content, inside its rounded background.
   static const double padding = 10.0;
 
-  /// Width of the accent bar on the left edge.
+  /// Width of the accent bar on the start edge.
   static const double barWidth = 4.0;
 
   /// Gap between the accent bar and the content.
@@ -74,12 +74,23 @@ class BlockPainter$Alert
   /// Vertical gap between the title and the body.
   static const double titleGap = 4.0;
 
-  /// Left offset where the title/body content begins.
+  /// Inset from the start edge where the title/body content begins.
   double get _contentLeft => padding + barWidth + gap;
 
   @override
   Size get size => _size;
   Size _size = Size.zero;
+
+  /// Whether the last layout mirrored the block for right-to-left text.
+  bool _rtl = false;
+
+  /// The width passed to the last [layout].
+  double _width = 0;
+
+  /// Block-local x where [painter]'s glyphs start: after the bar for
+  /// left-to-right text, or flush against the right-hand bar for RTL.
+  double _contentX(TextPainter painter) =>
+      _rtl ? math.max(_width - _contentLeft - painter.width, 0) : _contentLeft;
 
   /// Whether the body has any content to paint.
   bool _hasBody = false;
@@ -87,8 +98,10 @@ class BlockPainter$Alert
   /// Last span hit by the tap down event.
   TextSpan? _lastSpan;
 
-  Offset get _bodyOrigin =>
-      Offset(_contentLeft, padding + titlePainter.height + titleGap);
+  Offset get _bodyOrigin => Offset(
+        _contentX(bodyPainter),
+        padding + titlePainter.height + titleGap,
+      );
 
   TextSpan? _spanForPosition(Offset localPosition) {
     if (!_hasBody) return null;
@@ -120,6 +133,8 @@ class BlockPainter$Alert
 
   @override
   Size layout(double width) {
+    _rtl = theme.textDirection == TextDirection.rtl && width.isFinite;
+    _width = width;
     final available = math.max(0.0, width - _contentLeft - padding);
     titlePainter.layout(minWidth: 0, maxWidth: available);
     bodyPainter.layout(minWidth: 0, maxWidth: available);
@@ -149,10 +164,15 @@ class BlockPainter$Alert
         ..color = _accent.withValues(alpha: 0.10)
         ..style = PaintingStyle.fill,
     );
-    // Accent bar on the left.
+    // Accent bar on the start edge.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, offset, barWidth, _size.height),
+        Rect.fromLTWH(
+          _rtl ? size.width - barWidth : 0,
+          offset,
+          barWidth,
+          _size.height,
+        ),
         const Radius.circular(barWidth / 2),
       ),
       Paint()
@@ -160,7 +180,10 @@ class BlockPainter$Alert
         ..style = PaintingStyle.fill,
     );
 
-    titlePainter.paint(canvas, Offset(_contentLeft, offset + padding));
+    titlePainter.paint(
+      canvas,
+      Offset(_contentX(titlePainter), offset + padding),
+    );
     if (_hasBody) {
       bodyPainter.paint(canvas, _bodyOrigin + Offset(0, offset));
     }

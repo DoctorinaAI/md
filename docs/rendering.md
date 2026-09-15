@@ -145,6 +145,13 @@ and expose `fragments` + `renderedText`.
 > [selection](selection.md)), or hit-testing, highlight, and copied text will
 > disagree.
 
+> **Direction rule:** when `theme.textDirection` is `TextDirection.rtl`,
+> align content to the right edge of the width passed to `layout` (mirror x
+> as `width - x - w`), and use the same positions in `paint`,
+> `selectionOrigin` / fragment origins, and tap hit-testing. Under loose
+> constraints `MarkdownPainter` lays blocks out a second time at the final
+> content width, so a right-aligned block stays flush with the painted edge.
+
 ## Default block painters
 
 - **`$Paragraph`** — one `TextPainter` from spans, painted at `(0, offset)`;

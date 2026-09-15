@@ -217,13 +217,18 @@ class MarkdownRenderObject extends RenderBox
   // the same layout, so the cached state is always finalized before [paint].
   @override
   Size computeDryLayout(BoxConstraints constraints) =>
-      constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
+      constraints.constrain(_painter.layout(
+        maxWidth: constraints.maxWidth,
+        minWidth: constraints.minWidth,
+      ));
 
   @override
   void performLayout() {
     // Set the size of the render box to match the painter's size.
-    size =
-        constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
+    size = constraints.constrain(_painter.layout(
+      maxWidth: constraints.maxWidth,
+      minWidth: constraints.minWidth,
+    ));
   }
 
   @override

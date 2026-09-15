@@ -1,5 +1,27 @@
 ## Unreleased
 
+### Right-to-left layout
+- **FIXED**: With `MarkdownThemeData.textDirection` set to
+  `TextDirection.rtl`, blocks were still laid out left-to-right: paragraphs
+  and headings sat against the left edge, list bullets, quote bars and the
+  alert accent bar were on the left, and table columns ran left to right.
+  Blocks now mirror: text aligns to the right edge, bullets and bars sit on
+  the right, and the first table column is on the right (unaligned data
+  cells start on the right; explicit `:--` / `--:` alignment stays physical).
+  Link taps and text selection follow the mirrored positions. Left-to-right
+  layout is unchanged.
+- **FIXED**: Selection handles under a right-to-left `Directionality` sit at
+  the logical start (right edge) and end (left edge) of the selection.
+- **FIXED**: Link taps inside quotes account for the quote's indent.
+- **CHANGED**: Under tight constraints (for example a fixed-width chat
+  bubble), right-to-left content aligns to the full width, like `Text`. Under
+  loose constraints the widget still sizes to its content.
+- **CHANGED**: Fenced code blocks always render left-to-right, even in
+  right-to-left documents.
+- **ADDED**: `ParagraphGestureHandler.hitTestInlineSpanWithPointerEvent` takes
+  an optional `origin`, for painters whose text is not painted at the block
+  origin.
+
 ### Monospace font resolution
 - **FIXED**: Inline `` `code` `` and fenced blocks pick a monospace family the
   host platform can actually resolve. Flutter hands the family straight to the

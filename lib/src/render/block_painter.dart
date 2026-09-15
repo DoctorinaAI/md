@@ -246,10 +246,16 @@ double _distanceToRect(Offset point, Rect rect) {
 /// [BlockPainter.handleTapUp] can match down and up on the same span.
 mixin ParagraphGestureHandler {
   /// The [InlineSpan] under [event] within [painter], or null if none.
+  ///
+  /// [origin] is the block-local offset where [painter] is painted (for
+  /// example, the right-aligned position of right-to-left text).
   @protected
   InlineSpan? hitTestInlineSpanWithPointerEvent(
-      PointerEvent event, TextPainter painter) {
-    final pos = painter.getPositionForOffset(event.localPosition);
+    PointerEvent event,
+    TextPainter painter, {
+    Offset origin = Offset.zero,
+  }) {
+    final pos = painter.getPositionForOffset(event.localPosition - origin);
     final span = painter.text?.getSpanForPosition(pos);
     return span;
   }

@@ -265,27 +265,37 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
     _applyHandles(endpoints);
     final box = context.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
+    final rtl = _isRtl;
+    final direction = rtl ? TextDirection.rtl : TextDirection.ltr;
     final startPoint = TextSelectionPoint(
-      box.globalToLocal(
-          Offset(endpoints.startGlobal.left, endpoints.startGlobal.bottom)),
-      TextDirection.ltr,
+      box.globalToLocal(Offset(
+        rtl ? endpoints.startGlobal.right : endpoints.startGlobal.left,
+        endpoints.startGlobal.bottom,
+      )),
+      direction,
     );
     final endPoint = TextSelectionPoint(
-      box.globalToLocal(
-          Offset(endpoints.endGlobal.right, endpoints.endGlobal.bottom)),
-      TextDirection.ltr,
+      box.globalToLocal(Offset(
+        rtl ? endpoints.endGlobal.left : endpoints.endGlobal.right,
+        endpoints.endGlobal.bottom,
+      )),
+      direction,
     );
+    final startHandleType =
+        rtl ? TextSelectionHandleType.right : TextSelectionHandleType.left;
+    final endHandleType =
+        rtl ? TextSelectionHandleType.left : TextSelectionHandleType.right;
     final overlay = _selectionOverlay;
     if (overlay == null) {
       if (Overlay.maybeOf(context) == null) return; // no host for handles
       _selectionOverlay = SelectionOverlay(
         context: context,
-        startHandleType: TextSelectionHandleType.left,
+        startHandleType: startHandleType,
         lineHeightAtStart: endpoints.startLocal.height,
         onStartHandleDragStart: (d) => _onHandleDragStart(d, isStart: true),
         onStartHandleDragUpdate: (d) => _onHandleDragUpdate(d, isStart: true),
         onStartHandleDragEnd: (_) => _onHandleDragEnd(),
-        endHandleType: TextSelectionHandleType.right,
+        endHandleType: endHandleType,
         lineHeightAtEnd: endpoints.endLocal.height,
         onEndHandleDragStart: (d) => _onHandleDragStart(d, isStart: false),
         onEndHandleDragUpdate: (d) => _onHandleDragUpdate(d, isStart: false),
@@ -301,23 +311,37 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope> {
       )..showHandles();
     } else {
       overlay
-        ..startHandleType = TextSelectionHandleType.left
+        ..startHandleType = startHandleType
         ..lineHeightAtStart = endpoints.startLocal.height
-        ..endHandleType = TextSelectionHandleType.right
+        ..endHandleType = endHandleType
         ..lineHeightAtEnd = endpoints.endLocal.height
         ..selectionEndpoints = <TextSelectionPoint>[startPoint, endPoint];
     }
   }
+
+  /// Whether the ambient [Directionality] is right-to-left, in which case the
+  /// selection starts at the right edge of its first box and ends at the left
+  /// edge of its last one.
+  bool get _isRtl => Directionality.maybeOf(context) == TextDirection.rtl;
 
   /// Assigns the two handle leader layers to their owning surfaces (and clears
   /// them everywhere else) in a single pass, so nothing repaints needlessly.
   void _applyHandles(MarkdownHandleEndpoints? e) {
     final startSurface = e?.startSurface;
     final endSurface = e?.endSurface;
-    final startLocal =
-        e == null ? null : Offset(e.startLocal.left, e.startLocal.bottom);
-    final endLocal =
-        e == null ? null : Offset(e.endLocal.right, e.endLocal.bottom);
+    final rtl = e != null && _isRtl;
+    final startLocal = e == null
+        ? null
+        : Offset(
+            rtl ? e.startLocal.right : e.startLocal.left,
+            e.startLocal.bottom,
+          );
+    final endLocal = e == null
+        ? null
+        : Offset(
+            rtl ? e.endLocal.left : e.endLocal.right,
+            e.endLocal.bottom,
+          );
     for (final surface in controller.mountedSurfaces) {
       final isStart = identical(surface, startSurface);
       final isEnd = identical(surface, endSurface);
