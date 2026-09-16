@@ -401,7 +401,11 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     }
 
     if (sel case final current? when !current.isCollapsed) {
-      if (_dragGlobal == null) {
+      if (!_ownsChromeForCurrentSelection) {
+        // Sibling / prior subject: drop this scope's overlay without clearing
+        // [toolbarWanted] (the owning scope may still need restore intent).
+        _contextMenuController.remove();
+      } else if (_dragGlobal == null) {
         // Outside a drag: restore when [toolbarWanted] (scroll remount /
         // geometry change). Skip while disabled — chrome comes back on
         // the enabled flip in [didUpdateWidget].
@@ -498,6 +502,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   void _updateHandlesAndOverlay() {
     if (!_handlesEnabled) {
       _clearHandles();
+      // Losing chrome ownership (or disabled) must also drop a lingering
+      // context menu — handles alone were cleared before.
+      _contextMenuController.remove();
       return;
     }
     final endpoints = controller.selectionHandleEndpoints();

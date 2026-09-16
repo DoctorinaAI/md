@@ -85,6 +85,12 @@ extension points or reach into a default block painter's fields. Ordinary
   that reference that scope’s own `LayerLink`s, so chat dual mounts keep
   handles after non-collapsed range commits (including repeated handle-drag
   settles).
+- **FIXED**: A scope that loses `ownsSelectionChrome` for the live selection
+  document now removes its own context-menu overlay (and does the same when
+  handles are disabled for that reason). Previously only handles were cleared,
+  so a prior bubble’s adaptive toolbar could linger after selection moved to a
+  sibling scope. `toolbarWanted` is left alone so the owning scope can still
+  restore on settle.
 - **ADDED**: `MarkdownSelectionSurface.hasSelectionHandleLeaders`,
   `clearSelectionHandleLayersIfLinked`, and
   `MarkdownSelectionScopeState.selectionHandleLeadersAttached` for observing

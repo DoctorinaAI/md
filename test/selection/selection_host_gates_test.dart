@@ -459,6 +459,84 @@ void main() {
       });
     });
 
+    testWidgets(
+        'losing chrome ownership drops this scope toolbar without clearing '
+        'toolbarWanted', (tester) async {
+      await _withPlatform(TargetPlatform.android, () async {
+        final controller = _controllerWith({
+          'a': 'First message body text',
+          'b': 'Second message body text',
+        });
+        addTearDown(controller.dispose);
+
+        late MarkdownSelectionScopeState scopeA;
+
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 400,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    MarkdownSelectionScope(
+                      controller: controller,
+                      ownsSelectionChrome: (id) => id == 'a',
+                      child: Builder(builder: (context) {
+                        scopeA = MarkdownSelectionScope.stateOf(context)!;
+                        return const _Doc('a');
+                      }),
+                    ),
+                    MarkdownSelectionScope(
+                      controller: controller,
+                      ownsSelectionChrome: (id) => id == 'b',
+                      child: const _Doc('b'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        final first = tester.getRect(find.byType(MarkdownWidget).first);
+        await _longPressDrag(
+          tester,
+          first.topLeft + const Offset(2, 4),
+          first.topLeft + const Offset(60, 4),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.selection!.base.documentId, 'a');
+        expect(scopeA.toolbarIsVisible, isTrue);
+        expect(controller.toolbarWanted, isTrue);
+
+        // Retarget the live range onto B. Scope A no longer owns chrome for
+        // the selection document and must drop its overlay; toolbarWanted
+        // stays so B can restore on settle.
+        final second = tester.getRect(find.byType(MarkdownWidget).at(1));
+        controller.selectWordAtGlobal(second.center);
+        await tester.pumpAndSettle();
+
+        expect(controller.selection!.base.documentId, 'b');
+        expect(
+          scopeA.toolbarIsVisible,
+          isFalse,
+          reason:
+              'prior owner must remove its context menu when the selection '
+              'document moves to a sibling scope',
+        );
+        expect(
+          controller.toolbarWanted,
+          isTrue,
+          reason: 'toolbarWanted is shared restore intent, not this scope',
+        );
+        expect(scopeA.selectionHandleLeadersAttached, isFalse);
+      });
+    });
+
     testWidgets('a disabled sibling does not strip the owner handles',
         (tester) async {
       await _withPlatform(TargetPlatform.android, () async {
