@@ -1501,6 +1501,12 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
       }
       return;
     }
+    if (_dragGlobal != null) {
+      // Absolute toolbar anchors are dormant mid-drag; handles still track
+      // via LeaderLayer. Drag-end [showToolbar] re-presents.
+      _syncOverlay();
+      return;
+    }
     _refreshToolbarForVisibleGeometry();
     // Scroll notifications can run before child layout finishes (common when
     // the scope itself was outside the viewport cache). Retry next frame.
@@ -1518,7 +1524,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   }
 
   void _scheduleToolbarGeometryRefresh() {
-    if (!controller.toolbarWanted || _toolbarGeometryRefreshScheduled) {
+    if (!controller.toolbarWanted ||
+        _dragGlobal != null ||
+        _toolbarGeometryRefreshScheduled) {
       return;
     }
     _toolbarGeometryRefreshScheduled = true;
@@ -1535,6 +1543,10 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   /// Must not run during layout/build — geometry walks use [localToGlobal].
   void _refreshToolbarForVisibleGeometry() {
     if (!widget.enabled || !controller.toolbarWanted) return;
+    // Mid-drag: keep the menu hidden until drag-end [showToolbar]. Scroll /
+    // remount restore must not re-present while a pointer still owns the
+    // gesture (autoscroll delivers ScrollNotifications during edge hold).
+    if (_dragGlobal != null) return;
     if (!_ownsChromeForCurrentSelection) {
       _contextMenuController.remove();
       return;

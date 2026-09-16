@@ -91,6 +91,11 @@ extension points or reach into a default block painter's fields. Ordinary
   so a prior bubble’s adaptive toolbar could linger after selection moved to a
   sibling scope. `toolbarWanted` is left alone so the owning scope can still
   restore on settle.
+- **FIXED**: Scroll / geometry toolbar restore is skipped while a selection
+  drag is active (`_dragGlobal`). Autoscroll `ScrollNotification`s must not
+  re-present the adaptive toolbar mid-gesture even when `toolbarWanted` was
+  re-armed (for example a host restoring a clamped range via the public
+  `selection` setter).
 - **ADDED**: `MarkdownSelectionSurface.hasSelectionHandleLeaders`,
   `clearSelectionHandleLayersIfLinked`, and
   `MarkdownSelectionScopeState.selectionHandleLeadersAttached` for observing
