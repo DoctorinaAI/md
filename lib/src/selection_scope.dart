@@ -401,7 +401,11 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     }
 
     if (sel case final current? when !current.isCollapsed) {
-      if (_dragGlobal == null) {
+      if (!_ownsChromeForCurrentSelection) {
+        // Sibling / prior subject: drop this scope's overlay without clearing
+        // [toolbarWanted] (the owning scope may still need restore intent).
+        _contextMenuController.remove();
+      } else if (_dragGlobal == null) {
         // Outside a drag: restore when [toolbarWanted] (scroll remount /
         // geometry change). Skip while disabled — chrome comes back on
         // the enabled flip in [didUpdateWidget].
@@ -498,6 +502,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   void _updateHandlesAndOverlay() {
     if (!_handlesEnabled) {
       _clearHandles();
+      // Losing chrome ownership (or disabled) must also drop a lingering
+      // context menu — handles alone were cleared before.
+      _contextMenuController.remove();
       return;
     }
     final endpoints = controller.selectionHandleEndpoints();
@@ -1494,6 +1501,12 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
       }
       return;
     }
+    if (_dragGlobal != null) {
+      // Absolute toolbar anchors are dormant mid-drag; handles still track
+      // via LeaderLayer. Drag-end [showToolbar] re-presents.
+      _syncOverlay();
+      return;
+    }
     _refreshToolbarForVisibleGeometry();
     // Scroll notifications can run before child layout finishes (common when
     // the scope itself was outside the viewport cache). Retry next frame.
@@ -1511,7 +1524,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   }
 
   void _scheduleToolbarGeometryRefresh() {
-    if (!controller.toolbarWanted || _toolbarGeometryRefreshScheduled) {
+    if (!controller.toolbarWanted ||
+        _dragGlobal != null ||
+        _toolbarGeometryRefreshScheduled) {
       return;
     }
     _toolbarGeometryRefreshScheduled = true;
@@ -1528,6 +1543,10 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   /// Must not run during layout/build — geometry walks use [localToGlobal].
   void _refreshToolbarForVisibleGeometry() {
     if (!widget.enabled || !controller.toolbarWanted) return;
+    // Mid-drag: keep the menu hidden until drag-end [showToolbar]. Scroll /
+    // remount restore must not re-present while a pointer still owns the
+    // gesture (autoscroll delivers ScrollNotifications during edge hold).
+    if (_dragGlobal != null) return;
     if (!_ownsChromeForCurrentSelection) {
       _contextMenuController.remove();
       return;

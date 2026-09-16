@@ -600,6 +600,84 @@ void main() {
     });
 
     testWidgets(
+      'expand drag keeps toolbar hidden across scroll even if toolbarWanted '
+      'is re-armed mid-drag',
+      (tester) async {
+        // Hosts may restore a clamped same-document range via paths that arm
+        // toolbarWanted on mobile. Autoscroll scroll notifications must not
+        // re-present the menu until drag end.
+        final scrollController = ScrollController();
+        addTearDown(scrollController.dispose);
+        final controller = MarkdownSelectionController()
+          ..setDocuments(<MarkdownDocumentRef>[
+            MarkdownDocumentRef(
+              id: 'd',
+              model: Markdown.fromString('Hello selectable world again'),
+            ),
+          ]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ListView(
+                controller: scrollController,
+                children: <Widget>[
+                  const SizedBox(height: 80),
+                  MarkdownSelectionScope(
+                    controller: controller,
+                    child: const SizedBox(width: 400, child: _Doc('d')),
+                  ),
+                  const SizedBox(height: 1200),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final tl = tester.getTopLeft(find.byType(MarkdownWidget));
+        final pos = tl + const Offset(8, 8);
+        await tester.tapAt(pos);
+        await tester.pump(const Duration(milliseconds: 40));
+        await tester.tapAt(pos);
+        await tester.pumpAndSettle();
+        final state = tester.state<MarkdownSelectionScopeState>(
+          find.byType(MarkdownSelectionScope),
+        );
+        expect(state.toolbarIsVisible, isTrue);
+
+        final gesture = await tester.startGesture(pos);
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        expect(state.toolbarIsVisible, isFalse);
+
+        // Simulate a host restoring a clamped range via paths that arm
+        // toolbarWanted (public selection setter on a changed range).
+        controller.toolbarWanted = true;
+        expect(controller.toolbarWanted, isTrue);
+        await gesture.moveBy(const Offset(60, 0));
+        await tester.pump();
+
+        scrollController.jumpTo(40);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+
+        expect(
+          state.toolbarIsVisible,
+          isFalse,
+          reason:
+              'scroll geometry refresh must not show the toolbar while an '
+              'expand drag is still active',
+        );
+
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(state.toolbarIsVisible, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'Android long-press fires forLongPress haptic while handles deferred',
       (tester) async {
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
