@@ -48,11 +48,11 @@ extension points or reach into a default block painter's fields. Ordinary
   boxes**, not the full max-width layout of a paragraph. Empty horizontal
   gutter beside a short line is no longer I-beam / click-to-open.
 - **CHANGED**: Gesture *starts* (`hitsSelectableContent`) stay **surface-
-  bounds** (press inside the document/bubble arms text selection — tdesktop
-  `PointState::Inside` parity). Drag-extend may still clamp outside glyphs.
+  bounds**. A press inside the document or bubble arms text selection.
+  Drag-extend may still clamp outside glyphs.
 - **CHANGED**: Mouse single-click that misses selectable content while a
-  non-collapsed range is active clears the selection (tdesktop empty
-  Selecting / dismiss parity), instead of leaving the old range.
+  non-collapsed range is active clears the selection, instead of leaving
+  the old range.
 - **ADDED**: `SelectableBlockPainter.hitsRenderedTextAt`,
   `MarkdownSelectionSurface.hitsSelectableGlyphs`, and
   `MarkdownSelectionController.hitsSelectableGlyphs`.
