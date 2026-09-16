@@ -174,8 +174,8 @@ Statics: `MarkdownSelectionScope.of/maybeOf` (→ controller), `stateOf` (→ st
   tap-down and shows chrome on tap-up, **triple** selects the block, `Shift`-click
   extends, and a drag after a double/triple keeps word/block granularity. The
   touch recognizer and long-press only join the arena on a selectable hit
-  inside a mounted surface’s bounds (`hitsSelectableContent` — tdesktop-style
-  bubble Inside, including padding / empty line gutter; I-beam / link hits stay
+  inside a mounted surface’s bounds (`hitsSelectableContent`: press inside the
+  document or bubble, including padding / empty line gutter; I-beam / link hits stay
   glyph-tight via `hitsSelectableGlyphs`), or while a non-collapsed selection /
   toolbar is up, and only when
   `enableTouchGestures` is true. When `enableTouchConsecutiveTaps` is false,
