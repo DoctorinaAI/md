@@ -58,15 +58,27 @@ class BlockPainter$Table
       : MD$TableColumnAlign.none;
 
   /// The horizontal offset of a cell's text within its column, honoring the
-  /// column alignment (falling back to centered headers / left-aligned data).
+  /// column alignment (falling back to centered headers and start-aligned
+  /// data: left for left-to-right text, right for right-to-left).
   double _cellHorizontalPadding(int r, int c, double painterWidth) =>
       switch (_columnAlign(c)) {
         MD$TableColumnAlign.left => padding,
         MD$TableColumnAlign.center => (_columnWidths[c] - painterWidth) / 2,
         MD$TableColumnAlign.right => _columnWidths[c] - painterWidth - padding,
-        MD$TableColumnAlign.none =>
-          (r == 0) ? (_columnWidths[c] - painterWidth) / 2 : padding,
+        MD$TableColumnAlign.none => (r == 0)
+            ? (_columnWidths[c] - painterWidth) / 2
+            : (_rtl ? _columnWidths[c] - painterWidth - padding : padding),
       };
+
+  /// Whether the last layout mirrored the table for right-to-left text: the
+  /// first column on the right, and the table against the right edge.
+  bool _rtl = false;
+
+  /// Block-local x of the table's left border.
+  double _tableLeft = 0;
+
+  /// Block-local x of each column's left edge.
+  List<double> _columnLefts = const <double>[];
 
   final List<double> _columnWidths;
   final List<double> _rowHeights;
@@ -125,45 +137,35 @@ class BlockPainter$Table
 
     for (int r = 0; r < _cellPainters.length; r++) {
       final rowHeight = _rowHeights[r];
-      double currentX = 0.0;
 
       if (position.dy >= currentY && position.dy < currentY + rowHeight) {
         // In this row.
         for (int c = 0; c < _cellPainters[r].length; c++) {
           final painter = _cellPainters[r][c];
-          if (painter.text == null) {
-            currentX += _columnWidths[c];
-            continue;
-          }
-          final columnWidth = _columnWidths[c];
+          final columnLeft = _columnLefts[c];
+          if (painter.text == null ||
+              position.dx < columnLeft ||
+              position.dx >= columnLeft + _columnWidths[c]) continue;
 
-          if (position.dx >= currentX && position.dx < currentX + columnWidth) {
-            // In this cell.
-            final verticalPadding = (rowHeight - painter.height) / 2;
-            final horizontalPadding =
-                _cellHorizontalPadding(r, c, painter.width);
+          // In this cell.
+          final verticalPadding = (rowHeight - painter.height) / 2;
+          final horizontalPadding = _cellHorizontalPadding(r, c, painter.width);
 
-            final painterOffset = Offset(
-                currentX + horizontalPadding, currentY + verticalPadding);
-            final localPosition = position - painterOffset;
+          final painterOffset = Offset(
+            columnLeft + horizontalPadding,
+            currentY + verticalPadding,
+          );
+          final localPosition = position - painterOffset;
 
-            // Check if inside the actual painted text area.
-            if (localPosition.dx < 0 ||
-                localPosition.dx > painter.width ||
-                localPosition.dy < 0 ||
-                localPosition.dy > painter.height) {
-              currentX += columnWidth;
-              continue;
-            }
+          // Check if inside the actual painted text area.
+          if (localPosition.dx < 0 ||
+              localPosition.dx > painter.width ||
+              localPosition.dy < 0 ||
+              localPosition.dy > painter.height) continue;
 
-            final textPosition = painter.getPositionForOffset(localPosition);
-            final span = painter.text!.getSpanForPosition(textPosition);
-            if (span is TextSpan) {
-              return span;
-            }
-            return null; // Found cell, but no span.
-          }
-          currentX += columnWidth;
+          final textPosition = painter.getPositionForOffset(localPosition);
+          final span = painter.text!.getSpanForPosition(textPosition);
+          return span is TextSpan ? span : null;
         }
       }
       currentY += rowHeight;
@@ -239,6 +241,20 @@ class BlockPainter$Table
 
     final totalWidth = _columnWidths.reduce((a, b) => a + b);
 
+    // Column positions: left to right, or mirrored for right-to-left text so
+    // the first column sits on the right and the table hugs the right edge.
+    _rtl = theme.textDirection == TextDirection.rtl && width.isFinite;
+    _tableLeft = _rtl ? math.max(width - totalWidth, 0.0) : 0.0;
+    final lefts = List<double>.filled(columns, 0.0);
+    var columnStart = 0.0;
+    for (var c = 0; c < columns; c++) {
+      lefts[c] = _rtl
+          ? _tableLeft + totalWidth - columnStart - _columnWidths[c]
+          : columnStart;
+      columnStart += _columnWidths[c];
+    }
+    _columnLefts = lefts;
+
     // Layout painters with final widths and calculate row heights
 
     double totalHeight = 0.0;
@@ -265,15 +281,14 @@ class BlockPainter$Table
     double lineY = 0;
     for (int r = 0; r < allRows.length - 1; r++) {
       lineY += _rowHeights[r];
-      points[pointIndex++] = 0;
+      points[pointIndex++] = _tableLeft;
       points[pointIndex++] = lineY;
-      points[pointIndex++] = totalWidth;
+      points[pointIndex++] = _tableLeft + totalWidth;
       points[pointIndex++] = lineY;
     }
-    // Vertical lines
-    double lineX = 0;
+    // Vertical lines, between column c and the next one in reading order.
     for (int c = 0; c < columns - 1; c++) {
-      lineX += _columnWidths[c];
+      final lineX = _rtl ? lefts[c] : lefts[c] + _columnWidths[c];
       points[pointIndex++] = lineX;
       points[pointIndex++] = 0;
       points[pointIndex++] = lineX;
@@ -296,19 +311,19 @@ class BlockPainter$Table
     for (var r = 0; r < allRows.length; r++) {
       if (r > 0) text.write('\n');
       final cells = allRows[r].cells;
-      var colLeft = 0.0;
       for (var c = 0; c < columns; c++) {
         if (c < cells.length) {
           if (c > 0) text.write('\t');
           final painter = _cellPainters[r][c];
           final verticalPadding = (_rowHeights[r] - painter.height) / 2;
           final horizontalPadding = _cellHorizontalPadding(r, c, painter.width);
-          final origin =
-              Offset(colLeft + horizontalPadding, rowTop + verticalPadding);
+          final origin = Offset(
+            _columnLefts[c] + horizontalPadding,
+            rowTop + verticalPadding,
+          );
           frags.add(SelectableFragment(painter, origin, text.length));
           text.write(painter.plainText);
         }
-        colLeft += _columnWidths[c];
       }
       rowTop += _rowHeights[r];
     }
@@ -325,22 +340,18 @@ class BlockPainter$Table
 
     for (int r = 0; r < _cellPainters.length; r++) {
       final rowHeight = _rowHeights[r];
-      double currentX = 0;
 
       // Draw background for even data rows.
       if (r % 2 == 0 && r != 0) {
         canvas.drawRect(
-          Rect.fromLTWH(0, currentY, _size.width, rowHeight),
+          Rect.fromLTWH(_tableLeft, currentY, _size.width, rowHeight),
           _rowBackgroundPaint,
         );
       }
 
       for (int c = 0; c < columns; c++) {
         final painter = _cellPainters[r][c];
-        if (painter.text == null) {
-          currentX += _cellPainters[r].length > c ? _columnWidths[c] : 0;
-          continue;
-        }
+        if (painter.text == null) continue;
 
         final verticalPadding = (rowHeight - painter.height) / 2;
         final horizontalPadding = _cellHorizontalPadding(r, c, painter.width);
@@ -348,11 +359,10 @@ class BlockPainter$Table
         painter.paint(
           canvas,
           Offset(
-            currentX + horizontalPadding,
+            _columnLefts[c] + horizontalPadding,
             currentY + verticalPadding,
           ),
         );
-        currentX += _columnWidths[c];
       }
       currentY += rowHeight;
     }
@@ -367,11 +377,11 @@ class BlockPainter$Table
 
     // Draw outer borders
     canvas.drawRect(
-      Rect.fromLTRB(
-        0,
+      Rect.fromLTWH(
+        _tableLeft,
         offset,
         _size.width,
-        offset + _size.height,
+        _size.height,
       ),
       _borderPaint,
     );

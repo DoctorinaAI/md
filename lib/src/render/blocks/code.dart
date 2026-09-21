@@ -28,7 +28,8 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
         painter = TextPainter(
           text: _buildSpan(text, language, theme),
           textAlign: TextAlign.start,
-          textDirection: theme.textDirection,
+          // Code reads left-to-right even inside right-to-left documents.
+          textDirection: TextDirection.ltr,
           textScaler: theme.textScaler,
         );
 

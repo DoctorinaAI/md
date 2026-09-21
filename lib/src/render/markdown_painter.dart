@@ -264,29 +264,47 @@ class MarkdownPainter {
   }
 
   /// Layouts the markdown content with the given width.
-  Size layout({required double maxWidth}) {
+  ///
+  /// For right-to-left text, blocks align their content to the right edge of
+  /// the width they are laid out with. When the content ends up narrower than
+  /// [maxWidth] (loose constraints), the blocks are laid out again at the
+  /// final content width so that edge matches the painted size.
+  Size layout({required double maxWidth, double minWidth = 0}) {
     if (_isEmpty) {
       _size = Size.zero;
       _needsLayout = false; // No need to layout if the markdown is empty.
       return _size; // If the markdown is empty, return zero size.
     }
-    var width = .0, height = .0;
     final blocks = _blockPainters;
     if (_blockOffsets.length != blocks.length) {
       // Resize the block sizes array
       // if it does not match the number of painters.
       _blockOffsets = Float32List(blocks.length);
     }
+    var size = _layoutBlocks(maxWidth);
+    if (_theme.textDirection == TextDirection.rtl) {
+      final target = math.max(size.width, minWidth);
+      // Re-laying out at a width no smaller than every block's content keeps
+      // the same line breaks; only the right edge moves.
+      if (target < maxWidth) size = _layoutBlocks(target);
+    }
+    _needsLayout = false; // No need to layout if the markdown is empty.
+    return _size = size;
+  }
+
+  /// Lays out every block at [width], stacking them vertically, and returns
+  /// the content size.
+  Size _layoutBlocks(double width) {
+    var contentWidth = .0, height = .0;
+    final blocks = _blockPainters;
     final offsets = _blockOffsets;
     for (var i = 0; i < blocks.length; i++) {
       offsets[i] = height;
-      final block = blocks[i];
-      final size = block.layout(maxWidth);
-      width = math.max(width, size.width);
+      final size = blocks[i].layout(width);
+      contentWidth = math.max(contentWidth, size.width);
       height += size.height;
     }
-    _needsLayout = false; // No need to layout if the markdown is empty.
-    return _size = Size(width, height);
+    return Size(contentWidth, height);
   }
 
   /// Routes a tap-down / tap-up to the block under the pointer, re-basing the

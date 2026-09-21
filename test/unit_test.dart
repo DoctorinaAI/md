@@ -18,6 +18,7 @@ import 'selection/selection_widget_test.dart' as selection_widget_test;
 import 'highlight/highlight_test.dart' as highlight_test;
 import 'theme/theme_test.dart' as theme_test;
 import 'widget/render_test.dart' as render_test;
+import 'widget/rtl_test.dart' as rtl_test;
 import 'widget/widget_test.dart' as widget_test;
 
 void main() => group('Unit', () {
@@ -39,5 +40,6 @@ void main() => group('Unit', () {
       selection_keyboard_test.main();
       selection_handles_test.main();
       render_test.main();
+      rtl_test.main();
       widget_test.main();
     });
