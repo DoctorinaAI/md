@@ -117,6 +117,59 @@ void main() {
       expect(_allBounds(painter).right, closeTo(_width - inset, 0.5));
     });
 
+    group('nested children', () {
+      BlockPainter$Paragraph child(TextDirection direction) =>
+          BlockPainter$Paragraph(
+            spans: _block<MD$Paragraph>('שלום עולם').spans,
+            theme: _theme(direction),
+          );
+
+      BlockPainter$Quote quote(TextDirection direction) => BlockPainter$Quote(
+            spans: const <MD$Span>[],
+            indent: 0,
+            theme: _theme(direction),
+            children: <BlockPainter>[child(direction)],
+          )..layout(_width);
+
+      BlockPainter$Alert alert(TextDirection direction) => BlockPainter$Alert(
+            alert: MD$AlertType.note,
+            spans: const <MD$Span>[],
+            theme: _theme(direction),
+            children: <BlockPainter>[child(direction)],
+          )..layout(_width);
+
+      const quoteIndent = BlockPainter$Quote.lineIndent;
+      const alertInset = BlockPainter$Alert.padding +
+          BlockPainter$Alert.barWidth +
+          BlockPainter$Alert.gap;
+
+      test('a quote child sits left of the right-hand indent', () {
+        final box = _allBounds(quote(TextDirection.rtl));
+        expect(box.right, closeTo(_width - quoteIndent, 0.5));
+      });
+
+      test('a quote child keeps the left-hand indent for LTR', () {
+        final box = _allBounds(quote(TextDirection.ltr));
+        expect(box.left, closeTo(quoteIndent, 0.5));
+      });
+
+      test('an alert child sits left of the right-hand accent bar', () {
+        final box = _allBounds(alert(TextDirection.rtl));
+        expect(box.right, closeTo(_width - alertInset, 0.5));
+      });
+
+      test('an alert child keeps the left-hand bar for LTR', () {
+        final box = _allBounds(alert(TextDirection.ltr));
+        expect(box.left, closeTo(alertInset, 0.5));
+      });
+
+      test('maps the right edge to the start of a nested RTL child', () {
+        final painter = quote(TextDirection.rtl);
+        const start = Offset(_width - quoteIndent - 1, 7);
+        expect(painter.offsetForLocalPosition(start), 0);
+      });
+    });
+
     group('list', () {
       BlockPainter$List paint(TextDirection direction) => BlockPainter$List(
             items: _block<MD$List>('- אחד\n- שתיים').items,
