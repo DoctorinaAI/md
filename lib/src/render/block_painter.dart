@@ -405,13 +405,20 @@ mixin ParagraphGestureHandler {
   ///
   /// [origin] is the block-local offset where [painter] is painted (for
   /// example, the right-aligned position of right-to-left text).
+  ///
+  /// A point outside the painter's box hits nothing: the nearest-position
+  /// lookup would otherwise snap it onto the glyph at that end of the line,
+  /// so a tap in the empty space before right-to-left text would open a link
+  /// that happens to end the line.
   @protected
   InlineSpan? hitTestInlineSpanWithPointerEvent(
     PointerEvent event,
     TextPainter painter, {
     Offset origin = Offset.zero,
   }) {
-    final pos = painter.getPositionForOffset(event.localPosition - origin);
+    final local = event.localPosition - origin;
+    if (!(Offset.zero & painter.size).contains(local)) return null;
+    final pos = painter.getPositionForOffset(local);
     final span = painter.text?.getSpanForPosition(pos);
     return span;
   }
