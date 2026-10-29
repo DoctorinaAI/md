@@ -78,7 +78,10 @@ use `size.width` for full-width backgrounds/rules and to bail when too narrow).
 ```dart
 String get renderedText;                    // MUST equal markdownBlockRenderedText(block)
 int offsetForLocalPosition(Offset local);   // block-local → rendered-text index
+(int, TextAffinity) positionAndAffinityForLocal(Offset local); // + soft-wrap side
 List<Rect> boxesForRange(int start, int end);// block-local highlight rects for [start, end)
+Rect caretRectFor(int offset, TextAffinity affinity); // block-local caret (handles)
+bool hitsRenderedTextAt(Offset local);      // glyph-tight hover / link hit test
 bool get selectionHighlightAboveCachedContent; // true ⇒ also paint highlight above Picture
 ```
 
@@ -87,9 +90,10 @@ Two mixins implement it for you:
 - **`SelectableTextBlock`** — a block backed by a **single `TextPainter`**. Supply
   `TextPainter get selectionPainter` and optionally override `Offset get
   selectionOrigin` (default `Offset.zero`) when glyphs aren't at the block origin.
-  It derives `renderedText`, `offsetForLocalPosition`, `boxesForRange` for you.
+  It derives `renderedText` and the hit-test / caret / highlight members for
+  you.
 - **`MultiPainterSelectable`** — a block whose text spans **several
-  `TextPainter`s** at different origins (lists, tables). Supply
+  `TextPainter`s** at different origins (lists, tables, quotes, alerts). Supply
   `List<SelectableFragment> get fragments` (in rendered-text order, each
   `textStart` matching the linearization; the gaps are the `\n`/`\t` separators)
   and `renderedText`. `SelectableFragment` is `(TextPainter painter, Offset
@@ -160,10 +164,13 @@ and expose `fragments` + `renderedText`.
 - **`$Heading`** — like `$Paragraph`, styled by `theme.headingStyleFor(level)`.
 - **`$Quote`** — body styled `theme.quoteStyle ?? textStyle`; one vertical accent
   bar per `indent` level (`lineIndent = 10`, `dividerColor`); text shifted right
-  by `lineIndent + indent*lineIndent` (also its `selectionOrigin`).
+  by `lineIndent + indent*lineIndent`. `MultiPainterSelectable`: a leaf body is
+  one fragment; with `MD$Quote.blocks` it stacks nested `children` painters
+  (built through `theme.builder`, prose themed via `quoteStyle`).
 - **`$Alert`** — GitHub admonition: tinted rounded background (accent α 0.10),
   left accent bar (width 4), bold colored title above body (`alert.title`,
-  `alertColorFor(type)`); body selectable via `selectionOrigin`.
+  `alertColorFor(type)`); body selectable via `MultiPainterSelectable` (title is
+  not), stacking nested `children` when `MD$Alert.blocks` is non-empty.
 - **`$Code`** — monospace `TextPainter` (raw text, no span parsing); rounded
   `surfaceColor` background (radius = padding 8); taps are no-ops; **no link taps**.
 - **`$List`** — recursive nested items (`_baseIndent = 8`, `_levelIndent = 16` per
@@ -178,7 +185,7 @@ and expose `fragments` + `renderedText`.
   no-op; not selectable.
 
 `$Divider`/`$Spacer` are not selectable; `$Code` is selectable but has no link
-taps; only `$List`/`$Table` use `MultiPainterSelectable`.
+taps; `$List`/`$Table`/`$Quote`/`$Alert` use `MultiPainterSelectable`.
 
 ## Theme customization (`MarkdownThemeData`)
 

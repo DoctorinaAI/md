@@ -6,8 +6,8 @@ first, every time. Deep detail lives in [`docs/`](docs/) — linked per section.
 `flutter_md` is a Flutter Markdown package: a hand-rolled **parser** → an
 immutable **node model** → a **canvas render layer** (one `RenderBox`, no
 widget-per-block) → cross-block/cross-widget **text selection**. Repo:
-`DoctorinaAI/md`, package `flutter_md`, currently `0.2.0`, branch
-`feat/text-selection`.
+`DoctorinaAI/md`, package `flutter_md`, currently `0.3.0`, main branch
+`master`.
 
 ## Commands (these are the CI gates — run before you claim done)
 
@@ -65,7 +65,7 @@ Public API is the barrel `lib/flutter_md.dart` (`export … show …`). See
 5. **One test entrypoint:** a new `test/**/foo_test.dart` must be wired into
    `test/unit_test.dart` (import + `main()` inside `group('Unit', …)`) or CI won't run it.
 6. **CHANGELOG discipline:** the `version:` in `pubspec.yaml` must have a matching
-   `# <version>` heading in `CHANGELOG.md` or the CI setup step fails.
+   `## <version>` heading in `CHANGELOG.md` or the CI setup step fails.
 
 ## Load-bearing invariants (don't break silently)
 

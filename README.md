@@ -204,6 +204,11 @@ flutter pub get
 > **Upgrading from 0.0.x?** See the
 > [Migration guide: 0.0.x → 0.2.x](docs/migration/0.0.x-to-0.2.x.md). The upgrade
 > is almost entirely backward compatible — most apps need no code changes.
+>
+> **Upgrading from 0.2.x?** See the
+> [Migration guide: 0.2.x → 0.3.x](docs/migration/0.2.x-to-0.3.x.md). Only
+> custom painters, selection surfaces and quote / alert model readers need
+> changes.
 
 ## ✂️ Text Selection
 

@@ -15,6 +15,8 @@ example/windows/
 example/macos/
 example/linux/
 docs/
+# Agent orientation notes; they link into docs/, which is not published.
+AGENTS.md
 # Prism codegen tooling — not part of the published package. (.pubignore does
 # not inherit .gitignore, so node_modules must be excluded explicitly here.)
 tool/

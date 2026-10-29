@@ -6,12 +6,15 @@ import 'package:md_example/main.dart';
 import 'package:md_example/tabs/highlight_tab.dart';
 
 void main() {
-  testWidgets('all tabs build and selection drags do not crash',
-      (tester) async {
-    await tester.pumpWidget(ThemeModel(
-      notifier: ValueNotifier<ThemeMode>(ThemeMode.light),
-      child: const App(),
-    ));
+  testWidgets('all tabs build and selection drags do not crash', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ThemeModel(
+        notifier: ValueNotifier<ThemeMode>(ThemeMode.light),
+        child: const App(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     // Editor tab renders the preview.
@@ -23,8 +26,9 @@ void main() {
     await tester.pumpAndSettle();
     final md = find.byType(MarkdownWidget).first;
     final g = await tester.startGesture(
-        tester.getTopLeft(md) + const Offset(2, 4),
-        kind: PointerDeviceKind.mouse);
+      tester.getTopLeft(md) + const Offset(2, 4),
+      kind: PointerDeviceKind.mouse,
+    );
     await tester.pump(const Duration(milliseconds: 150));
     await g.moveTo(tester.getCenter(md));
     await tester.pump(const Duration(milliseconds: 150));
