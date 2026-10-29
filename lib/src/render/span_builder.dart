@@ -26,19 +26,14 @@ TapGestureRecognizer? _buildTapRecognizer(
 }
 
 /// Whether any of [spans] paints an opaque / translucent fill behind glyphs
-/// (`monospace` / `highlight` backgrounds from [MarkdownThemeData]), or — when
-/// [images] is set — may paint a picture (an image or a link icon). Used to
+/// (`monospace` / `highlight` backgrounds from [MarkdownThemeData]). Used to
 /// decide whether the selection tint must paint *above* the cached content
-/// picture so those fills do not hide it.
-bool markdownSpansPaintOpaqueBackground(
-  Iterable<MD$Span> spans, {
-  bool images = false,
-}) {
+/// picture so those fills do not hide it. Pictures do the same; check the
+/// built text with `markdownSpanHasImages`.
+bool markdownSpansPaintOpaqueBackground(Iterable<MD$Span> spans) {
   const fills = MD$Style(MD$Style.monospace | MD$Style.highlight);
-  const pictures = MD$Style(fills | MD$Style.image | MD$Style.link);
-  final mask = images ? pictures : fills;
   for (final span in spans) {
-    if (span.style & mask != 0) return true;
+    if (span.style & fills != 0) return true;
   }
   return false;
 }
@@ -62,7 +57,9 @@ String? _titleOf(MD$Span span) => switch (span.extra) {
 /// With a [MarkdownThemeData.imageResolver], images (and link icons) it
 /// resolves become [MarkdownImageSpan]s: lay the resulting text out with
 /// [layoutMarkdownText] and paint it with [paintMarkdownText] instead of the
-/// plain [TextPainter] methods.
+/// plain [TextPainter] methods. Called outside a `MarkdownWidget`, the caller
+/// owns those images: listen to [MarkdownImageSpan.image] to repaint, and
+/// dispose it with the text.
 TextSpan paragraphFromMarkdownSpans({
   required Iterable<MD$Span> spans,
   required MarkdownThemeData theme,

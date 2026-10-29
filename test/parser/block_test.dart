@@ -157,6 +157,37 @@ void main() => group('Block parsing', () {
           final q = _blocks('> ```\r\n> x\r\n> ```\r\n').first as MD$Quote;
           expect((q.blocks.single as MD$Code).text, 'x');
         });
+
+        test('an indented or tab-separated quoted fence still nests', () {
+          final spaced =
+              _blocks('> intro\n>  ```\n>  code\n>  ```').single as MD$Quote;
+          expect(spaced.blocks.last, isA<MD$Code>());
+          final tab = _blocks('>\t```\n>\tcode\n>\t```').single as MD$Quote;
+          expect((tab.blocks.single as MD$Code).text, 'code');
+          // An indented closing fence closes the block.
+          final close = _blocks('> ```\n> a\n>  ```\n> b').single as MD$Quote;
+          expect((close.blocks.first as MD$Code).text, 'a');
+          expect(close.blocks.last, isA<MD$Paragraph>());
+          // Four spaces is not a fence.
+          final code = _blocks('> a\n>     ```\n>     b').single as MD$Quote;
+          expect(code.blocks, isEmpty);
+        });
+
+        test('uneven list indents keep every item', () {
+          final list = _blocks('- a\n    - b\n  - c\n- d').single as MD$List;
+          expect(list.items.map((i) => i.text), <String>['a', 'd']);
+          expect(
+            list.items.first.children.map((i) => i.text),
+            <String>['b', 'c'],
+          );
+          expect(markdownBlockRenderedText(list), 'a\nb\nc\nd');
+        });
+
+        test('blank lines around an alert body add no gaps', () {
+          final a =
+              _blocks('> [!TIP]\n>\n> ```\n> b\n> ```\n>').single as MD$Alert;
+          expect(a.blocks.single, isA<MD$Code>());
+        });
       });
 
       group('Fenced code', () {

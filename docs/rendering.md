@@ -126,8 +126,9 @@ class MyBlock with ParagraphGestureHandler, SelectableTextBlock implements Block
   Size _size = Size.zero;
   @override Size get size => _size;
 
-  @override Size layout(double width) { painter.layout(maxWidth: width); return _size = painter.size; }
-  @override void paint(Canvas c, Size s, double dy) { /* decorate */ painter.paint(c, Offset(0, dy)); }
+  // layoutMarkdownText / paintMarkdownText also size and draw inline pictures.
+  @override Size layout(double width) { layoutMarkdownText(painter, maxWidth: width); return _size = painter.size; }
+  @override void paint(Canvas c, Size s, double dy) { /* decorate */ paintMarkdownText(painter, c, Offset(0, dy)); }
   @override void handleTapDown(PointerDownEvent e) {/* see BlockPainter$Paragraph */}
   @override void handleTapUp(PointerUpEvent e) {/* ... */}
   @override void dispose() => painter.dispose();

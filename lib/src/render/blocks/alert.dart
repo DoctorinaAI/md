@@ -40,16 +40,7 @@ class BlockPainter$Alert
             ? <String>[for (final b in blocks) markdownBlockRenderedText(b)]
             : null,
         _accent = theme.alertColorFor(alert),
-        _selectionHighlightAboveCachedContent = children.isNotEmpty
-            ? children.any(
-                (c) =>
-                    c is SelectableBlockPainter &&
-                    c.selectionHighlightAboveCachedContent,
-              )
-            : markdownSpansPaintOpaqueBackground(
-                spans,
-                images: theme.imageResolver != null,
-              ),
+        _fills = children.isEmpty && markdownSpansPaintOpaqueBackground(spans),
         titlePainter = TextPainter(
           text: TextSpan(
             text: alert.title,
@@ -84,8 +75,15 @@ class BlockPainter$Alert
   /// content [Picture].
   @override
   bool get selectionHighlightAboveCachedContent =>
-      _selectionHighlightAboveCachedContent;
-  final bool _selectionHighlightAboveCachedContent;
+      _fills ||
+      _hasImages ||
+      _children.any(
+        (c) =>
+            c is SelectableBlockPainter &&
+            c.selectionHighlightAboveCachedContent,
+      );
+  final bool _fills;
+  late final bool _hasImages = markdownSpanHasImages(_bodyPainter?.text);
 
   /// The kind of the alert being painted.
   final MD$AlertType alert;

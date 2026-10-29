@@ -43,16 +43,7 @@ class BlockPainter$Quote
         _modelTexts = blocks.isNotEmpty && blocks.length == children.length
             ? <String>[for (final b in blocks) markdownBlockRenderedText(b)]
             : null,
-        _selectionHighlightAboveCachedContent = children.isNotEmpty
-            ? children.any(
-                (c) =>
-                    c is SelectableBlockPainter &&
-                    c.selectionHighlightAboveCachedContent,
-              )
-            : markdownSpansPaintOpaqueBackground(
-                spans,
-                images: theme.imageResolver != null,
-              ),
+        _fills = children.isEmpty && markdownSpansPaintOpaqueBackground(spans),
         _leafPainter = children.isEmpty
             ? TextPainter(
                 text: paragraphFromMarkdownSpans(
@@ -85,8 +76,15 @@ class BlockPainter$Quote
   /// content [Picture].
   @override
   bool get selectionHighlightAboveCachedContent =>
-      _selectionHighlightAboveCachedContent;
-  final bool _selectionHighlightAboveCachedContent;
+      _fills ||
+      _hasImages ||
+      _children.any(
+        (c) =>
+            c is SelectableBlockPainter &&
+            c.selectionHighlightAboveCachedContent,
+      );
+  final bool _fills;
+  late final bool _hasImages = markdownSpanHasImages(_leafPainter?.text);
 
   /// The theme used to style the quote.
   final MarkdownThemeData theme;

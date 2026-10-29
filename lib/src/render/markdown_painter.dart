@@ -432,6 +432,7 @@ class MarkdownPainter {
   /// final content width so that edge matches the painted size.
   Size layout({required double maxWidth, double minWidth = 0}) {
     if (_isEmpty) {
+      _images.sweep(); // The previous document's pictures are gone.
       _size = Size.zero;
       _needsLayout = false; // No need to layout if the markdown is empty.
       return _size; // If the markdown is empty, return zero size.

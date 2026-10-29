@@ -141,14 +141,33 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// blockquote line, matching the historical trim behavior.
   static String _stripQuoteMarker(String line) => line.substring(1).trim();
 
-  /// Strips a single leading `>` and at most one following space, keeping the
-  /// rest of the line verbatim. Unlike [_stripQuoteMarker], this preserves
-  /// indentation, so a body re-parsed as nested blocks keeps the leading
-  /// whitespace of fenced code lines.
-  static String _stripQuoteMarkerRaw(String line) =>
-      line.length > 1 && line.codeUnitAt(1) == 0x20 /* space */
-          ? line.substring(2)
-          : line.substring(1);
+  /// Strips a single leading `>` and at most one following space or tab,
+  /// keeping the rest of the line verbatim. Unlike [_stripQuoteMarker], this
+  /// preserves indentation, so a body re-parsed as nested blocks keeps the
+  /// leading whitespace of fenced code lines.
+  static String _stripQuoteMarkerRaw(String line) {
+    if (line.length > 1) {
+      final c = line.codeUnitAt(1);
+      if (c == 0x20 /* space */ || c == 0x09 /* tab */)
+        return line.substring(2);
+    }
+    return line.substring(1);
+  }
+
+  /// [line] without its indentation when it is a fence (` ``` ` / `~~~`)
+  /// indented by at most three spaces or tabs (CommonMark), else [line]
+  /// itself — the block parser only recognises fences at column 0.
+  static String _unindentFence(String line) {
+    var k = 0;
+    while (k < line.length && k < 4) {
+      final c = line.codeUnitAt(k);
+      if (c != 0x20 /* space */ && c != 0x09 /* tab */) break;
+      k++;
+    }
+    if (k == 0 || k > 3) return line;
+    final rest = line.substring(k);
+    return rest.startsWith('```') || rest.startsWith('~~~') ? rest : line;
+  }
 
   /// Joins `lines[from..to)` with their quote markers stripped by
   /// [_stripQuoteMarkerRaw] — the body a quote or alert re-parses as nested
@@ -157,7 +176,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
     final buffer = StringBuffer();
     for (var k = from; k < to; k++) {
       if (k > from) buffer.writeln();
-      buffer.write(_stripQuoteMarkerRaw(lines[k]));
+      buffer.write(_unindentFence(_stripQuoteMarkerRaw(lines[k])));
     }
     return buffer.toString();
   }
@@ -172,6 +191,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
       while (line.startsWith('>')) {
         line = _stripQuoteMarkerRaw(line);
       }
+      line = _unindentFence(line);
       if (line.startsWith('```') || line.startsWith('~~~')) return true;
     }
     return false;
@@ -309,7 +329,15 @@ class MarkdownDecoder extends Converter<String, Markdown> {
           // Fenced code inside alerts must be nested blocks — feeding the
           // body to [_parseInlineSpans] pairs fence backticks as monospace.
           if (_linesContainFence(lines, i + 1, j)) {
-            final nested = convert(_rawQuoteBody(lines, i + 1, j)).blocks;
+            var nested = convert(_rawQuoteBody(lines, i + 1, j)).blocks;
+            // Blank `>` lines around the body are not gaps (the inline body
+            // is trimmed too).
+            var from = 0, to = nested.length;
+            while (from < to && nested[from] is MD$Spacer) from++;
+            while (to > from && nested[to - 1] is MD$Spacer) to--;
+            if (from > 0 || to < nested.length) {
+              nested = nested.sublist(from, to);
+            }
             pushBlock(MD$Alert(
               alert: alertType,
               text: body,
@@ -418,9 +446,12 @@ class MarkdownDecoder extends Converter<String, Markdown> {
               // we continue traversing deeper into the list.
               final children = traverse(indent: item.intent);
               if (items.isNotEmpty) {
-                // If we have a parent item, add children to it
-                items.last = items.last.copyWith(
-                    children: List<MD$ListItem>.unmodifiable(children));
+                // If we have a parent item, add children to it (after any it
+                // already has: `- a` / `    - b` / `  - c` nests both).
+                final parent = items.last;
+                items.last = parent.copyWith(
+                    children: List<MD$ListItem>.unmodifiable(
+                        <MD$ListItem>[...parent.children, ...children]));
               } else {
                 // If this is the first item, just add children
                 items.add(MD$ListItem(

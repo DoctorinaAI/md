@@ -319,10 +319,10 @@ void main() => group('Inline images', () {
             p.wordBoundaryForLocal(Offset(1, label.first.center.dy)),
             const TextRange(start: 0, end: 3),
           );
-          // The icon is a word of its own with no model text.
+          // The icon has no model text: it selects its label's first word.
           expect(
             p.wordBoundaryForLocal(label.first.center),
-            const TextRange(start: 4, end: 4),
+            const TextRange(start: 4, end: 8),
           );
           // Upstream right after the icon resolves to the icon.
           expect(
@@ -980,6 +980,153 @@ void main() => group('Inline images', () {
         });
       });
 
+      group('review fixes', () {
+        test('RTL: the hit half of a picture picks its edge', () {
+          final resolver = _FakeResolver();
+          final theme = MarkdownThemeData(
+            textStyle: const TextStyle(fontSize: 14),
+            textDirection: TextDirection.rtl,
+            imageResolver: resolver.call,
+          );
+          final p = _paragraph('אב ![cat](c.png) גד', theme);
+          final slot = p.boxesForRange(3, 6).single;
+          final dy = slot.center.dy;
+          // The right half is the start of the picture in RTL.
+          expect(
+            p.positionAndAffinityForLocal(Offset(slot.right - 1, dy)),
+            (3, TextAffinity.downstream),
+          );
+          expect(
+            p.positionAndAffinityForLocal(Offset(slot.left + 1, dy)),
+            (6, TextAffinity.upstream),
+          );
+        });
+
+        test('an empty-alt picture selects nothing on double click', () {
+          final resolver = _FakeResolver();
+          final p = _paragraph('a ![](c.png) b', _theme(resolver.call));
+          final slot = p.inlineSlot();
+          expect(
+            p.wordBoundaryForLocal(slot.center),
+            const TextRange(start: 2, end: 2),
+          );
+        });
+
+        test('the tint goes above only when a picture was emitted', () {
+          final none = _FakeResolver(); // icons off: links stay text
+          const source = 'see [x](https://a.b) here';
+          expect(
+            _paragraph(source, _theme(none.call))
+                .selectionHighlightAboveCachedContent,
+            isFalse,
+          );
+          final icons = _FakeResolver(icons: true);
+          expect(
+            _paragraph(source, _theme(icons.call))
+                .selectionHighlightAboveCachedContent,
+            isTrue,
+          );
+          // Lists learn it while laying out their items.
+          final list = BlockPainter$List(
+            items: _first<MD$List>('- ![a](1.png)').items,
+            theme: _theme(_FakeResolver().call),
+          );
+          expect(list.selectionHighlightAboveCachedContent, isFalse);
+          list.layout(300);
+          expect(list.selectionHighlightAboveCachedContent, isTrue);
+          list.dispose();
+          // Quotes and alerts ask their nested children every time.
+          final quote = BlockPainter$Quote(
+            indent: 1,
+            spans: _first<MD$Quote>('> ![a](1.png)').spans,
+            theme: _theme(_FakeResolver().call),
+          )..layout(300);
+          expect(quote.selectionHighlightAboveCachedContent, isTrue);
+          quote.dispose();
+        });
+
+        test('a throwing resolver reports and keeps the alt text', () {
+          final errors = <FlutterErrorDetails>[];
+          final previous = FlutterError.onError;
+          FlutterError.onError = errors.add;
+          addTearDown(() => FlutterError.onError = previous);
+          MarkdownImage? boom(MarkdownImageRequest request) =>
+              throw StateError('boom');
+          final painter = MarkdownPainter(
+            markdown: Markdown.fromString('a ![cat](c.png) b'),
+            theme: _theme(boom),
+          )..layout(maxWidth: 300);
+          expect(errors, hasLength(1));
+          expect(errors.single.exception, isStateError);
+          expect(painter.debugImages.length, 0);
+          painter.dispose();
+          // Outside a pool too.
+          final span = paragraphFromMarkdownSpans(
+            spans: _first<MD$Paragraph>('![cat](c.png)').spans,
+            theme: _theme(boom),
+          );
+          expect(span.toPlainText(), 'cat');
+          expect(errors, hasLength(2));
+        });
+
+        test('an emptied document disposes its pictures', () {
+          final resolver = _FakeResolver();
+          final theme = _theme(resolver.call);
+          final painter = MarkdownPainter(
+            markdown: Markdown.fromString('![a](1.png)'),
+            theme: theme,
+          )..layout(maxWidth: 300);
+          final image = resolver.images.single;
+          painter
+            ..update(markdown: Markdown.fromString(''), theme: theme)
+            ..layout(maxWidth: 300);
+          expect(image.disposed, isTrue);
+          expect(painter.debugImages.length, 0);
+          painter.dispose();
+        });
+
+        test('table min widths ignore alt text shown as a picture', () {
+          final resolver = _FakeResolver();
+          const source = '| a | b |\n|---|---|\n'
+              '| ![averyveryverylongalttextthatwouldnotfit](x.png) '
+              '| y y y y y y y y y y y y y y y y y y y y y y |';
+          final model = _first<MD$Table>(source);
+          final table = BlockPainter$Table(
+            header: model.header,
+            rows: model.rows,
+            theme: _theme(resolver.call),
+          )..layout(120);
+          // The picture column does not claim the alt text's width.
+          expect(table.size.width, lessThanOrEqualTo(120));
+          table.dispose();
+        });
+
+        test('data URIs match the MIME type case-insensitively', () {
+          final provider = MarkdownProviderImageResolver.defaultImageProvider(
+            Uri.parse('data:IMAGE/PNG;base64,iVBORw0KGgo='),
+          );
+          expect(provider, isA<MemoryImage>());
+        });
+
+        test('in-page anchors never get a link icon', () {
+          final resolver = MarkdownProviderImageResolver(
+            linkIcons: true,
+            baseUri: Uri.parse('https://example.com/docs/'),
+          );
+          const anchor = MarkdownImageRequest(
+            kind: MarkdownImageKind.linkIcon,
+            url: '#section',
+          );
+          expect(resolver(anchor), isNull);
+          final page = resolver(const MarkdownImageRequest(
+            kind: MarkdownImageKind.linkIcon,
+            url: 'other.html',
+          ));
+          expect(page, isNotNull);
+          page!.dispose();
+        });
+      });
+
       test('theme copyWith, lerp and mergeTheme carry the resolver', () {
         MarkdownImage? resolver(MarkdownImageRequest r) => null;
         final theme = MarkdownThemeData(
@@ -1003,6 +1150,11 @@ void main() => group('Inline images', () {
         );
       });
     });
+
+extension on BlockPainter$Paragraph {
+  /// The box of the first picture slot.
+  Rect inlineSlot() => painter.inlinePlaceholderBoxes!.first.toRect();
+}
 
 /// A baseline-aligned picture with a settable size.
 class _BaselineImage extends MarkdownImage {

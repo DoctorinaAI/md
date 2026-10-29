@@ -54,25 +54,21 @@ class BlockPainter$List
     required this.theme,
   })  : _items = items,
         _painters = <_ListItemMetrics>[],
-        _selectionHighlightAboveCachedContent =
-            _listItemsPaintOpaqueBackground(items, theme.imageResolver != null);
+        _fills = _listItemsPaintOpaqueBackground(items);
 
   /// Inline monospace/highlight fills in item text live in the content
   /// [Picture].
   @override
-  bool get selectionHighlightAboveCachedContent =>
-      _selectionHighlightAboveCachedContent;
-  final bool _selectionHighlightAboveCachedContent;
+  bool get selectionHighlightAboveCachedContent => _fills || _hasImages;
+  final bool _fills;
 
-  static bool _listItemsPaintOpaqueBackground(
-    List<MD$ListItem> items,
-    bool images,
-  ) {
+  /// Whether the laid-out item text holds a picture.
+  bool _hasImages = false;
+
+  static bool _listItemsPaintOpaqueBackground(List<MD$ListItem> items) {
     for (final item in items) {
-      if (markdownSpansPaintOpaqueBackground(item.spans, images: images)) {
-        return true;
-      }
-      if (_listItemsPaintOpaqueBackground(item.children, images)) return true;
+      if (markdownSpansPaintOpaqueBackground(item.spans)) return true;
+      if (_listItemsPaintOpaqueBackground(item.children)) return true;
     }
     return false;
   }
@@ -143,6 +139,7 @@ class BlockPainter$List
       painter.dispose();
     }
     _painters.clear();
+    _hasImages = false;
 
     double currentHeight = 0;
     double maxContentWidth = 0;
@@ -176,6 +173,7 @@ class BlockPainter$List
           contentPainter,
           maxWidth: math.max(0, width - indent - bulletPainter.width),
         );
+        _hasImages = _hasImages || markdownSpanHasImages(contentPainter.text);
 
         final bulletX = rtl ? width - indent - bulletPainter.width : indent;
         final metrics = _ListItemMetrics(

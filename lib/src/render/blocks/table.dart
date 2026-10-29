@@ -222,8 +222,9 @@ class BlockPainter$Table
         naturalWidths[c] =
             math.max(naturalWidths[c], textPainter.width + padding * 2);
 
-        // Calculate min width (longest word)
-        final cellText = cell.map((s) => s.text).join();
+        // Calculate min width (longest word). Pictures scale down to the
+        // column, so their alt text (U+FFFC in the painter) does not count.
+        final cellText = textPainter.plainText.replaceAll('\uFFFC', ' ');
         final words = cellText.split(RegExp(r'\s+'));
         if (words.isNotEmpty) {
           final longestWord =

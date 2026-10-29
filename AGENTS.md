@@ -105,8 +105,12 @@ Public API is the barrel `lib/flutter_md.dart` (`export … show …`). See
   block-approximate. `MarkdownSelectedBlock.sourceRange` is currently always null.
 - An inline picture is one U+FFFC in its `TextPainter` but its alt text in the
   model: read `markdownModelText(painter)`, never `painter.plainText`, for
-  selection text, and lay out / paint with `layoutMarkdownText` /
-  `paintMarkdownText`.
+  selection text (custom painters: use the `SelectableTextBlock` /
+  `MultiPainterSelectable` mixins, which map offsets), and lay out / paint
+  with `layoutMarkdownText` / `paintMarkdownText`.
+  Known limitation: keyboard character steps walk the alt text one code unit
+  at a time, so an endpoint can sit inside it — the highlight covers the whole
+  picture while the copy holds only part of the alt text.
 - `__x__` = **underline**, not bold. Soft line breaks are preserved inside
   paragraphs. Inline `$…$` math is **opt-in** (`inlineMath: true`).
 - `example/` is a separate package (`md_example`, `path: ../`).

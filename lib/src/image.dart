@@ -125,11 +125,12 @@ final class MarkdownImageConstraints {
 /// a new instance from every resolver call; never share one between
 /// resolvers or widgets.
 ///
-/// The selected text of a picture is its [MarkdownImageRequest.text] (alt
-/// text for an image, nothing for a link icon); selection treats the picture
-/// as a single unit.
+/// The selected text of an image is its alt text
+/// ([MarkdownImageRequest.text]); a link icon adds no text. Selection treats
+/// the picture as a single unit.
 abstract class MarkdownImage extends ChangeNotifier {
-  /// How the picture sits on its line of text.
+  /// How the picture sits on its line of text. Defaults to
+  /// [ui.PlaceholderAlignment.middle].
   ///
   /// [ui.PlaceholderAlignment.baseline] puts the bottom of the picture on the
   /// text baseline.
@@ -435,7 +436,8 @@ class MarkdownProviderImageResolver {
         return uri.host.isEmpty ? null : NetworkImage(uri.toString());
       case 'data':
         final data = uri.data;
-        if (data == null || !data.mimeType.startsWith('image/')) return null;
+        if (data == null || !data.mimeType.toLowerCase().startsWith('image/'))
+          return null;
         return MemoryImage(data.contentAsBytes());
       default:
         return null;
@@ -443,7 +445,8 @@ class MarkdownProviderImageResolver {
   }
 
   /// `/favicon.ico` at the root of a web link's origin, or `null` for any
-  /// other link (mail, phone, relative anchors).
+  /// other link (mail, phone). In-page anchors (`#section`) never get an
+  /// icon, even with a [baseUri].
   static Uri? defaultFaviconUri(Uri link) {
     if (link.scheme != 'http' && link.scheme != 'https') return null;
     if (link.host.isEmpty) return null;
@@ -464,6 +467,10 @@ class MarkdownProviderImageResolver {
 
   /// Resolves [request]; see [MarkdownImageResolver].
   MarkdownImage? call(MarkdownImageRequest request) {
+    if (request.kind == MarkdownImageKind.linkIcon &&
+        request.url.trimLeft().startsWith('#')) {
+      return null;
+    }
     final uri = _absolute(request.url);
     if (uri == null) return null;
     switch (request.kind) {

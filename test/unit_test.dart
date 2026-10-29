@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'coverage_gaps_test.dart' as coverage_gaps_test;
+import 'highlight/grammar_coverage_test.dart' as grammar_coverage_test;
 import 'highlight/highlight_test.dart' as highlight_test;
 import 'nodes/nodes_test.dart' as nodes_test;
 import 'parser/block_test.dart' as block_test;
@@ -58,6 +60,7 @@ void main() => group('Unit', () {
       golden_test.main();
       nodes_test.main();
       highlight_test.main();
+      grammar_coverage_test.main();
       theme_test.main();
       selection_test.main();
       markup_formatter_test.main();
@@ -85,4 +88,5 @@ void main() => group('Unit', () {
       rtl_test.main();
       rtl_geometry_test.main();
       widget_test.main();
+      coverage_gaps_test.main();
     });

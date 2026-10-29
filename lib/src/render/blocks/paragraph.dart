@@ -26,11 +26,7 @@ class BlockPainter$Paragraph
   BlockPainter$Paragraph({
     required List<MD$Span> spans,
     required this.theme,
-  })  : _selectionHighlightAboveCachedContent =
-            markdownSpansPaintOpaqueBackground(
-          spans,
-          images: theme.imageResolver != null,
-        ),
+  })  : _fills = markdownSpansPaintOpaqueBackground(spans),
         painter = TextPainter(
           text: paragraphFromMarkdownSpans(
             spans: spans,
@@ -44,9 +40,9 @@ class BlockPainter$Paragraph
   /// Inline monospace/highlight fills live in the content [Picture]; paint the
   /// selection tint above that picture when present.
   @override
-  bool get selectionHighlightAboveCachedContent =>
-      _selectionHighlightAboveCachedContent;
-  final bool _selectionHighlightAboveCachedContent;
+  bool get selectionHighlightAboveCachedContent => _fills || _hasImages;
+  final bool _fills;
+  late final bool _hasImages = markdownSpanHasImages(painter.text);
 
   /// The theme used to style the paragraph.
   final MarkdownThemeData theme;

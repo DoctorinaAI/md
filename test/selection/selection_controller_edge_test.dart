@@ -99,6 +99,22 @@ void main() {
       expect(c.toolbarWanted, isFalse);
     });
 
+    test('an unrelated document update keeps a caret toolbar', () {
+      final c = MarkdownSelectionController()
+        ..setDocuments([
+          MarkdownDocumentRef(id: 'a', model: Markdown.fromString('hello')),
+          MarkdownDocumentRef(id: 'b', model: Markdown.fromString('x')),
+        ]);
+      c
+        ..selection =
+            MarkdownSelection(base: _p('a', 0, 2), extent: _p('a', 0, 2))
+        ..toolbarWanted = true;
+      // Another message streams in: the caret and its menu stay.
+      c.putDocument('b', Markdown.fromString('xy'));
+      expect(c.selection!.isCollapsed, isTrue);
+      expect(c.toolbarWanted, isTrue);
+    });
+
     test('removeDocument dropping the range clears toolbarWanted', () {
       final c = MarkdownSelectionController()
         ..setDocuments([

@@ -968,7 +968,7 @@ class MarkdownSelectionController extends ChangeNotifier {
     _selection = (base == null || extent == null)
         ? null
         : MarkdownSelection(base: base, extent: extent);
-    _resetChromeIfInactive();
+    if (_selection != sel) _resetChromeIfInactive();
   }
 
   void _validateSelection() {
@@ -984,7 +984,7 @@ class MarkdownSelectionController extends ChangeNotifier {
       base: _clampInto(sel.base, _modelOf(sel.base.documentId)),
       extent: _clampInto(sel.extent, _modelOf(sel.extent.documentId)),
     );
-    _resetChromeIfInactive();
+    if (_selection != sel) _resetChromeIfInactive();
   }
 
   // --- surfaces (mounted geometry) ----------------------------------------

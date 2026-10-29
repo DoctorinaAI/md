@@ -251,20 +251,50 @@ InlineSpan? markdownSpanAtLocal(TextPainter painter, Offset local) {
   return painter.text?.getSpanForPosition(painter.getPositionForOffset(local));
 }
 
+/// The text position, in model offsets, nearest to [local] (text-painter
+/// coordinates). On a picture it is the edge of the slot on the hit side, in
+/// either text direction — the nearest-caret lookup alone resolves a whole
+/// right-to-left slot to its end.
+@meta.internal
+(int, TextAffinity) markdownPositionForLocal(
+  TextPainter painter,
+  Offset local,
+) {
+  final map = _mapOf(painter);
+  final slot = _slotIndexAt(painter, map, local);
+  if (slot >= 0) {
+    final box = painter.inlinePlaceholderBoxes![slot];
+    final start = map.placeholderOffsets[slot];
+    final leftHalf = local.dx < (box.left + box.right) / 2;
+    final before = leftHalf == (box.direction == TextDirection.ltr);
+    return before
+        ? (markdownModelOffset(painter, start), TextAffinity.downstream)
+        : (markdownModelOffset(painter, start + 1), TextAffinity.upstream);
+  }
+  final position = painter.getPositionForOffset(local);
+  return (markdownModelOffset(painter, position.offset), position.affinity);
+}
+
 /// The word range, in model offsets, at [local] (text-painter coordinates).
-/// A picture is a word of its own: its whole alt text.
+/// A picture is a word of its own: its whole alt text. A link icon selects
+/// the first word of its label.
 @meta.internal
 TextRange markdownWordBoundary(TextPainter painter, Offset local) {
   final map = _mapOf(painter);
   final slot = _slotIndexAt(painter, map, local);
+  var offset = -1;
   if (slot >= 0) {
     final start = map.placeholderOffsets[slot];
-    return TextRange(
-      start: markdownModelOffset(painter, start),
-      end: markdownModelOffset(painter, start + 1),
-    );
+    final span = map.placeholders[slot] as MarkdownImageSpan;
+    if (span.request.kind != MarkdownImageKind.linkIcon) {
+      return TextRange(
+        start: markdownModelOffset(painter, start),
+        end: markdownModelOffset(painter, start + 1),
+      );
+    }
+    offset = start + 1; // The label follows its icon.
   }
-  final offset = painter.getPositionForOffset(local).offset;
+  if (offset < 0) offset = painter.getPositionForOffset(local).offset;
   final word = painter.getWordBoundary(TextPosition(offset: offset));
   return TextRange(
     start: markdownModelOffset(painter, word.start),
@@ -278,6 +308,14 @@ TextRange markdownWordBoundary(TextPainter painter, Offset local) {
 /// by the model text it stands for.
 @meta.internal
 String markdownModelText(TextPainter painter) => _mapOf(painter).modelText;
+
+/// Whether [span] contains a [MarkdownImageSpan] (a picture or link icon).
+@meta.internal
+bool markdownSpanHasImages(InlineSpan? span) {
+  var found = false;
+  span?.visitChildren((child) => !(found = child is MarkdownImageSpan));
+  return found;
+}
 
 /// Maps a model offset of [painter]'s text to a painter offset. An offset
 /// strictly inside an image's alt text snaps to the slot's start, or to its
@@ -399,7 +437,8 @@ _TextMap _mapOf(TextPainter painter) {
 /// [resolveMarkdownImage] routes requests here: a request seen before returns
 /// the same image, so repeated pictures and streaming rebuilds reuse one
 /// loaded image. Images no block asked for since the last [nextGeneration]
-/// are disposed by [sweep].
+/// are disposed by [sweep]. A `null` resolution is remembered too: a request
+/// is resolved once per resolver while it stays in the document.
 ///
 /// Each image's notifications are turned into [onChanged] — `true` when an
 /// occurrence's measured size changed (re-layout), `false` for a repaint.
@@ -465,7 +504,7 @@ final class MarkdownImagePool {
       known.generation = _generation;
       return known.image;
     }
-    final image = resolver(request);
+    final image = _callResolver(resolver, request);
     final entry = _PoolEntry(image, _generation);
     _byRequest[request] = entry;
     if (image != null) {
@@ -565,5 +604,25 @@ MarkdownImage? resolveMarkdownImage(
   MarkdownImageRequest request,
 ) {
   final pool = MarkdownImagePool._active;
-  return pool == null ? resolver(request) : pool._resolve(resolver, request);
+  return pool == null
+      ? _callResolver(resolver, request)
+      : pool._resolve(resolver, request);
+}
+
+/// Calls [resolver], reporting a throw and rendering the alt text instead.
+MarkdownImage? _callResolver(
+  MarkdownImageResolver resolver,
+  MarkdownImageRequest request,
+) {
+  try {
+    return resolver(request);
+  } on Object catch (error, stackTrace) {
+    FlutterError.reportError(FlutterErrorDetails(
+      exception: error,
+      stack: stackTrace,
+      library: 'flutter_md',
+      context: ErrorDescription('resolving $request'),
+    ));
+    return null;
+  }
 }

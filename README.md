@@ -539,6 +539,9 @@ MarkdownThemeData(
 )
 ```
 
+Create the resolver once (a `const`, a field or a top-level `final`), not
+inside `build`: a different resolver drops and reloads every picture.
+
 `MarkdownProviderImageResolver` loads through Flutter `ImageProvider`s, so
 swapping the source or adding a cache is one function:
 

@@ -57,6 +57,12 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
 - **CHANGED**: `MarkdownRenderObject.updateSelection` takes an optional
   `markdown:`. `@meta.internal`, but `MarkdownWidget` subclasses that call it
   must now invoke it **before** `update` (see the registry fix below).
+- **CHANGED**: With an `imageResolver` set, `paragraphFromMarkdownSpans` may
+  emit `MarkdownImageSpan` (a `PlaceholderSpan`) children, so
+  `TextPainter.plainText` holds U+FFFC where the model has alt text.
+  `SelectableTextBlock.renderedText` and `SelectableFragment.length` now come
+  from the model text. Lay out / paint custom painters with
+  `layoutMarkdownText` / `paintMarkdownText`.
 - **CHANGED**: Code spans render in `Menlo` (iOS / macOS) / `Consolas`
   (Windows) instead of the unresolvable `'monospace'`, with a fallback chain on
   every platform (see *Monospace font resolution*). Expect golden diffs there.
@@ -72,7 +78,8 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
   its slot in the line (`layout`), paints itself into it (`paint`) and calls
   `notifyListeners` when it loads, fails or animates. Implement it to control
   sources, caching and appearance; `MarkdownImageResolver` maps a
-  `MarkdownImageRequest` (kind, url, alt / label, title) to one.
+  `MarkdownImageRequest` (`MarkdownImageKind`, url, alt / label, title) to
+  one; `MarkdownImageConstraints` carries the line's width and text style.
 - **ADDED**: `MarkdownProviderImage` (any Flutter `ImageProvider` — network,
   file, asset, memory or a disk-cached third-party provider; `.icon` for a
   text-sized link icon) and the ready-made `MarkdownProviderImageResolver`

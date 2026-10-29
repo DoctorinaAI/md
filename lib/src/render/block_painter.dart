@@ -121,9 +121,7 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
 
   @override
   (int, TextAffinity) positionAndAffinityForLocal(Offset local) {
-    final painter = selectionPainter;
-    final position = painter.getPositionForOffset(local - selectionOrigin);
-    return (markdownModelOffset(painter, position.offset), position.affinity);
+    return markdownPositionForLocal(selectionPainter, local - selectionOrigin);
   }
 
   @override
@@ -225,10 +223,9 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
     final dy =
         (local.dy - fragment.origin.dy).clamp(0.0, fragment.painter.height);
     final painter = fragment.painter;
-    final position = painter.getPositionForOffset(Offset(dx, dy));
-    final inner = markdownModelOffset(painter, position.offset);
+    final (inner, affinity) = markdownPositionForLocal(painter, Offset(dx, dy));
     final offset = fragment.textStart + inner.clamp(0, fragment.length);
-    return (offset, position.affinity);
+    return (offset, affinity);
   }
 
   @override
