@@ -121,7 +121,7 @@ class MarkdownSelectionScope extends StatefulWidget {
   /// Optional host gate for starting a body selection at a global point.
   ///
   /// When this returns false, mouse/touch selection recognizers do not claim
-  /// the pointer and [_beginSelection] refuses — so enclosing hosts can own
+  /// the pointer and a selection start is refused — so enclosing hosts can own
   /// taps on chrome (links, code headers) without the scope eating the click.
   /// Null means every selectable-content hit may start selection.
   final bool Function(Offset globalPosition)? canStartSelectionAt;
@@ -188,8 +188,9 @@ class MarkdownSelectionScope extends StatefulWidget {
   State<MarkdownSelectionScope> createState() => MarkdownSelectionScopeState();
 }
 
-/// State for [MarkdownSelectionScope]. Public so a custom [contextMenuBuilder]
-/// can drive it (copy/select-all/clear + toolbar geometry), mirroring
+/// State for [MarkdownSelectionScope]. Public so a custom
+/// [MarkdownSelectionScope.contextMenuBuilder] can drive it (copy/select-all/
+/// clear + toolbar geometry), mirroring
 /// `SelectableRegionState`.
 class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     with TickerProviderStateMixin {
@@ -317,10 +318,19 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
           _refreshToolbarForVisibleGeometry();
         }
       } else {
+        // The recognizers are dropped with the subtree, so their end
+        // callbacks never fire: tear down the in-flight drag here.
+        _abortDrag();
         _clearHandles();
         _contextMenuController.remove();
       }
     }
+  }
+
+  void _abortDrag() {
+    _stopAutoscroll();
+    _deferHandleShow = false;
+    _selectionOverlay?.hideMagnifier();
   }
 
   @override
@@ -413,6 +423,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
           _refreshToolbarForVisibleGeometry();
         }
       }
+    } else if (_isDesktopPlatform && _lastSecondaryTapDown != null) {
+      // Desktop right-click menu is point-anchored: keep it, refresh items.
+      _markContextMenuNeedsBuild();
     } else {
       hideToolbar();
     }
@@ -831,6 +844,9 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
 
   /// Pointer-driven autoscroll step: only starts the ticker when scrolling.
   void _driveAutoscroll() {
+    // A running ticker already steps once per frame from the latest
+    // [_dragGlobal]; stepping again per pointer event would multiply speed.
+    if (_autoscrollTicker != null) return;
     _tickAutoscroll();
   }
 
@@ -1587,7 +1603,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     if (!_isDesktopPlatform) {
       _lastSecondaryTapDown = null;
     }
-    if (_visibleSelectionBounds() case null) {
+    final pointAnchored = _lastSecondaryTapDown != null;
+    if (!pointAnchored && _visibleSelectionBounds() == null) {
       _contextMenuController.remove();
       return;
     }
@@ -1708,7 +1725,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
           ..onTapUp = _handleTapUp
           ..onDragStart = _handleDragStart
           ..onDragUpdate = _handleDragUpdate
-          ..onDragEnd = ((_) => _onBodyDragEnd()),
+          ..onDragEnd = ((_) => _onBodyDragEnd())
+          ..onCancel = _stopAutoscroll,
       ),
     };
 
@@ -1757,7 +1775,8 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
           ..onTapUp = _handleTapUp
           ..onDragStart = _handleDragStart
           ..onDragUpdate = _handleDragUpdate
-          ..onDragEnd = ((_) => _onBodyDragEnd()),
+          ..onDragEnd = ((_) => _onBodyDragEnd())
+          ..onCancel = _stopAutoscroll,
       );
     }
 
@@ -1819,10 +1838,14 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
             _magnifierInfo(d.globalPosition, isStart: false),
           );
         })
+        ..onLongPressCancel = (() {
+          _stopAutoscroll();
+          _selectionOverlay?.hideMagnifier();
+        })
         ..onLongPressEnd = ((_) {
-          if (_dragGlobal == null && controller.selection == null) {
-            return;
-          }
+          // Not armed (missed content / host gate refused): the host owns
+          // this press — do not present our chrome.
+          if (_dragGlobal == null) return;
           _stopAutoscroll();
           _selectionOverlay?.hideMagnifier();
           _deferHandleShow = false;
@@ -1894,7 +1917,11 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
       },
     ),
     DismissIntent: CallbackAction<DismissIntent>(
-      onInvoke: (_) {
+      onInvoke: (intent) {
+        if (controller.selection == null && !toolbarIsVisible) {
+          // Nothing to dismiss here: forward to ancestors (dialog / route).
+          return Actions.maybeInvoke<DismissIntent>(context, intent);
+        }
         clearSelection();
         return null;
       },

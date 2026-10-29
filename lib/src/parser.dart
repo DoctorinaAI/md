@@ -141,11 +141,37 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// blockquote line, matching the historical trim behavior.
   static String _stripQuoteMarker(String line) => line.substring(1).trim();
 
-  /// Whether any line opens (or closes) a fenced code block (` ``` ` / `~~~`).
-  /// Used to decide when a quote/alert body must be re-parsed as nested blocks
-  /// instead of being fed to [_parseInlineSpans].
-  static bool _linesContainFence(Iterable<String> lines) {
-    for (final line in lines) {
+  /// Strips a single leading `>` and at most one following space, keeping the
+  /// rest of the line verbatim. Unlike [_stripQuoteMarker], this preserves
+  /// indentation, so a body re-parsed as nested blocks keeps the leading
+  /// whitespace of fenced code lines.
+  static String _stripQuoteMarkerRaw(String line) =>
+      line.length > 1 && line.codeUnitAt(1) == 0x20 /* space */
+          ? line.substring(2)
+          : line.substring(1);
+
+  /// Joins `lines[from..to)` with their quote markers stripped by
+  /// [_stripQuoteMarkerRaw] — the body a quote or alert re-parses as nested
+  /// blocks.
+  static String _rawQuoteBody(List<String> lines, int from, int to) {
+    final buffer = StringBuffer();
+    for (var k = from; k < to; k++) {
+      if (k > from) buffer.writeln();
+      buffer.write(_stripQuoteMarkerRaw(lines[k]));
+    }
+    return buffer.toString();
+  }
+
+  /// Whether any quote line `lines[from..to)` opens (or closes) a fenced code
+  /// block (` ``` ` / `~~~`), at any quote depth. Used to decide when a
+  /// quote/alert body must be re-parsed as nested blocks instead of being fed
+  /// to [_parseInlineSpans].
+  static bool _linesContainFence(List<String> lines, int from, int to) {
+    for (var k = from; k < to; k++) {
+      var line = _stripQuoteMarkerRaw(lines[k]);
+      while (line.startsWith('>')) {
+        line = _stripQuoteMarkerRaw(line);
+      }
       if (line.startsWith('```') || line.startsWith('~~~')) return true;
     }
     return false;
@@ -282,8 +308,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
           final body = bodyLines.join('\n').trim();
           // Fenced code inside alerts must be nested blocks — feeding the
           // body to [_parseInlineSpans] pairs fence backticks as monospace.
-          if (_linesContainFence(bodyLines)) {
-            final nested = convert(body).blocks;
+          if (_linesContainFence(lines, i + 1, j)) {
+            final nested = convert(_rawQuoteBody(lines, i + 1, j)).blocks;
             pushBlock(MD$Alert(
               alert: alertType,
               text: body,
@@ -304,8 +330,8 @@ class MarkdownDecoder extends Converter<String, Markdown> {
           // CommonMark/GFM: strip `>` then re-parse the body as blocks so a
           // fenced code block inside a quote stays a code block — not inline
           // ``monospace`` from backtick pairing in [_parseInlineSpans].
-          if (_linesContainFence(quoteLines)) {
-            final nested = convert(text).blocks;
+          if (_linesContainFence(lines, i, j)) {
+            final nested = convert(_rawQuoteBody(lines, i, j)).blocks;
             pushBlock(MD$Quote(
               indent: 1,
               text: text,

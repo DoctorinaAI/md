@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:meta/meta.dart' as meta show internal;
 
 /// A class for painting blocks in markdown.
 /// You can implement this interface to create custom block painters.
@@ -321,6 +322,83 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
     return best;
   }
 }
+
+/// Selectable fragments and rendered text of a quote / alert body made of
+/// nested [children] painted at block-local [origins].
+///
+/// Children are joined by `\n`, skipping those with empty text, exactly like
+/// `markdownBlockRenderedText` walks `MD$Quote.blocks` / `MD$Alert.blocks`.
+/// [modelTexts] (one per child, or null) is the model-side rendered text of
+/// each child: it keeps the offset space in sync when a host builder returns a
+/// child painter that exposes no selectable text. A child laid out to an
+/// empty size paints nothing, so its text keeps its offsets but contributes
+/// no fragments (nothing to highlight or hit).
+@meta.internal
+(List<SelectableFragment>, String) nestedBlockFragments(
+  List<BlockPainter> children,
+  List<Offset> origins,
+  List<String>? modelTexts,
+) {
+  final frags = <SelectableFragment>[];
+  final parts = <String>[];
+  var textStart = 0;
+  for (var i = 0; i < children.length; i++) {
+    final child = children[i];
+    final origin = origins[i];
+    final String text;
+    var own = const <SelectableFragment>[];
+    switch (child) {
+      case MultiPainterSelectable():
+        text = child.renderedText;
+        own = child.fragments;
+      case SelectableTextBlock():
+        text = child.renderedText;
+        own = <SelectableFragment>[
+          SelectableFragment(child.selectionPainter, child.selectionOrigin, 0),
+        ];
+      case SelectableBlockPainter():
+        text = child.renderedText;
+      default:
+        text = modelTexts?[i] ?? '';
+    }
+    if (text.isEmpty) continue;
+    if (!child.size.isEmpty) {
+      for (final f in own) {
+        frags.add(SelectableFragment(
+          f.painter,
+          origin + f.origin,
+          textStart + f.textStart,
+        ));
+      }
+    }
+    parts.add(text);
+    textStart += text.length + 1;
+  }
+  return (frags, parts.join('\n'));
+}
+
+/// Glyph-tight hit test over nested [children] painted at block-local
+/// [origins]: each selectable child answers with its own
+/// [SelectableBlockPainter.hitsRenderedTextAt] policy.
+@meta.internal
+bool nestedBlocksHitRenderedText(
+  List<BlockPainter> children,
+  List<Offset> origins,
+  Offset local,
+) {
+  for (var i = 0; i < children.length; i++) {
+    final child = children[i];
+    if (child is! SelectableBlockPainter || child.size.isEmpty) continue;
+    if (child.hitsRenderedTextAt(local - origins[i])) return true;
+  }
+  return false;
+}
+
+/// Whether [local] (text-painter coordinates) lies inside any glyph line box
+/// of [painter]'s full rendered range. Uses the per-layout glyph-box cache.
+@meta.internal
+bool painterHitsGlyphBoxes(TextPainter painter, Offset local) =>
+    _painterHitsGlyphBoxes(painter, local);
 
 /// Whether [local] (text-painter coordinates) lies inside any glyph line box
 /// of [painter]'s full rendered range.

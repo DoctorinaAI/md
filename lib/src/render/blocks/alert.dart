@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../nodes.dart';
+import '../../selection.dart' show markdownBlockRenderedText;
 import '../../theme.dart';
 import '../block_painter.dart';
 import '../span_builder.dart';
@@ -20,12 +21,23 @@ class BlockPainter$Alert
   /// Creates an alert painter of kind [alert] with body [spans], styled by
   /// [theme]. When [children] is non-empty, those painters replace the leaf
   /// body painter (fenced code inside `> [!NOTE]`, etc.).
+  ///
+  /// [blocks] are the [MD$Alert.blocks] models [children] were built from
+  /// (one per child, in order). Optional: they let a child painter that
+  /// exposes no selectable text (a host [MarkdownThemeData.builder] result)
+  /// still occupy its text in the selection offset space, keeping it equal to
+  /// `markdownBlockRenderedText`. Ignored unless it matches [children] in
+  /// length.
   BlockPainter$Alert({
     required this.alert,
     required List<MD$Span> spans,
     required this.theme,
     List<BlockPainter> children = const <BlockPainter>[],
+    List<MD$Block> blocks = const <MD$Block>[],
   })  : _children = children,
+        _modelTexts = blocks.isNotEmpty && blocks.length == children.length
+            ? <String>[for (final b in blocks) markdownBlockRenderedText(b)]
+            : null,
         _accent = theme.alertColorFor(alert),
         _selectionHighlightAboveCachedContent = children.isNotEmpty
             ? children.any(
@@ -57,6 +69,9 @@ class BlockPainter$Alert
 
   /// Nested body painters when the alert model carries [MD$Alert.blocks].
   final List<BlockPainter> _children;
+
+  /// Model-side rendered text per child, when [MD$Alert.blocks] were given.
+  final List<String>? _modelTexts;
 
   /// Leaf body painter when there are no nested children.
   final TextPainter? _bodyPainter;
@@ -130,6 +145,9 @@ class BlockPainter$Alert
 
   /// Vertical offsets of each nested child within the body column.
   List<double> _childOffsets = const <double>[];
+
+  /// Block-local top-left of each nested child.
+  List<Offset> _childOrigins = const <Offset>[];
 
   /// Last span hit by the tap down event.
   TextSpan? _lastSpan;
@@ -206,6 +224,7 @@ class BlockPainter$Alert
         _renderedText = '';
       }
       _childOffsets = const <double>[];
+      _childOrigins = const <Offset>[];
     } else {
       final offsets = List<double>.filled(_children.length, 0.0);
       var y = 0.0;
@@ -231,45 +250,31 @@ class BlockPainter$Alert
   }
 
   void _rebuildFragments() {
-    final frags = <SelectableFragment>[];
-    final parts = <String>[];
-    var textStart = 0;
-    for (var i = 0; i < _children.length; i++) {
-      final child = _children[i];
-      final origin = Offset(_columnLeft, _bodyTop + _childOffsets[i]);
-      if (child is MultiPainterSelectable) {
-        final text = child.renderedText;
-        if (text.isNotEmpty) {
-          for (final f in child.fragments) {
-            frags.add(SelectableFragment(
-              f.painter,
-              origin + f.origin,
-              textStart + f.textStart,
-            ));
-          }
-          parts.add(text);
-          textStart += text.length + 1;
-        }
-      } else if (child case final SelectableTextBlock textBlock) {
-        final text = textBlock.renderedText;
-        if (text.isNotEmpty) {
-          frags.add(SelectableFragment(
-            textBlock.selectionPainter,
-            origin + textBlock.selectionOrigin,
-            textStart,
-          ));
-          parts.add(text);
-          textStart += text.length + 1;
-        }
-      }
-    }
-    _renderedText = parts.join('\n');
+    _childOrigins = <Offset>[
+      for (final dy in _childOffsets) Offset(_columnLeft, _bodyTop + dy),
+    ];
+    final (frags, text) =
+        nestedBlockFragments(_children, _childOrigins, _modelTexts);
     _fragments = frags;
+    _renderedText = text;
+  }
+
+  /// Glyph-tight: the gutter beside a short body line (or a nested child's
+  /// own gutter) is not text, matching paragraphs. The title is not
+  /// selectable and never hits.
+  @override
+  bool hitsRenderedTextAt(Offset local) {
+    if (!_hasBody) return false;
+    final body = _bodyPainter;
+    if (body != null) return painterHitsGlyphBoxes(body, local - _bodyOrigin);
+    return nestedBlocksHitRenderedText(_children, _childOrigins, local);
   }
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
-    if (size.width < _size.width) return;
+    // A leaf alert narrower than its text paints nothing. Nested children
+    // may legitimately overflow (a wide table), so they are always painted.
+    if (_bodyPainter != null && size.width < _size.width) return;
 
     final rect = Rect.fromLTWH(0, offset, size.width, _size.height);
     // Tinted background.

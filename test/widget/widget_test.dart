@@ -3,7 +3,8 @@
 // branch that builds a default `MarkdownThemeData` from the build context in
 // both `createRenderObject` and `updateRenderObject`.
 import 'package:flutter/material.dart';
-import 'package:flutter/src/services/mouse_cursor.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_md/flutter_md.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -66,22 +67,40 @@ void main() {
     });
 
     testWidgets('MarkdownWidget honors cursorResolver', (tester) async {
-      SystemMouseCursor resolver(Offset offset, int? idx, MD$Block? block) =>
-          SystemMouseCursors.click;
+      final hits = <(int?, MD$Block?)>[];
+      MouseCursor resolver(Offset offset, int? idx, MD$Block? block) {
+        hits.add((idx, block));
+        return SystemMouseCursors.grab;
+      }
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: SizedBox(
-              width: 300,
-              child: MarkdownWidget(
-                markdown: Markdown.fromString('Hello'),
-                cursorResolver: resolver,
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 300,
+                child: MarkdownWidget(
+                  markdown: Markdown.fromString('Hello'),
+                  cursorResolver: resolver,
+                ),
               ),
             ),
           ),
         ),
       );
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(gesture.removePointer);
+      await gesture.addPointer(location: const Offset(400, 400));
+      await gesture.moveTo(const Offset(4, 4));
+      await tester.pump();
       expect(tester.takeException(), isNull);
+      expect(
+        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1),
+        SystemMouseCursors.grab,
+      );
+      expect(hits.last.$1, 0);
+      expect(hits.last.$2, isA<MD$Paragraph>());
     });
   });
 }

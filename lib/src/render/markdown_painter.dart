@@ -55,8 +55,15 @@ class MarkdownPainter {
   Size get size => _size;
   Size _size;
 
+  /// Horizontal extent hit tests accept: the width the blocks were laid out
+  /// at (never less than the content width).
+  double _hitWidth = 0;
+
   /// Indicates if the layout needs to be recalculated.
   bool _needsLayout = true;
+
+  /// Whether [layout] must run before geometry queries are meaningful.
+  bool get needsLayout => _needsLayout;
 
   Float32List _blockOffsets = Float32List(0);
   List<BlockPainter> _blockPainters = const <BlockPainter>[];
@@ -94,6 +101,7 @@ class MarkdownPainter {
           spans: q.spans,
           indent: q.indent,
           theme: theme,
+          blocks: q.blocks,
           children: [
             for (final child in q.blocks)
               _nestedBlockBuilder(
@@ -124,6 +132,7 @@ class MarkdownPainter {
           alert: a.alert,
           spans: a.spans,
           theme: theme,
+          blocks: a.blocks,
           children: [
             for (final child in a.blocks) _nestedBlockBuilder(child, theme),
           ],
@@ -244,7 +253,7 @@ class MarkdownPainter {
   (int, MD$Block)? blockAtLocal(Offset local) {
     if (_needsLayout || _isEmpty || _blockPainters.isEmpty) return null;
     if (local.dx < 0 ||
-        local.dx >= _size.width ||
+        local.dx >= _hitWidth ||
         local.dy < 0 ||
         local.dy >= _size.height) {
       return null;
@@ -261,7 +270,7 @@ class MarkdownPainter {
   bool isSelectableAtLocal(Offset local) {
     if (_needsLayout || _isEmpty || _blockPainters.isEmpty) return false;
     if (local.dx < 0 ||
-        local.dx >= _size.width ||
+        local.dx >= _hitWidth ||
         local.dy < 0 ||
         local.dy >= _size.height) {
       return false;
@@ -405,12 +414,18 @@ class MarkdownPainter {
       _blockOffsets = Float32List(blocks.length);
     }
     var size = _layoutBlocks(maxWidth);
+    var laidOutWidth = maxWidth;
     if (_theme.textDirection == TextDirection.rtl) {
       final target = math.max(size.width, minWidth);
       // Re-laying out at a width no smaller than every block's content keeps
       // the same line breaks; only the right edge moves.
-      if (target < maxWidth) size = _layoutBlocks(target);
+      if (target < maxWidth) size = _layoutBlocks(laidOutWidth = target);
     }
+    // Right-to-left glyphs sit against the right edge of the width the
+    // blocks were laid out at, which can exceed the content width (tight or
+    // min-width constraints), so hit tests must accept that whole width.
+    _hitWidth =
+        laidOutWidth.isFinite ? math.max(size.width, laidOutWidth) : size.width;
     _needsLayout = false; // No need to layout if the markdown is empty.
     return _size = size;
   }
@@ -511,6 +526,10 @@ class MarkdownPainter {
   /// If the size is the same as the last painted size,
   /// we can reuse the last picture.
   Picture? _lastPicture;
+
+  /// The cached glyph picture reused across repaints at the same size.
+  @visibleForTesting
+  Picture? get debugCachedPicture => _lastPicture;
 
   /// The markdown content to paint.
   void paint(Canvas canvas, Size size) {

@@ -101,6 +101,62 @@ void main() => group('Block parsing', () {
             'code',
           );
         });
+
+        test('quoted fence preserves code indentation', () {
+          final q = _blocks(
+            '> ```py\n'
+            '> def f():\n'
+            '>     return 1\n'
+            '> ```',
+          ).single as MD$Quote;
+          expect((q.blocks.single as MD$Code).text, 'def f():\n    return 1');
+        });
+
+        test('alert fence preserves code indentation', () {
+          final a = _blocks(
+            '> [!NOTE]\n'
+            '> ```py\n'
+            '> if x:\n'
+            '>     y()\n'
+            '> ```',
+          ).single as MD$Alert;
+          expect((a.blocks.single as MD$Code).text, 'if x:\n    y()');
+        });
+
+        test('quote marker without a space still nests a fence', () {
+          final q = _blocks('>```\n>  x\n>```').single as MD$Quote;
+          expect((q.blocks.single as MD$Code).text, ' x');
+        });
+
+        test('fence inside a nested quote is nested code', () {
+          final q = _blocks('> > ```\n> > a `b` c\n> > ```').single as MD$Quote;
+          final inner = q.blocks.single as MD$Quote;
+          expect((inner.blocks.single as MD$Code).text, 'a `b` c');
+          expect(markdownBlockRenderedText(q), 'a `b` c');
+        });
+
+        test('rendered text of a nested quote skips spacers', () {
+          final md = Markdown.fromString(
+            '> *a*\n>\n> ```\n> x\n> ```\n> b',
+          );
+          expect(markdownBlockRenderedText(md.blocks.single), 'a\nx\nb');
+        });
+
+        test('Markdown.text renders nested prose spans', () {
+          expect(
+            Markdown.fromString('> **bold** text\n> ```\n> x\n> ```').text,
+            'bold text\nx',
+          );
+          expect(
+            Markdown.fromString('> [!TIP]\n> _a_\n> ```\n> x\n> ```').text,
+            'a\nx',
+          );
+        });
+
+        test('CRLF quoted fence', () {
+          final q = _blocks('> ```\r\n> x\r\n> ```\r\n').first as MD$Quote;
+          expect((q.blocks.single as MD$Code).text, 'x');
+        });
       });
 
       group('Fenced code', () {
