@@ -141,42 +141,68 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// blockquote line, matching the historical trim behavior.
   static String _stripQuoteMarker(String line) => line.substring(1).trim();
 
-  /// Strips a single leading `>` and at most one following space or tab,
-  /// keeping the rest of the line verbatim. Unlike [_stripQuoteMarker], this
-  /// preserves indentation, so a body re-parsed as nested blocks keeps the
-  /// leading whitespace of fenced code lines.
-  static String _stripQuoteMarkerRaw(String line) {
-    if (line.length > 1) {
-      final c = line.codeUnitAt(1);
-      if (c == 0x20 /* space */ || c == 0x09 /* tab */)
-        return line.substring(2);
-    }
-    return line.substring(1);
-  }
+  /// Strips a single leading `>` and at most one following space, keeping the
+  /// rest of the line verbatim. Unlike [_stripQuoteMarker], this preserves
+  /// indentation, so a body re-parsed as nested blocks keeps the leading
+  /// whitespace of fenced code lines.
+  static String _stripQuoteMarkerRaw(String line) =>
+      line.length > 1 && line.codeUnitAt(1) == 0x20 /* space */
+          ? line.substring(2)
+          : line.substring(1);
 
-  /// [line] without its indentation when it is a fence (` ``` ` / `~~~`)
-  /// indented by at most three spaces or tabs (CommonMark), else [line]
-  /// itself — the block parser only recognises fences at column 0.
-  static String _unindentFence(String line) {
+  /// The fence (` ``` ` / `~~~` run) [line] opens, or null. Up to three
+  /// spaces of indentation are allowed — or a single tab, which is how a
+  /// `>\t```` quote line reads once its marker is stripped. A backtick fence
+  /// with another backtick after it (` ```a``` b `) is inline code, not a
+  /// fence (CommonMark).
+  static ({int indent, String fence})? _openingFence(String line) {
     var k = 0;
-    while (k < line.length && k < 4) {
-      final c = line.codeUnitAt(k);
-      if (c != 0x20 /* space */ && c != 0x09 /* tab */) break;
-      k++;
+    if (line.startsWith('\t')) {
+      k = 1;
+    } else {
+      while (k < line.length && k < 4 && line.codeUnitAt(k) == 0x20) {
+        k++;
+      }
+      if (k > 3) return null;
     }
-    if (k == 0 || k > 3) return line;
-    final rest = line.substring(k);
-    return rest.startsWith('```') || rest.startsWith('~~~') ? rest : line;
+    final c = k < line.length ? line.codeUnitAt(k) : 0;
+    if (c != 0x60 /* ` */ && c != 0x7E /* ~ */) return null;
+    var e = k;
+    while (e < line.length && line.codeUnitAt(e) == c) {
+      e++;
+    }
+    if (e - k < 3) return null;
+    if (c == 0x60 && line.indexOf('`', e) >= 0 && k > 0) return null;
+    return (indent: k, fence: line.substring(k, e));
   }
 
   /// Joins `lines[from..to)` with their quote markers stripped by
   /// [_stripQuoteMarkerRaw] — the body a quote or alert re-parses as nested
-  /// blocks.
+  /// blocks. The block parser only knows fences at column 0, so an indented
+  /// opening fence, and the indented fence that closes it, lose their
+  /// indentation; every other line (code content included) stays verbatim.
   static String _rawQuoteBody(List<String> lines, int from, int to) {
     final buffer = StringBuffer();
+    String? open; // The fence of the code block being read, if any.
     for (var k = from; k < to; k++) {
       if (k > from) buffer.writeln();
-      buffer.write(_unindentFence(_stripQuoteMarkerRaw(lines[k])));
+      var line = _stripQuoteMarkerRaw(lines[k]);
+      final fence = _openingFence(line);
+      if (open == null) {
+        if (fence != null) {
+          open = fence.fence;
+          line = line.substring(fence.indent);
+        }
+      } else if (line.startsWith(open.substring(0, 3))) {
+        open = null; // Closes at column 0, as in the block parser.
+      } else if (fence != null &&
+          fence.fence.codeUnitAt(0) == open.codeUnitAt(0) &&
+          fence.fence.length >= open.length &&
+          line.substring(fence.indent + fence.fence.length).trim().isEmpty) {
+        open = null; // An indented closing fence (CommonMark).
+        line = line.substring(fence.indent);
+      }
+      buffer.write(line);
     }
     return buffer.toString();
   }
@@ -191,8 +217,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
       while (line.startsWith('>')) {
         line = _stripQuoteMarkerRaw(line);
       }
-      line = _unindentFence(line);
-      if (line.startsWith('```') || line.startsWith('~~~')) return true;
+      if (_openingFence(line) != null) return true;
     }
     return false;
   }

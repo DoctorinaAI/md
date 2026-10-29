@@ -1012,6 +1012,16 @@ void main() => group('Inline images', () {
           );
         });
 
+        test('an icon on an empty label selects nothing', () {
+          final resolver = _FakeResolver(icons: true);
+          final p = _paragraph('[](https://a.b) next', _theme(resolver.call));
+          final slot = p.inlineSlot();
+          expect(
+            p.wordBoundaryForLocal(slot.center),
+            const TextRange(start: 0, end: 0),
+          );
+        });
+
         test('the tint goes above only when a picture was emitted', () {
           final none = _FakeResolver(); // icons off: links stay text
           const source = 'see [x](https://a.b) here';

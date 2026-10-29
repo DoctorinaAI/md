@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart';
 
 /// {@template highlight_grammar}
@@ -244,18 +246,32 @@ void _applyRules(
     final rule = rules[r];
     if (rule.greedy) {
       _applyGreedy(nodes, rules, r, depth);
+    } else {
+      _applyPlain(nodes, rule, depth, 0);
+    }
+  }
+}
+
+/// Applies the non-greedy [rule] to every plain node of `nodes[from..]`, in
+/// place. Builds the result in one pass (splicing per match would be
+/// quadratic in the node count).
+void _applyPlain(List<_Node> nodes, GrammarToken rule, int depth, int from) {
+  List<_Node>? out;
+  for (var i = from; i < nodes.length; i++) {
+    final node = nodes[i];
+    final replacement =
+        node is _Text ? _applyRule(node.text, rule, depth) : null;
+    if (replacement == null) {
+      out?.add(node);
       continue;
     }
-    for (var i = 0; i < nodes.length; i++) {
-      final node = nodes[i];
-      if (node is! _Text) continue;
-      final replacement = _applyRule(node.text, rule, depth);
-      if (replacement == null) continue;
-      nodes.replaceRange(i, i + 1, replacement);
-      // Skip the freshly inserted nodes; they must not be re-scanned by the
-      // same rule (already exhaustively matched) but will be seen by the next.
-      i += replacement.length - 1;
-    }
+    out ??= nodes.sublist(0, i);
+    out.addAll(replacement);
+  }
+  if (out != null) {
+    nodes
+      ..clear()
+      ..addAll(out);
   }
 }
 
@@ -265,10 +281,17 @@ int _lengthOf(_Node node) => switch (node) {
       _Span(:final length) => length,
     };
 
-/// Applies the greedy rule `rules[r]` across [nodes]: it matches the whole
-/// text, so a match may span tokens claimed by earlier rules. A match must
-/// start in plain text; the nodes it overlaps are replaced by the new token
-/// plus plain text around it, and the rest of a token it cut through is
+/// How many matches a greedy rule may discard (they start inside another
+/// token) before it falls back to matching plain text only: each discard
+/// re-searches the rest of the text, so pathological input would turn
+/// quadratic.
+const int _maxGreedySkips = 256;
+
+/// Applies the greedy rule `rules[r]` across [nodes] (Prism's `greedy`): it
+/// matches the whole text, so a match may span tokens claimed by earlier
+/// rules. A match must start in plain text; it replaces the nodes it
+/// overlaps, plus the plain text right after them, with the new token and the
+/// plain text around it. When it swallowed a token, that leftover text is
 /// re-tokenized by the rules before `r`.
 void _applyGreedy(
   List<_Node> nodes,
@@ -282,61 +305,81 @@ void _applyGreedy(
     _write(node, full);
   }
   final text = full.toString();
-  var i = 0, nodeStart = 0, from = 0;
-  while (from < text.length && i < nodes.length) {
+  // `nodes[i..]` is the unprocessed input (starting at text offset
+  // `nodeStart`); [out] collects the result.
+  final out = <_Node>[];
+  var i = 0, nodeStart = 0, from = 0, skips = 0;
+  var changed = false;
+  while (i < nodes.length && from < text.length) {
     final match = rule.pattern.allMatches(text, from).firstOrNull;
-    if (match == null) return;
+    if (match == null) break;
     var start = match.start;
     if (rule.lookbehind && match.groupCount >= 1) {
       start += match.group(1)?.length ?? 0;
     }
     final end = match.end;
-    if (start >= end) {
+    if (start >= end || start < nodeStart) {
       from = end > match.start ? end : match.start + 1;
       continue;
     }
     // The node holding the match start.
     while (i < nodes.length && nodeStart + _lengthOf(nodes[i]) <= start) {
       nodeStart += _lengthOf(nodes[i]);
-      i++;
+      out.add(nodes[i++]);
     }
-    if (i >= nodes.length) return;
+    if (i >= nodes.length) break;
     if (nodes[i] is _Span) {
       // Starts inside another token: not a match here.
       from = nodeStart + _lengthOf(nodes[i]);
+      if (++skips > _maxGreedySkips) break;
       continue;
     }
-    // The last node the match overlaps.
+    // The nodes the match overlaps, then any plain text right after them.
     var j = i, stop = nodeStart + _lengthOf(nodes[i]);
-    while (stop < end && j + 1 < nodes.length) {
+    var swallowed = false;
+    while (j + 1 < nodes.length && (stop < end || nodes[j + 1] is _Text)) {
       j++;
+      swallowed = swallowed || nodes[j] is _Span;
       stop += _lengthOf(nodes[j]);
     }
     final matched = text.substring(start, end);
     final inside = rule.inside;
-    final replacement = <_Node>[
-      if (start > nodeStart) _Text(text.substring(nodeStart, start)),
-      _Span(
-        rule.type,
-        rule.alias,
-        inside == null
-            ? <_Node>[_Text(matched)]
-            : _tokenize(matched, inside, depth + 1),
-      ),
+    if (start > nodeStart) out.add(_Text(text.substring(nodeStart, start)));
+    out.add(_Span(
+      rule.type,
+      rule.alias,
+      inside == null
+          ? <_Node>[_Text(matched)]
+          : _tokenize(matched, inside, depth + 1),
+    ));
+    changed = true;
+    final after = <_Node>[
+      if (end < stop) _Text(text.substring(end, stop)),
     ];
-    if (end < stop) {
-      final after = <_Node>[_Text(text.substring(end, stop))];
-      // Only text freed from a swallowed token is new to the earlier rules;
-      // the rest of a plain node was already scanned by them.
-      if (nodes[j] is _Span) _applyRules(after, rules, r, depth);
-      replacement.addAll(after);
+    if (swallowed && after.isNotEmpty) _applyRules(after, rules, r, depth);
+    // The leftover is still input for this rule: put it back in front of
+    // `nodes[j + 1..]`, reusing the consumed slots when they suffice.
+    final k = j + 1 - after.length;
+    if (k >= i) {
+      nodes.setRange(k, j + 1, after);
+      i = k;
+    } else {
+      nodes.replaceRange(i, j + 1, after);
     }
-    nodes.replaceRange(i, j + 1, replacement);
-    // Continue right after the new token.
-    i += start > nodeStart ? 2 : 1;
     nodeStart = end;
     from = end;
   }
+  if (!changed) {
+    // Nothing matched (or every match started inside a token).
+    if (skips > _maxGreedySkips) _applyPlain(nodes, rule, depth, 0);
+    return;
+  }
+  final rest = nodes.sublist(i);
+  if (skips > _maxGreedySkips) _applyPlain(rest, rule, depth, 0);
+  nodes
+    ..clear()
+    ..addAll(out)
+    ..addAll(rest);
 }
 
 /// Writes the text of [node] to [out].
@@ -360,7 +403,9 @@ List<_Node>? _applyRule(String text, GrammarToken rule, int depth) {
     var start = match.start;
     var matched = match.group(0)!;
     if (rule.lookbehind) {
-      final lead = (match.groupCount >= 1 ? match.group(1) : null)?.length ?? 0;
+      final group = match.groupCount >= 1 ? match.group(1) : null;
+      // A group inside a lookahead can outrun the match.
+      final lead = math.min(group?.length ?? 0, matched.length);
       start += lead;
       matched = matched.substring(lead);
     }

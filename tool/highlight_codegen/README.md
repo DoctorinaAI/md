@@ -51,8 +51,12 @@ To add languages, append to `languages.json` and re-run.
   flag appears in the current language set.
 - The tokenizer follows Prism: rules apply in grammar order, and `greedy`
   rules match across tokens claimed by earlier rules (a match must start in
-  plain text; the rest of a token it cuts through is re-tokenized by the
-  earlier rules). Prism's `alias` arrays keep only their first entry.
+  plain text; the rest of a token it cuts through, joined with the plain text
+  after it, is re-tokenized by the earlier rules). Deviations: a greedy rule
+  whose matches keep starting inside other tokens gives up after 256 tries and
+  matches plain text only; Prism's `alias` arrays keep only their first
+  entry. Some patterns backtrack heavily on pathological input (thousands of
+  unclosed quotes or tags), as they do in Prism.
 - Grammar keys with `undefined` values (e.g. Dart's inherited `string` hole)
   are skipped.
 

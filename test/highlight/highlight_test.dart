@@ -307,6 +307,27 @@ def f(x): return x
       }
     });
 
+    test('text freed from a swallowed token joins the text after it', () {
+      // The string swallows the start of a line comment; the block comment
+      // that follows is re-tokenized whole, across the line break.
+      const src = 'var s = "a // b"; /* x\n y */ z;';
+      final c = colors('js', src);
+      expect(c[src.indexOf('a // b')], string);
+      expect(c[src.indexOf('/* x')], comment);
+      expect(c[src.indexOf('y */')], comment);
+      expect(c[src.indexOf('*/') + 1], comment);
+      expect(c[src.indexOf(' z')], isNot(comment));
+    });
+
+    test('many discarded greedy matches fall back to plain matching', () {
+      // Every `"x"` sits inside a comment: the string rule discards it.
+      final src = '${List.filled(400, '// "x"\n').join()}y = "z";\n';
+      expect(roundTrip('js', src), src);
+      final c = colors('js', src);
+      expect(c[src.indexOf('"x"')], comment);
+      expect(c[src.indexOf('"z"')], string);
+    });
+
     test('a greedy rule that can match empty text skips it', () {
       final grammar = Grammar([
         GrammarToken('comment', compileHighlightPattern('#.*')),

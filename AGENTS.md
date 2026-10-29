@@ -47,6 +47,8 @@ benchmarks run under `dart run`.
 | `render/blocks/*.dart` | `BlockPainter$Paragraph … $Table` — the 9 default painters | [rendering](docs/rendering.md) |
 | `selection.dart` | `MarkdownSelectionController`, `MarkdownPosition/Selection`, registry, reconciliation, formatters, `markdownBlockRenderedText` | [selection](docs/selection.md) |
 | `selection_scope.dart` | `MarkdownSelectionScope` — gestures, keyboard, handles, toolbar; `MarkdownSelectionGroup` | [selection](docs/selection.md) |
+| `selection_autoscroll.dart` | Edge autoscroll while selecting: `MarkdownSelectionAutoscrollConfig`, `MarkdownAutoscrollTarget` (+ resolver / callback / scrollable targets) | [selection](docs/selection.md) |
+| `highlight/engine.dart` (+ `lib/highlight/*.dart`) | Syntax highlighting: Prism-style tokenizer (`greedy` rules match across earlier tokens), `MarkdownHighlighter`, generated per-language grammars (`tool/highlight_codegen`), GitHub themes | [codegen](tool/highlight_codegen/README.md) |
 | `widget.dart` | `MarkdownWidget` (`LeafRenderObjectWidget`) — the public entry widget | [rendering](docs/rendering.md) |
 
 Public API is the barrel `lib/flutter_md.dart` (`export … show …`). See

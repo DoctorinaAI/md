@@ -163,7 +163,8 @@ void main() => group('Block parsing', () {
               _blocks('> intro\n>  ```\n>  code\n>  ```').single as MD$Quote;
           expect(spaced.blocks.last, isA<MD$Code>());
           final tab = _blocks('>\t```\n>\tcode\n>\t```').single as MD$Quote;
-          expect((tab.blocks.single as MD$Code).text, 'code');
+          // Code content keeps its tab verbatim.
+          expect((tab.blocks.single as MD$Code).text, '\tcode');
           // An indented closing fence closes the block.
           final close = _blocks('> ```\n> a\n>  ```\n> b').single as MD$Quote;
           expect((close.blocks.first as MD$Code).text, 'a');
@@ -171,6 +172,23 @@ void main() => group('Block parsing', () {
           // Four spaces is not a fence.
           final code = _blocks('> a\n>     ```\n>     b').single as MD$Quote;
           expect(code.blocks, isEmpty);
+        });
+
+        test('fence-like lines inside quoted code stay verbatim', () {
+          final tilde =
+              _blocks('> ```\n>   ~~~\n>   x\n> ```').single as MD$Quote;
+          expect((tilde.blocks.single as MD$Code).text, '  ~~~\n  x');
+          final ticks = _blocks('> ~~~\n>   ```js\n> ~~~').single as MD$Quote;
+          expect((ticks.blocks.single as MD$Code).text, '  ```js');
+          final tabs = _blocks('> ```\n>\t\tx\n> ```').single as MD$Quote;
+          expect((tabs.blocks.single as MD$Code).text, '\t\tx');
+        });
+
+        test('indented inline code in a quote is not a fence', () {
+          final q = _blocks('> say\n>  ```a``` b\n> more').single as MD$Quote;
+          expect(q.blocks, isEmpty);
+          expect(q.spans.map((s) => s.text).join(), contains('a'));
+          expect(q.spans.map((s) => s.text).join(), contains('more'));
         });
 
         test('uneven list indents keep every item', () {

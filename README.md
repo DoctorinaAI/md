@@ -27,7 +27,8 @@ A high-performance, lightweight Markdown parser and renderer specifically design
   bundled (the rest tree-shake away)
 - **🎯 AI-Optimized**: Specifically designed for AI-generated content display
 - **🔧 Extensible**: Easy to extend with custom block and span renderers
-- **✅ Well Tested**: 370+ tests; parser and node model at ~100% line coverage
+- **✅ Well Tested**: 1,700+ tests; ~97% line coverage (parser and node
+  model ~100%)
 
 ## 📋 Supported Markdown Syntax
 

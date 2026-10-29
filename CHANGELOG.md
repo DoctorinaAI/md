@@ -78,8 +78,8 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
   its slot in the line (`layout`), paints itself into it (`paint`) and calls
   `notifyListeners` when it loads, fails or animates. Implement it to control
   sources, caching and appearance; `MarkdownImageResolver` maps a
-  `MarkdownImageRequest` (`MarkdownImageKind`, url, alt / label, title) to
-  one; `MarkdownImageConstraints` carries the line's width and text style.
+  `MarkdownImageRequest` (`kind`, `url`, `text` — the alt text or link
+  label — and `title`) to one; `MarkdownImageConstraints` carries the line's width and text style.
 - **ADDED**: `MarkdownProviderImage` (any Flutter `ImageProvider` — network,
   file, asset, memory or a disk-cached third-party provider; `.icon` for a
   text-sized link icon) and the ready-made `MarkdownProviderImageResolver`
@@ -91,8 +91,9 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
   `TextPainter.layout` still lays out (a text-sized empty slot per picture).
 - Selection is unchanged: a picture counts as its alt text (a link icon as
   nothing), so offsets, highlight and copied text match
-  `markdownBlockRenderedText` whether or not pictures are shown; any part of
-  the alt text selects the whole picture, and a double tap on it selects it.
+  `markdownBlockRenderedText` whether or not pictures are shown; a range
+  touching the alt text highlights the whole picture, and a double tap on it
+  selects it.
 - Pictures are owned by the rendered document: a request seen before reuses
   the loaded image (streaming rebuilds and repeated images load once), and
   images that leave the document are disposed. A size change re-lays out the
@@ -116,8 +117,12 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
   across tokens claimed by earlier rules. A comment marker inside a string
   (`"a # b"` in Python / Bash, `'http://…'` in JS) no longer turns the rest
   of the line into a comment, and Ruby / Elixir `#{…}` interpolation is
-  highlighted inside strings. Highlighting stays lossless; long blocks take
-  somewhat longer to tokenize.
+  highlighted inside strings. Highlighting stays lossless.
+- **FIXED**: Tokenizing is linear in the number of tokens: each rule builds
+  its result in one pass instead of splicing per match. A 10,000-line C block
+  went from ~7 s to ~0.3 s; typical blocks are a little faster too. A greedy
+  rule whose matches keep starting inside other tokens falls back to plain
+  matching after a bounded number of tries.
 - **FIXED**: `HighlightThemes.githubDark` / `githubLight` color diffs:
   inserted and deleted lines get GitHub's green / red, hunk headers (`coord`)
   the function color. Previously a diff rendered uncolored.
@@ -133,8 +138,9 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
   `MD$Alert.blocks`, instead of being consumed as inline monospace by backtick
   pairing (` `` ` + monospace + ` `` `). The fenced code keeps its
   indentation, fences inside nested quotes (`> > ```…`) are nested code too,
-  and a fence may follow the `>` after up to three spaces or a tab. Blank `>`
-  lines around an alert body add no extra gap.
+  and a fence may follow the `>` after up to three spaces or a tab (lines
+  inside the code keep their indentation verbatim). Blank `>` lines around an
+  alert body add no extra gap.
 - **ADDED**: Optional `blocks` on `MD$Quote` / `MD$Alert` (empty for leaf
   inline bodies). Render, `markdownBlockRenderedText` and `Markdown.text` walk
   nested children when present (`Markdown.text` yields the children's span
@@ -338,7 +344,10 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
 - **FIXED**: `MarkdownWidget` reports its intrinsic height and max intrinsic
   width, so `IntrinsicHeight` (and similar) no longer collapses it to 0.
 - **FIXED**: A fenced code block too narrow for its padding is inert for
-  selection, so `selectAll` at tiny widths no longer crashes.
+  selection, so `selectAll` at tiny widths no longer crashes, and no longer
+  throws `TextPainter.paint called when text geometry was not yet calculated`
+  while painting (at widget widths of a few dozen pixels, less inside a quote
+  or alert).
 
 ### Right-to-left layout
 - **FIXED**: With `MarkdownThemeData.textDirection` set to
@@ -369,9 +378,6 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
 - **ADDED**: `ParagraphGestureHandler.hitTestInlineSpanWithPointerEvent` takes
   an optional `origin`, for painters whose text is not painted at the block
   origin.
-- **FIXED**: A fenced code block narrower than its padding (at widget widths
-  of a few dozen pixels, less inside a quote or alert) threw
-  `TextPainter.paint called when text geometry was not yet calculated`.
 - **FIXED**: A dry layout at other constraints, made after the real layout,
   left hit testing, highlights and link taps at the measured positions while
   the glyphs stayed put. The real layout is now restored after measuring.

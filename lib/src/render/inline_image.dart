@@ -286,7 +286,9 @@ TextRange markdownWordBoundary(TextPainter painter, Offset local) {
   if (slot >= 0) {
     final start = map.placeholderOffsets[slot];
     final span = map.placeholders[slot] as MarkdownImageSpan;
-    if (span.request.kind != MarkdownImageKind.linkIcon) {
+    if (span.request.kind != MarkdownImageKind.linkIcon ||
+        span.request.text.isEmpty) {
+      // A picture is one word; an icon without a label selects nothing.
       return TextRange(
         start: markdownModelOffset(painter, start),
         end: markdownModelOffset(painter, start + 1),
