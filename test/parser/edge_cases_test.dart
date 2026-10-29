@@ -40,6 +40,39 @@ void main() => group('Edge cases & robustness', () {
         }
       });
 
+      // Inputs that once made the parser quadratic. At 256 KB a quadratic
+      // pass takes tens of seconds and a linear one milliseconds, so the
+      // generous budget never flakes on a slow machine. Their exact output is
+      // pinned at small sizes by the `patho-*` golden entries.
+      group('Parses pathological input in linear time', () {
+        const size = 256 * 1024;
+        const budget = Duration(seconds: 1);
+        String rows(String row) => row * (size ~/ row.length);
+        final inputs = <String, String>{
+          'emphasis run, no closer': 'a${'*' * size}b',
+          'underscore run, no closer': 'a${'_' * size}b',
+          'strikethrough run, no closer': 'a${'~' * size}b',
+          'highlight run, no closer': 'a${'=' * size}b',
+          'spoiler run, no closer': 'a${'|' * size}b',
+          'bold openers, no closer': rows('**a '),
+          'backticks after escaped backslashes': 'a${rows(r'\\`')}b',
+          'label openers, one closer': '${'[' * size}]',
+          'image openers, one closer': '${rows('![')}]',
+          'table rows, no separator': rows('| a | b |\n'),
+          'table, one ragged last row':
+              '| h | i |\n|---|---|\n${rows('| a | b |\n')}| a | b | c |\n',
+          'stacked header/separator pairs': '${rows('|h|\n|-|\n')}|a|b|\n',
+          'delimiter rows, alternating counts': rows('|-|\n|-|-|\n'),
+        };
+        for (final MapEntry(:key, :value) in inputs.entries) {
+          test(key, () {
+            final stopwatch = Stopwatch()..start();
+            markdownDecoder.convert(value);
+            expect(stopwatch.elapsed, lessThan(budget));
+          });
+        }
+      });
+
       group('Unicode & emoji', () {
         test('cyrillic text parses and round-trips', () {
           final md = markdownDecoder.convert('Привет **мир**');
