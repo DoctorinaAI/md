@@ -255,6 +255,22 @@ listens to each image: if an occurrence's `layout` size changed it reports a
 re-layout, otherwise a repaint; either way the cached picture is dropped. A
 notification while the pool is running (a synchronous load inside `layout`)
 is re-checked in a microtask, since the render object is mid-layout.
+A `null` resolution is pooled too (resolved once per resolver). A resolver
+that throws is reported via `FlutterError.reportError` and treated as `null`.
+Outside a pool (`paragraphFromMarkdownSpans` called by a host), the resolver
+is called directly and the caller owns the images.
+
+**Selection tint.** A block whose built text holds a `MarkdownImageSpan`
+reports `selectionHighlightAboveCachedContent` (checked with
+`markdownSpanHasImages`; lists learn it during layout, quotes / alerts ask
+their children), so the tint stays visible over opaque pictures. A resolver
+that returns `null` for everything leaves the flag as without one.
+
+**Known limitations.** Failed loads are not retried while the URL stays in
+the document; an animated image drops and re-records the document's glyph
+`Picture` every frame; keyboard character steps walk alt text one code unit at
+a time (an endpoint inside it highlights the whole picture but copies part of
+the alt text).
 
 ## Public vs internal
 

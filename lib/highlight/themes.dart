@@ -19,6 +19,8 @@ abstract final class HighlightThemes {
     className: Color(0xFFFFA657),
     variable: Color(0xFF79C0FF),
     punctuation: Color(0xFFC9D1D9),
+    inserted: Color(0xFF7EE787),
+    deleted: Color(0xFFFFA198),
   );
 
   /// GitHub "light" code theme (background `#F6F8FA`).
@@ -33,6 +35,8 @@ abstract final class HighlightThemes {
     className: Color(0xFF953800),
     variable: Color(0xFF0550AE),
     punctuation: Color(0xFF24292F),
+    inserted: Color(0xFF116329),
+    deleted: Color(0xFF82071E),
   );
 }
 
@@ -51,6 +55,8 @@ final class _GithubTheme implements CodeHighlightTheme {
     required this.className,
     required this.variable,
     required this.punctuation,
+    required this.inserted,
+    required this.deleted,
   })  : _background = background,
         _foreground = foreground;
 
@@ -80,6 +86,12 @@ final class _GithubTheme implements CodeHighlightTheme {
 
   /// Color for punctuation.
   final Color punctuation;
+
+  /// Color for inserted diff lines.
+  final Color inserted;
+
+  /// Color for deleted diff lines.
+  final Color deleted;
 
   @override
   Color? get background => _background;
@@ -131,6 +143,9 @@ final class _GithubTheme implements CodeHighlightTheme {
         'assign-left' =>
           TextStyle(color: variable),
         'punctuation' => TextStyle(color: punctuation),
+        'inserted' => TextStyle(color: inserted),
+        'deleted' => TextStyle(color: deleted),
+        'coord' => TextStyle(color: function),
         _ => null,
       };
 }

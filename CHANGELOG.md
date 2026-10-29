@@ -97,14 +97,44 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
   the loaded image (streaming rebuilds and repeated images load once), and
   images that leave the document are disposed. A size change re-lays out the
   widget; any other change only repaints it.
+- A resolver (or `imageProvider` callback) that throws is reported through
+  `FlutterError.reportError` and the image falls back to its alt text; the
+  rest of the document still renders. A `null` result is remembered for the
+  request while it stays in the document. In-page anchors (`#section`) never
+  get a link icon, and `data:` image MIME types match case-insensitively.
+- Keep the resolver stable (a `const` resolver's `.call`, a field or a
+  top-level function): a different resolver drops and reloads every picture.
+- Known limitations: a failed load is not retried while its URL stays in the
+  document; an animated image re-records the document's cached picture on
+  every frame; a link icon that fails to load collapses, shifting its label
+  once. Keyboard character steps walk an image's alt text one code unit at a
+  time, so an endpoint can sit inside it — the whole picture highlights while
+  the copy holds part of the alt text.
+
+### Syntax highlighting
+- **FIXED**: Grammar rules marked `greedy` (Prism's semantics) now match
+  across tokens claimed by earlier rules. A comment marker inside a string
+  (`"a # b"` in Python / Bash, `'http://…'` in JS) no longer turns the rest
+  of the line into a comment, and Ruby / Elixir `#{…}` interpolation is
+  highlighted inside strings. Highlighting stays lossless; long blocks take
+  somewhat longer to tokenize.
+- **FIXED**: `HighlightThemes.githubDark` / `githubLight` color diffs:
+  inserted and deleted lines get GitHub's green / red, hunk headers (`coord`)
+  the function color. Previously a diff rendered uncolored.
+
+### Parser
+- **FIXED**: List items at uneven indents are kept: in `- a` / `    - b` /
+  `  - c`, `b` was dropped (the shallower `c` replaced `a`'s children instead
+  of joining them).
 
 ### Quote / alert nested fenced code
 - **FIXED**: Fenced code (` ```lang ` / `~~~`) inside a blockquote or GitHub
   alert is re-parsed as nested `MD$Code` in `MD$Quote.blocks` /
   `MD$Alert.blocks`, instead of being consumed as inline monospace by backtick
   pairing (` `` ` + monospace + ` `` `). The fenced code keeps its
-  indentation, and fences inside nested quotes (`> > ```…`) are nested code
-  too.
+  indentation, fences inside nested quotes (`> > ```…`) are nested code too,
+  and a fence may follow the `>` after up to three spaces or a tab. Blank `>`
+  lines around an alert body add no extra gap.
 - **ADDED**: Optional `blocks` on `MD$Quote` / `MD$Alert` (empty for leaf
   inline bodies). Render, `markdownBlockRenderedText` and `Markdown.text` walk
   nested children when present (`Markdown.text` yields the children's span

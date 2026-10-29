@@ -434,9 +434,13 @@ MarkdownWidget(markdown: doc, theme: theme);
 - **Selection- and copy-safe.** The highlighter only *partitions* the source
   into colored spans; the concatenated text is byte-identical, so cross-block
   selection, offsets and "Copy as Markdown" stay aligned.
-- **Themes.** Use `HighlightThemes.githubDark` / `githubLight`, or implement
+- **Themes.** Use `HighlightThemes.githubDark` / `githubLight` (diffs
+  included: inserted / deleted lines in green / red), or implement
   `CodeHighlightTheme` (a `switch` from token type → `TextStyle`) for your own
   palette. Its `background` is applied to the code-block surface.
+- **Prism semantics.** Rules run in grammar order and `greedy` rules match
+  across earlier tokens, as in Prism — so `"a # b"` stays a string and
+  `"#{name}"` interpolation is highlighted.
 - **Demos & tooling.** `import 'package:flutter_md/highlight/all.dart';` exposes
   `allHighlightLanguages`, a ready map of every grammar keyed by tag and alias
   (`js`, `ts`, `sh`, …). It references everything, so unused languages can no
@@ -574,15 +578,25 @@ class Badge extends MarkdownImage {
           Paint()..color = Colors.teal);
 }
 
+// A top-level function is a stable resolver.
+MarkdownImage? badges(MarkdownImageRequest request) =>
+    request.kind == MarkdownImageKind.linkIcon ? Badge() : null;
+
 MarkdownThemeData(
   textStyle: const TextStyle(fontSize: 14),
-  imageResolver: (request) =>
-      request.kind == MarkdownImageKind.linkIcon ? Badge() : null,
+  imageResolver: badges,
 )
 ```
 
+Return a new `MarkdownImage` from every call (the renderer owns and disposes
+it), or `null` to keep the alt text. A resolver that throws is reported via
+`FlutterError.reportError` and that image shows its alt text.
+
 Selection treats a picture as its alt text (a link icon as nothing), so copied
-text is the same with or without pictures.
+text is the same with or without pictures. Building text yourself with
+`paragraphFromMarkdownSpans` outside a `MarkdownWidget`? Lay it out and paint
+it with `layoutMarkdownText` / `paintMarkdownText`, and dispose the
+`MarkdownImageSpan.image`s you get — no widget owns them.
 
 ### Custom Block Painters
 
