@@ -594,7 +594,7 @@ final class MD$ListItem {
 
 /// A block representing a list in Markdown.
 /// Contains a list of items, each represented as a list of inline text spans.
-/// The [indent] property indicates the indentation level of the list.
+/// Each item's [MD$ListItem.indent] holds its nesting level.
 /// Always a leaf node in the Markdown tree.
 /// {@macro markdown_block}
 final class MD$List extends MD$Block {

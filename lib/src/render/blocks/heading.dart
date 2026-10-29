@@ -10,6 +10,7 @@ import 'package:flutter/rendering.dart';
 import '../../nodes.dart';
 import '../../theme.dart';
 import '../block_painter.dart';
+import '../inline_image.dart';
 import '../span_builder.dart';
 
 /// A class for painting a heading block in markdown.
@@ -26,8 +27,7 @@ class BlockPainter$Heading
     required int level,
     required List<MD$Span> spans,
     required this.theme,
-  })  : _selectionHighlightAboveCachedContent =
-            markdownSpansPaintOpaqueBackground(spans),
+  })  : _fills = markdownSpansPaintOpaqueBackground(spans),
         painter = TextPainter(
           text: paragraphFromMarkdownSpans(
             spans: spans,
@@ -40,9 +40,9 @@ class BlockPainter$Heading
         );
 
   @override
-  bool get selectionHighlightAboveCachedContent =>
-      _selectionHighlightAboveCachedContent;
-  final bool _selectionHighlightAboveCachedContent;
+  bool get selectionHighlightAboveCachedContent => _fills || _hasImages;
+  final bool _fills;
+  late final bool _hasImages = markdownSpanHasImages(painter.text);
 
   /// The theme used to style the heading.
   final MarkdownThemeData theme;
@@ -59,7 +59,7 @@ class BlockPainter$Heading
   double _dx = 0;
 
   /// Last span hit by the tap down event.
-  TextSpan? _lastSpan;
+  InlineSpan? _lastSpan;
 
   @override
   void handleTapDown(PointerDownEvent event) {
@@ -69,7 +69,7 @@ class BlockPainter$Heading
       painter,
       origin: selectionOrigin,
     );
-    if (span case TextSpan textSpan) _lastSpan = textSpan;
+    _lastSpan = span;
   }
 
   @override
@@ -83,7 +83,7 @@ class BlockPainter$Heading
     if (span != null && _lastSpan == span) {
       // If the span is the same as the one hit on tap down,
       // call the tap recognizer.
-      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
+      if (markdownSpanRecognizer(span) case TapGestureRecognizer(:final onTap))
         onTap?.call();
     }
     _lastSpan = null; // Clear the span after handling the tap.
@@ -91,10 +91,7 @@ class BlockPainter$Heading
 
   @override
   Size layout(double width) {
-    painter.layout(
-      minWidth: 0,
-      maxWidth: width,
-    );
+    layoutMarkdownText(painter, maxWidth: width);
     _dx = theme.textDirection == TextDirection.rtl && width.isFinite
         ? (width - painter.width).clamp(0.0, width)
         : 0.0;
@@ -105,10 +102,7 @@ class BlockPainter$Heading
   void paint(Canvas canvas, Size size, double offset) {
     // If the width is less than required do not paint anything.
     if (size.width < _size.width) return;
-    painter.paint(
-      canvas,
-      Offset(_dx, offset),
-    );
+    paintMarkdownText(painter, canvas, Offset(_dx, offset));
   }
 
   @override

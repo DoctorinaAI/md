@@ -257,6 +257,130 @@ def f(x): return x
     });
   });
 
+  group('Highlight › greedy rules', () {
+    const theme = HighlightThemes.githubDark;
+    final string = theme.styleFor('string')!.color;
+    final comment = theme.styleFor('comment')!.color;
+
+    // The color of every code unit of [src] highlighted as [tag].
+    List<Color?> colors(String tag, String src) {
+      final highlighter = highlighterWith({tag: allHighlightLanguages[tag]!});
+      return <Color?>[
+        for (final (text, style) in _fragments(
+          TextSpan(children: highlighter.highlight(src, tag, base)),
+        ))
+          for (var i = 0; i < text.length; i++) style.color,
+      ];
+    }
+
+    test('a comment marker inside a string stays a string', () {
+      for (final (tag, src) in const [
+        ('python', 'x = "a # b"'),
+        ('js', "s = 'http://a.b';"),
+        ('bash', 'echo "a # b"'),
+      ]) {
+        final c = colors(tag, src);
+        final hash = src.contains('#') ? src.indexOf('#') : src.indexOf('//');
+        expect(c[hash], string, reason: '$tag: $src');
+        expect(c, isNot(contains(comment)), reason: tag);
+      }
+      // A real comment after the string is still a comment.
+      final c = colors('js', "s = 'a//b' // c");
+      expect(c.last, comment);
+      expect(c[6], string);
+    });
+
+    test('interpolation inside a string is highlighted', () {
+      for (final (tag, src) in const [
+        ('ruby', 'puts "Hello #{name}!"'),
+        ('elixir', 'IO.puts "Hi #{name}"'),
+      ]) {
+        final c = colors(tag, src);
+        expect(c, isNot(contains(comment)), reason: tag);
+        // The `#{` delimiter is punctuation, not a comment or string text.
+        expect(
+          c[src.indexOf('#{')],
+          theme.styleFor('punctuation')!.color,
+          reason: tag,
+        );
+        expect(roundTrip(tag, src), src);
+      }
+    });
+
+    test('text freed from a swallowed token joins the text after it', () {
+      // The string swallows the start of a line comment; the block comment
+      // that follows is re-tokenized whole, across the line break.
+      const src = 'var s = "a // b"; /* x\n y */ z;';
+      final c = colors('js', src);
+      expect(c[src.indexOf('a // b')], string);
+      expect(c[src.indexOf('/* x')], comment);
+      expect(c[src.indexOf('y */')], comment);
+      expect(c[src.indexOf('*/') + 1], comment);
+      expect(c[src.indexOf(' z')], isNot(comment));
+    });
+
+    test('many discarded greedy matches fall back to plain matching', () {
+      // Every `"x"` sits inside a comment: the string rule discards it.
+      final src = '${List.filled(400, '// "x"\n').join()}y = "z";\n';
+      expect(roundTrip('js', src), src);
+      final c = colors('js', src);
+      expect(c[src.indexOf('"x"')], comment);
+      expect(c[src.indexOf('"z"')], string);
+    });
+
+    test('a greedy rule that can match empty text skips it', () {
+      final grammar = Grammar([
+        GrammarToken('comment', compileHighlightPattern('#.*')),
+        GrammarToken('string', compileHighlightPattern('a*'), greedy: true),
+      ]);
+      final highlighter = highlighterWith({'x': grammar});
+      const src = 'xa #aa\nbaab';
+      final frags = _fragments(
+        TextSpan(children: highlighter.highlight(src, 'x', base)),
+      );
+      expect(frags.map((f) => f.$1).join(), src);
+      expect(_colorOf(frags, 'aa'), string);
+      expect(_colorOf(frags, 'x'), isNull);
+    });
+
+    test('greedy matches round-trip on mixed input', () {
+      const src = '# c "q"\nx = "a # b" # d\ny = \'#\'  # "e"\n';
+      expect(roundTrip('python', src), src);
+      final c = colors('python', src);
+      expect(c.first, comment);
+      expect(c[src.indexOf('a # b')], string);
+      expect(c[src.lastIndexOf('# "e"')], comment);
+    });
+  });
+
+  group('Highlight › diff', () {
+    test('GitHub themes color inserted and deleted lines', () {
+      for (final theme in const [
+        HighlightThemes.githubDark,
+        HighlightThemes.githubLight,
+      ]) {
+        final inserted = theme.styleFor('inserted')?.color;
+        final deleted = theme.styleFor('deleted')?.color;
+        expect(inserted, isNotNull);
+        expect(deleted, isNotNull);
+        expect(inserted, isNot(deleted));
+        expect(theme.styleFor('coord'), isNotNull);
+        final highlighter = MarkdownHighlighter(
+          languages: {'diff': allHighlightLanguages['diff']!},
+          theme: theme,
+        );
+        const src = '@@ -1 +1 @@\n-old\n+new\n same\n';
+        final frags = _fragments(
+          TextSpan(children: highlighter.highlight(src, 'diff', base)),
+        );
+        Color? lineColor(String line) =>
+            frags.firstWhere((f) => f.$1.startsWith(line)).$2.color;
+        expect(lineColor('old'), deleted);
+        expect(lineColor('new'), inserted);
+      }
+    });
+  });
+
   group('Highlight › corner cases', () {
     test('empty and whitespace-only inputs round-trip and do not throw', () {
       for (final src in const ['', ' ', '\n', '\n\n', '\t  \n ', '   ']) {

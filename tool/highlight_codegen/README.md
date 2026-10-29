@@ -49,9 +49,14 @@ To add languages, append to `languages.json` and re-run.
 - Regex sources are emitted as escaped Dart string literals. Dart's `RegExp`
   (Irregexp) is JS-compatible, so most patterns port verbatim; only the `i`
   flag appears in the current language set.
-- The tokenizer relies on grammar ordering rather than a cross-segment `greedy`
-  re-scan (the `greedy` flag is retained but advisory). This can mis-highlight
-  rare pathological cases; it is correct for typical code.
+- The tokenizer follows Prism: rules apply in grammar order, and `greedy`
+  rules match across tokens claimed by earlier rules (a match must start in
+  plain text; the rest of a token it cuts through, joined with the plain text
+  after it, is re-tokenized by the earlier rules). Deviations: a greedy rule
+  whose matches keep starting inside other tokens gives up after 256 tries and
+  matches plain text only; Prism's `alias` arrays keep only their first
+  entry. Some patterns backtrack heavily on pathological input (thousands of
+  unclosed quotes or tags), as they do in Prism.
 - Grammar keys with `undefined` values (e.g. Dart's inherited `string` hole)
   are skipped.
 

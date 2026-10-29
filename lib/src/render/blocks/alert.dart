@@ -9,8 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../nodes.dart';
+import '../../selection.dart' show markdownBlockRenderedText;
 import '../../theme.dart';
 import '../block_painter.dart';
+import '../inline_image.dart';
 import '../span_builder.dart';
 
 /// A class for painting a GitHub-style alert (admonition) block in markdown.
@@ -20,20 +22,25 @@ class BlockPainter$Alert
   /// Creates an alert painter of kind [alert] with body [spans], styled by
   /// [theme]. When [children] is non-empty, those painters replace the leaf
   /// body painter (fenced code inside `> [!NOTE]`, etc.).
+  ///
+  /// [blocks] are the [MD$Alert.blocks] models [children] were built from
+  /// (one per child, in order). Optional: they let a child painter that
+  /// exposes no selectable text (a host [MarkdownThemeData.builder] result)
+  /// still occupy its text in the selection offset space, keeping it equal to
+  /// `markdownBlockRenderedText`. Ignored unless it matches [children] in
+  /// length.
   BlockPainter$Alert({
     required this.alert,
     required List<MD$Span> spans,
     required this.theme,
     List<BlockPainter> children = const <BlockPainter>[],
+    List<MD$Block> blocks = const <MD$Block>[],
   })  : _children = children,
+        _modelTexts = blocks.isNotEmpty && blocks.length == children.length
+            ? <String>[for (final b in blocks) markdownBlockRenderedText(b)]
+            : null,
         _accent = theme.alertColorFor(alert),
-        _selectionHighlightAboveCachedContent = children.isNotEmpty
-            ? children.any(
-                (c) =>
-                    c is SelectableBlockPainter &&
-                    c.selectionHighlightAboveCachedContent,
-              )
-            : markdownSpansPaintOpaqueBackground(spans),
+        _fills = children.isEmpty && markdownSpansPaintOpaqueBackground(spans),
         titlePainter = TextPainter(
           text: TextSpan(
             text: alert.title,
@@ -58,6 +65,9 @@ class BlockPainter$Alert
   /// Nested body painters when the alert model carries [MD$Alert.blocks].
   final List<BlockPainter> _children;
 
+  /// Model-side rendered text per child, when [MD$Alert.blocks] were given.
+  final List<String>? _modelTexts;
+
   /// Leaf body painter when there are no nested children.
   final TextPainter? _bodyPainter;
 
@@ -65,8 +75,15 @@ class BlockPainter$Alert
   /// content [Picture].
   @override
   bool get selectionHighlightAboveCachedContent =>
-      _selectionHighlightAboveCachedContent;
-  final bool _selectionHighlightAboveCachedContent;
+      _fills ||
+      _hasImages ||
+      _children.any(
+        (c) =>
+            c is SelectableBlockPainter &&
+            c.selectionHighlightAboveCachedContent,
+      );
+  final bool _fills;
+  late final bool _hasImages = markdownSpanHasImages(_bodyPainter?.text);
 
   /// The kind of the alert being painted.
   final MD$AlertType alert;
@@ -131,12 +148,15 @@ class BlockPainter$Alert
   /// Vertical offsets of each nested child within the body column.
   List<double> _childOffsets = const <double>[];
 
+  /// Block-local top-left of each nested child.
+  List<Offset> _childOrigins = const <Offset>[];
+
   /// Last span hit by the tap down event.
-  TextSpan? _lastSpan;
+  InlineSpan? _lastSpan;
 
   Offset get _bodyOrigin => Offset(_contentX(_bodyPainter!), _bodyTop);
 
-  TextSpan? _spanForPosition(Offset localPosition) {
+  InlineSpan? _spanForPosition(Offset localPosition) {
     if (!_hasBody) return null;
     if (_bodyPainter != null) {
       final local = localPosition - _bodyOrigin;
@@ -146,9 +166,7 @@ class BlockPainter$Alert
           local.dy > _bodyPainter.height) {
         return null;
       }
-      final position = _bodyPainter.getPositionForOffset(local);
-      final span = _bodyPainter.text?.getSpanForPosition(position);
-      return span is TextSpan ? span : null;
+      return markdownSpanAtLocal(_bodyPainter, local);
     }
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
@@ -157,9 +175,7 @@ class BlockPainter$Alert
           localPosition.dy >= top + child.size.height) {
         continue;
       }
-      final span =
-          _childSpanAt(child, localPosition - Offset(_columnLeft, top));
-      return span is TextSpan ? span : null;
+      return _childSpanAt(child, localPosition - Offset(_columnLeft, top));
     }
     return null;
   }
@@ -174,7 +190,8 @@ class BlockPainter$Alert
     if (_lastSpan == null) return;
     final span = _spanForPosition(event.localPosition);
     if (span != null && _lastSpan == span) {
-      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
+      if (markdownSpanRecognizer(span)
+          case TapGestureRecognizer(:final onTap)) {
         onTap?.call();
       }
     }
@@ -192,7 +209,7 @@ class BlockPainter$Alert
     double bodyWidth = 0;
     double bodyHeight = 0;
     if (_bodyPainter != null) {
-      _bodyPainter.layout(minWidth: 0, maxWidth: available);
+      layoutMarkdownText(_bodyPainter, maxWidth: available);
       _hasBody = _bodyPainter.text?.toPlainText().isNotEmpty ?? false;
       if (_hasBody) {
         bodyWidth = _bodyPainter.width;
@@ -200,12 +217,13 @@ class BlockPainter$Alert
         _fragments = <SelectableFragment>[
           SelectableFragment(_bodyPainter, _bodyOrigin, 0),
         ];
-        _renderedText = _bodyPainter.plainText;
+        _renderedText = markdownModelText(_bodyPainter);
       } else {
         _fragments = const <SelectableFragment>[];
         _renderedText = '';
       }
       _childOffsets = const <double>[];
+      _childOrigins = const <Offset>[];
     } else {
       final offsets = List<double>.filled(_children.length, 0.0);
       var y = 0.0;
@@ -231,45 +249,31 @@ class BlockPainter$Alert
   }
 
   void _rebuildFragments() {
-    final frags = <SelectableFragment>[];
-    final parts = <String>[];
-    var textStart = 0;
-    for (var i = 0; i < _children.length; i++) {
-      final child = _children[i];
-      final origin = Offset(_columnLeft, _bodyTop + _childOffsets[i]);
-      if (child is MultiPainterSelectable) {
-        final text = child.renderedText;
-        if (text.isNotEmpty) {
-          for (final f in child.fragments) {
-            frags.add(SelectableFragment(
-              f.painter,
-              origin + f.origin,
-              textStart + f.textStart,
-            ));
-          }
-          parts.add(text);
-          textStart += text.length + 1;
-        }
-      } else if (child case final SelectableTextBlock textBlock) {
-        final text = textBlock.renderedText;
-        if (text.isNotEmpty) {
-          frags.add(SelectableFragment(
-            textBlock.selectionPainter,
-            origin + textBlock.selectionOrigin,
-            textStart,
-          ));
-          parts.add(text);
-          textStart += text.length + 1;
-        }
-      }
-    }
-    _renderedText = parts.join('\n');
+    _childOrigins = <Offset>[
+      for (final dy in _childOffsets) Offset(_columnLeft, _bodyTop + dy),
+    ];
+    final (frags, text) =
+        nestedBlockFragments(_children, _childOrigins, _modelTexts);
     _fragments = frags;
+    _renderedText = text;
+  }
+
+  /// Glyph-tight: the gutter beside a short body line (or a nested child's
+  /// own gutter) is not text, matching paragraphs. The title is not
+  /// selectable and never hits.
+  @override
+  bool hitsRenderedTextAt(Offset local) {
+    if (!_hasBody) return false;
+    final body = _bodyPainter;
+    if (body != null) return painterHitsGlyphBoxes(body, local - _bodyOrigin);
+    return nestedBlocksHitRenderedText(_children, _childOrigins, local);
   }
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
-    if (size.width < _size.width) return;
+    // A leaf alert narrower than its text paints nothing. Nested children
+    // may legitimately overflow (a wide table), so they are always painted.
+    if (_bodyPainter != null && size.width < _size.width) return;
 
     final rect = Rect.fromLTWH(0, offset, size.width, _size.height);
     // Tinted background.
@@ -302,7 +306,7 @@ class BlockPainter$Alert
     if (!_hasBody) return;
 
     if (_bodyPainter != null) {
-      _bodyPainter.paint(canvas, _bodyOrigin + Offset(0, offset));
+      paintMarkdownText(_bodyPainter, canvas, _bodyOrigin + Offset(0, offset));
       return;
     }
 
@@ -348,9 +352,7 @@ InlineSpan? _childSpanAt(BlockPainter child, Offset local) {
     final painter = fragment.painter;
     final inner = local - fragment.origin;
     if (!(Offset.zero & painter.size).contains(inner)) continue;
-    return painter.text?.getSpanForPosition(
-      painter.getPositionForOffset(inner),
-    );
+    return markdownSpanAtLocal(painter, inner);
   }
   return null;
 }

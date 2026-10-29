@@ -12,6 +12,7 @@ import 'package:flutter/rendering.dart';
 import '../../nodes.dart';
 import '../../theme.dart';
 import '../block_painter.dart';
+import '../inline_image.dart';
 import '../span_builder.dart';
 
 /// A class for painting a table block in markdown.
@@ -113,7 +114,7 @@ class BlockPainter$Table
   String _renderedText = '';
 
   /// Last span hit by the tap down event.
-  TextSpan? _lastSpan;
+  InlineSpan? _lastSpan;
 
   @override
   void handleTapDown(PointerDownEvent event) {
@@ -131,13 +132,13 @@ class BlockPainter$Table
     if (span != null && _lastSpan == span) {
       // If the span is the same as the one hit on tap down,
       // call the tap recognizer.
-      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap)))
+      if (markdownSpanRecognizer(span) case TapGestureRecognizer(:final onTap))
         onTap?.call();
     }
     _lastSpan = null; // Clear the span after handling the tap.
   }
 
-  TextSpan? _getSpanForOffset(Offset position) {
+  InlineSpan? _getSpanForOffset(Offset position) {
     double currentY = 0.0;
 
     for (int r = 0; r < _cellPainters.length; r++) {
@@ -168,9 +169,7 @@ class BlockPainter$Table
               localPosition.dy < 0 ||
               localPosition.dy > painter.height) continue;
 
-          final textPosition = painter.getPositionForOffset(localPosition);
-          final span = painter.text!.getSpanForPosition(textPosition);
-          return span is TextSpan ? span : null;
+          return markdownSpanAtLocal(painter, localPosition);
         }
       }
       currentY += rowHeight;
@@ -219,12 +218,13 @@ class BlockPainter$Table
         );
 
         // Calculate natural width
-        textPainter.layout(maxWidth: double.infinity);
+        layoutMarkdownText(textPainter);
         naturalWidths[c] =
             math.max(naturalWidths[c], textPainter.width + padding * 2);
 
-        // Calculate min width (longest word)
-        final cellText = cell.map((s) => s.text).join();
+        // Calculate min width (longest word). Pictures scale down to the
+        // column, so their alt text (U+FFFC in the painter) does not count.
+        final cellText = textPainter.plainText.replaceAll('\uFFFC', ' ');
         final words = cellText.split(RegExp(r'\s+'));
         if (words.isNotEmpty) {
           final longestWord =
@@ -271,7 +271,10 @@ class BlockPainter$Table
       for (int c = 0; c < columns; c++) {
         final painter = _cellPainters[r][c];
         if (painter.text == null) continue;
-        painter.layout(maxWidth: math.max(0.0, _columnWidths[c] - padding * 2));
+        layoutMarkdownText(
+          painter,
+          maxWidth: math.max(0.0, _columnWidths[c] - padding * 2),
+        );
         rowHeight = math.max(
           rowHeight,
           painter.height,
@@ -330,7 +333,7 @@ class BlockPainter$Table
             rowTop + verticalPadding,
           );
           frags.add(SelectableFragment(painter, origin, text.length));
-          text.write(painter.plainText);
+          text.write(markdownModelText(painter));
         }
       }
       rowTop += _rowHeights[r];
@@ -364,7 +367,8 @@ class BlockPainter$Table
         final verticalPadding = (rowHeight - painter.height) / 2;
         final horizontalPadding = _cellHorizontalPadding(r, c, painter.width);
 
-        painter.paint(
+        paintMarkdownText(
+          painter,
           canvas,
           Offset(
             _columnLefts[c] + horizontalPadding,

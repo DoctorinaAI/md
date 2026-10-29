@@ -30,10 +30,26 @@ class MarkdownRenderObject extends RenderBox
         _painter = MarkdownPainter(
           markdown: markdown,
           theme: theme,
-        );
+        ) {
+    _painter.onImageChanged = _handleImageChanged;
+  }
+
+  /// An inline picture loaded, failed or advanced a frame.
+  void _handleImageChanged(bool relayout) {
+    if (_disposed) return;
+    if (relayout) {
+      markNeedsLayout();
+    } else {
+      markNeedsPaint();
+    }
+  }
 
   /// Painter for rendering markdown content.
   final MarkdownPainter _painter;
+
+  /// The painter behind this render object, for tests.
+  @visibleForTesting
+  MarkdownPainter get debugPainter => _painter;
 
   MarkdownThemeData _theme;
   MarkdownCursorResolver? _cursorResolver;
@@ -282,7 +298,14 @@ class MarkdownRenderObject extends RenderBox
 
   // --- MouseTrackerAnnotation (cursor over links and selectable text) ---
 
-  /// Currently resolved hover cursor, or null when pointer is not hovering.
+  /// Last content-local hover position, or null when the pointer is not
+  /// hovering. The cursor is resolved from it lazily (see [cursor]) so a
+  /// rebuild — a fresh resolver closure, a streamed token, a new theme — keeps
+  /// the cursor under a still pointer instead of dropping it.
+  Offset? _hoverLocal;
+
+  /// Cursor last resolved at [_hoverLocal]; used only to detect a flip that
+  /// needs a repaint so [MouseTracker] re-reads [cursor].
   MouseCursor? _hoverCursor;
 
   MouseCursor _resolveCursorAt(Offset local) {
@@ -303,6 +326,10 @@ class MarkdownRenderObject extends RenderBox
   }
 
   void _updateHoverCursor(Offset local) {
+    _hoverLocal = local;
+    // Stale geometry until the pending layout; the repaint that follows it
+    // makes [MouseTracker] re-read [cursor], which resolves at [local].
+    if (_painter.needsLayout) return;
     final next = _resolveCursorAt(local);
     if (next != _hoverCursor) {
       _hoverCursor = next;
@@ -310,7 +337,16 @@ class MarkdownRenderObject extends RenderBox
     }
   }
 
+  /// Asks [MouseTracker] to re-read [cursor] after the next frame, when the
+  /// pointer is hovering and the inputs the cursor depends on changed.
+  void _refreshHoverCursor() {
+    if (_hoverLocal == null) return;
+    _hoverCursor = null;
+    if (!_disposed && attached) markNeedsPaint();
+  }
+
   void _clearHoverCursor() {
+    _hoverLocal = null;
     if (_hoverCursor != null) {
       _hoverCursor = null;
       if (!_disposed && attached) markNeedsPaint();
@@ -322,9 +358,13 @@ class MarkdownRenderObject extends RenderBox
   /// participates in a selection controller (so users see the content is
   /// selectable), and otherwise defers to what is behind it.
   @override
-  MouseCursor get cursor =>
-      _hoverCursor ??
-      (_controller != null ? SystemMouseCursors.text : MouseCursor.defer);
+  MouseCursor get cursor {
+    final local = _hoverLocal;
+    if (local != null && !_disposed && !_painter.needsLayout) {
+      return _hoverCursor = _resolveCursorAt(local);
+    }
+    return _controller != null ? SystemMouseCursors.text : MouseCursor.defer;
+  }
 
   @override
   void Function(PointerEnterEvent)? get onEnter => null;
@@ -392,6 +432,28 @@ class MarkdownRenderObject extends RenderBox
     }
     return measured;
   }
+
+  // Intrinsics measure through [getDryLayout], which restores the real layout
+  // afterwards (see [computeDryLayout]), so [IntrinsicHeight] / [IntrinsicWidth]
+  // and friends see the content instead of the zero RenderBox defaults.
+  //
+  // The minimum intrinsic width stays at the inherited `0`: the true
+  // min-content width is the widest unbreakable run (word, table cell, code
+  // line), which no block painter exposes and which a full re-layout at width
+  // zero would only approximate at the cost of every TextPainter. `0` is safe
+  // — it never asks a parent for more width than the content can shrink to.
+
+  @override
+  double computeMaxIntrinsicWidth(double height) =>
+      getDryLayout(const BoxConstraints()).width;
+
+  @override
+  double computeMinIntrinsicHeight(double width) =>
+      computeMaxIntrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) =>
+      getDryLayout(BoxConstraints(maxWidth: width)).height;
 
   @override
   void performLayout() {
@@ -462,17 +524,19 @@ class MarkdownRenderObject extends RenderBox
     required MarkdownThemeData theme,
     MarkdownCursorResolver? cursorResolver,
   }) {
+    final cursorInputsChanged =
+        !identical(_theme, theme) || _cursorResolver != cursorResolver;
     _theme = theme;
-    if (_cursorResolver != cursorResolver) {
-      _cursorResolver = cursorResolver;
-      _clearHoverCursor();
-    }
+    _cursorResolver = cursorResolver;
     if (_painter.update(
       markdown: markdown,
       theme: theme,
     )) {
       // Mark the render object as needing layout.
       markNeedsLayout();
+      _refreshHoverCursor();
+    } else if (cursorInputsChanged) {
+      _refreshHoverCursor();
     }
     final controller = _controller;
     final id = _documentId;

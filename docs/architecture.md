@@ -18,7 +18,8 @@ String ──► Parser ──► Node model ──► Render layer ──► Sc
    the selection as logical anchors over the immutable models, and reads geometry
    from mounted render objects for hit-testing/highlight/handles.
 4. **Theme** (`lib/src/theme.dart`) supplies styles and the customization hooks
-   (`builder`, `blockFilter`, `spanFilter`) that the render layer reads.
+   (`builder`, `blockFilter`, `spanFilter`, `imageResolver`, `highlighter`,
+   `cursorResolver`) that the render layer reads.
 
 The parser and node model are stable ground; the render layer was reorganized
 into `lib/src/render/**` (see [rendering](rendering.md)). Selection is the newest
@@ -84,17 +85,25 @@ These are cross-cutting; each subsystem doc repeats the ones it owns.
 
 Everything public is re-exported from `lib/flutter_md.dart`:
 
-- **Whole-file exports:** `markdown.dart`, `nodes.dart`, `parser.dart`,
-  `selection.dart`, `selection_scope.dart`, `theme.dart`, `widget.dart`.
+- **Whole-file exports:** `image.dart`, `markdown.dart`, `nodes.dart`,
+  `parser.dart`, `selection.dart`, `selection_scope.dart`, `theme.dart`,
+  `widget.dart`.
 - **Curated `show` from `render.dart`:** the `BlockPainter` framework
   (`BlockPainter`, `SelectableBlockPainter`, `SelectableTextBlock`,
   `MultiPainterSelectable`, `SelectableFragment`, `ParagraphGestureHandler`,
-  `paragraphFromMarkdownSpans`) and the nine default painters
+  `paragraphFromMarkdownSpans`, `MarkdownImageSpan`, `layoutMarkdownText`,
+  `paintMarkdownText`) and the nine default painters
   (`BlockPainter$Paragraph … $Spacer`).
+- **Curated `show`:** `highlight/engine.dart` (`CodeHighlightTheme`,
+  `SyntaxHighlighter`) and `selection_autoscroll.dart` (the
+  `Markdown*Autoscroll*` types). The highlighter itself is a separate
+  entrypoint, `package:flutter_md/highlight.dart`.
 
 Deliberately **not** public (reachable only via `import 'package:flutter_md/src/render.dart'`,
-annotated `@meta.internal`): `MarkdownPainter`, `MarkdownRenderObject`. Treat the
-`show` list as the supported surface; additions to it are permanent commitments.
+annotated `@meta.internal`): `MarkdownPainter`, `MarkdownRenderObject`,
+`MarkdownImagePool` and the offset helpers in `render/inline_image.dart`. Treat
+the `show` list as the supported surface; additions to it are permanent
+commitments.
 
 ## Where to make a change
 

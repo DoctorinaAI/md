@@ -9,8 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../nodes.dart';
+import '../../selection.dart' show markdownBlockRenderedText;
 import '../../theme.dart';
 import '../block_painter.dart';
+import '../inline_image.dart';
 import '../span_builder.dart';
 
 /// A class for painting a quote block in markdown.
@@ -24,19 +26,24 @@ class BlockPainter$Quote
   /// Creates a quote painter for [spans] nested [indent] levels deep, styled
   /// by [theme]. When [children] is non-empty, those painters are stacked
   /// instead of [spans].
+  ///
+  /// [blocks] are the [MD$Quote.blocks] models [children] were built from
+  /// (one per child, in order). Optional: they let a child painter that
+  /// exposes no selectable text (a host [MarkdownThemeData.builder] result)
+  /// still occupy its text in the selection offset space, keeping it equal to
+  /// `markdownBlockRenderedText`. Ignored unless it matches [children] in
+  /// length.
   BlockPainter$Quote({
     required List<MD$Span> spans,
     required this.indent,
     required this.theme,
     List<BlockPainter> children = const <BlockPainter>[],
+    List<MD$Block> blocks = const <MD$Block>[],
   })  : _children = children,
-        _selectionHighlightAboveCachedContent = children.isNotEmpty
-            ? children.any(
-                (c) =>
-                    c is SelectableBlockPainter &&
-                    c.selectionHighlightAboveCachedContent,
-              )
-            : markdownSpansPaintOpaqueBackground(spans),
+        _modelTexts = blocks.isNotEmpty && blocks.length == children.length
+            ? <String>[for (final b in blocks) markdownBlockRenderedText(b)]
+            : null,
+        _fills = children.isEmpty && markdownSpansPaintOpaqueBackground(spans),
         _leafPainter = children.isEmpty
             ? TextPainter(
                 text: paragraphFromMarkdownSpans(
@@ -59,6 +66,9 @@ class BlockPainter$Quote
   /// Nested block painters when the quote model carries [MD$Quote.blocks].
   final List<BlockPainter> _children;
 
+  /// Model-side rendered text per child, when [MD$Quote.blocks] were given.
+  final List<String>? _modelTexts;
+
   /// Leaf glyph painter when there are no nested children.
   final TextPainter? _leafPainter;
 
@@ -66,8 +76,15 @@ class BlockPainter$Quote
   /// content [Picture].
   @override
   bool get selectionHighlightAboveCachedContent =>
-      _selectionHighlightAboveCachedContent;
-  final bool _selectionHighlightAboveCachedContent;
+      _fills ||
+      _hasImages ||
+      _children.any(
+        (c) =>
+            c is SelectableBlockPainter &&
+            c.selectionHighlightAboveCachedContent,
+      );
+  final bool _fills;
+  late final bool _hasImages = markdownSpanHasImages(_leafPainter?.text);
 
   /// The theme used to style the quote.
   final MarkdownThemeData theme;
@@ -118,8 +135,11 @@ class BlockPainter$Quote
   /// Vertical offsets of each nested child within the quote content column.
   List<double> _childOffsets = const <double>[];
 
+  /// Block-local top-left of each nested child.
+  List<Offset> _childOrigins = const <Offset>[];
+
   /// Last span hit by the tap down event.
-  TextSpan? _lastSpan;
+  InlineSpan? _lastSpan;
 
   /// Whether the last layout mirrored the block for right-to-left text.
   bool _rtl = false;
@@ -149,8 +169,7 @@ class BlockPainter$Quote
           local.dy > _leafPainter.height) {
         return null;
       }
-      final position = _leafPainter.getPositionForOffset(local);
-      return _leafPainter.text?.getSpanForPosition(position);
+      return markdownSpanAtLocal(_leafPainter, local);
     }
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
@@ -168,7 +187,7 @@ class BlockPainter$Quote
   void handleTapDown(PointerDownEvent event) {
     _lastSpan = null;
     final span = _spanForPosition(event.localPosition);
-    if (span case TextSpan textSpan) _lastSpan = textSpan;
+    _lastSpan = span;
   }
 
   @override
@@ -176,7 +195,8 @@ class BlockPainter$Quote
     if (_lastSpan == null) return;
     final span = _spanForPosition(event.localPosition);
     if (span != null && _lastSpan == span) {
-      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
+      if (markdownSpanRecognizer(span)
+          case TapGestureRecognizer(:final onTap)) {
         onTap?.call();
       }
     }
@@ -189,7 +209,7 @@ class BlockPainter$Quote
     _width = width;
     final contentWidth = math.max(width - _contentLeft, 0.0);
     if (_leafPainter != null) {
-      _leafPainter.layout(minWidth: 0, maxWidth: contentWidth);
+      layoutMarkdownText(_leafPainter, maxWidth: contentWidth);
       _size = Size(
         _leafPainter.size.width + _contentLeft,
         _leafPainter.size.height,
@@ -197,8 +217,9 @@ class BlockPainter$Quote
       _fragments = <SelectableFragment>[
         SelectableFragment(_leafPainter, Offset(_leafLeft, 0), 0),
       ];
-      _renderedText = _leafPainter.plainText;
+      _renderedText = markdownModelText(_leafPainter);
       _childOffsets = const <double>[];
+      _childOrigins = const <Offset>[];
       return _size;
     }
 
@@ -218,47 +239,31 @@ class BlockPainter$Quote
   }
 
   void _rebuildFragments() {
-    final frags = <SelectableFragment>[];
-    final parts = <String>[];
-    var textStart = 0;
-    for (var i = 0; i < _children.length; i++) {
-      final child = _children[i];
-      final origin = Offset(_columnLeft, _childOffsets[i]);
-      if (child is MultiPainterSelectable) {
-        final text = child.renderedText;
-        if (text.isNotEmpty) {
-          for (final f in child.fragments) {
-            frags.add(SelectableFragment(
-              f.painter,
-              origin + f.origin,
-              textStart + f.textStart,
-            ));
-          }
-          parts.add(text);
-          textStart += text.length + 1;
-        }
-      } else if (child case final SelectableTextBlock textBlock) {
-        final text = textBlock.renderedText;
-        if (text.isNotEmpty) {
-          frags.add(SelectableFragment(
-            textBlock.selectionPainter,
-            origin + textBlock.selectionOrigin,
-            textStart,
-          ));
-          parts.add(text);
-          textStart += text.length + 1;
-        }
-      }
-    }
-    // Drop the trailing +1 from the last non-empty part.
-    _renderedText = parts.join('\n');
+    _childOrigins = <Offset>[
+      for (final dy in _childOffsets) Offset(_columnLeft, dy),
+    ];
+    final (frags, text) =
+        nestedBlockFragments(_children, _childOrigins, _modelTexts);
     _fragments = frags;
+    _renderedText = text;
+  }
+
+  /// Glyph-tight: the gutter beside a short line (or a nested child's own
+  /// gutter) is not text, matching paragraphs.
+  @override
+  bool hitsRenderedTextAt(Offset local) {
+    final leaf = _leafPainter;
+    if (leaf != null) {
+      return painterHitsGlyphBoxes(leaf, local - Offset(_leafLeft, 0));
+    }
+    return nestedBlocksHitRenderedText(_children, _childOrigins, local);
   }
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
-    // If the width is less than required do not paint anything.
-    if (size.width < _size.width) return;
+    // A leaf quote narrower than its text paints nothing. Nested children
+    // may legitimately overflow (a wide table), so they are always painted.
+    if (_leafPainter != null && size.width < _size.width) return;
 
     // --- Draw vertical lines --- //
     for (var i = 1; i <= indent; i++) {
@@ -271,7 +276,7 @@ class BlockPainter$Quote
     }
 
     if (_leafPainter != null) {
-      _leafPainter.paint(canvas, Offset(_leafLeft, offset));
+      paintMarkdownText(_leafPainter, canvas, Offset(_leafLeft, offset));
       return;
     }
 
@@ -316,9 +321,7 @@ InlineSpan? _childSpanAt(BlockPainter child, Offset local) {
     final painter = fragment.painter;
     final inner = local - fragment.origin;
     if (!(Offset.zero & painter.size).contains(inner)) continue;
-    return painter.text?.getSpanForPosition(
-      painter.getPositionForOffset(inner),
-    );
+    return markdownSpanAtLocal(painter, inner);
   }
   return null;
 }

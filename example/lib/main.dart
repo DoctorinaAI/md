@@ -36,10 +36,11 @@ class App extends StatelessWidget {
     builder: (context, child) => MarkdownTheme(
       data: MarkdownThemeData.mergeTheme(
         Theme.of(context),
-        // Exclude images from the markdown rendering,
-        // so they are not rendered in the output.
-        // Because image spans are not supported yet.
-        spanFilter: (span) => !span.style.contains(MD$Style.image),
+        // Show `![alt](src)` images and a favicon in front of every link.
+        imageResolver: const MarkdownProviderImageResolver(
+          linkIcons: true,
+          maxImageHeight: 240,
+        ).call,
         onLinkTap: (title, url) {
           ScaffoldMessenger.maybeOf(context)
             ?..clearSnackBars()
@@ -392,6 +393,10 @@ Duis aute irure dolor in _reprehenderit in voluptate velit esse_ cillum dolore e
 ## Links
 
 You may be using [Markdown Live Preview](https://markdownlivepreview.com/).
+
+## Images
+
+![Flutter logo](https://avatars.githubusercontent.com/u/14101776?s=200)
 
 ---
 

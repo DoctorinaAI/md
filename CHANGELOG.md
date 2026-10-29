@@ -1,10 +1,18 @@
-## Unreleased
+## 0.3.0
+
+> **Upgrading from 0.2.x?** See the
+> [migration guide](docs/migration/0.2.x-to-0.3.x.md). Ordinary
+> `MarkdownWidget` / `MarkdownSelectionScope` users need no code changes; hosts
+> that implement the render / selection extension points do. **Coming from
+> pub.dev 0.0.8?** 0.1.0 and 0.2.0 were never published there — read the
+> [0.0.x → 0.2.x guide](docs/migration/0.0.x-to-0.2.x.md) first, then this one.
 
 ### Breaking vs 0.2.0
 
 Source-breaking only for hosts that implement the render / selection
-extension points or reach into a default block painter's fields. Ordinary
-`MarkdownWidget` / `MarkdownSelectionScope` users are unaffected.
+extension points, reach into a default block painter's fields, or read the
+quote / alert model directly. Ordinary `MarkdownWidget` /
+`MarkdownSelectionScope` users are unaffected.
 
 - **REMOVED**: `BlockPainter$Quote.painter` and `BlockPainter$Alert.bodyPainter`.
   Both painters now stack nested children, so a single body `TextPainter` no
@@ -13,40 +21,145 @@ extension points or reach into a default block painter's fields. Ordinary
 - **CHANGED**: `BlockPainter$Quote` and `BlockPainter$Alert` mix in
   `MultiPainterSelectable` instead of `SelectableTextBlock`. Subclasses that
   overrode `selectionPainter` / `selectionOrigin` must move to `fragments`.
+  Both constructors gained an optional `children:` (the nested block
+  painters) and `blocks:` (the matching child models, which keep selection
+  offsets in sync when a child painter exposes no selectable text); a custom
+  `builder` that rebuilds them must pass both for bodies with nested blocks.
+  `BlockPainter$Quote.inheritFrom` gives a nested child the theme the default
+  quote uses.
+- **CHANGED**: A quote / alert whose body contains a fenced block now has
+  empty `spans`; its content is in the new `MD$Quote.blocks` /
+  `MD$Alert.blocks`. Code that builds `BlockPainter$Quote/Alert(spans: …)` in
+  a custom `MarkdownThemeData.builder`, or otherwise walks `spans`, must handle
+  `blocks`. Plain quotes / alerts keep the leaf shape (`spans`, empty
+  `blocks`).
 - **CHANGED**: `SelectableBlockPainter` gained `positionAndAffinityForLocal`,
   `caretRectFor`, `hitsRenderedTextAt` and
   `selectionHighlightAboveCachedContent`. Custom painters built on the
   `SelectableTextBlock` / `MultiPainterSelectable` mixins inherit working
   implementations; painters that `implements SelectableBlockPainter` directly
   must add all four.
-- **CHANGED**: `MarkdownSelectionSurface` gained `hitForGlobal`,
-  `hitsSelectableGlyphs`, `isLinkAtGlobal`, `caretRectFor`,
+- **CHANGED**: `MarkdownSelectionSurface` gained `textDirection`,
+  `hitForGlobal`, `hitsSelectableGlyphs`, `isLinkAtGlobal`, `caretRectFor`,
   `localBoxesForRange`, `hasSelectionHandleLeaders` and
   `clearSelectionHandleLayersIfLinked`. Custom surfaces must implement them.
+- **CHANGED**: `MarkdownSelectionController.startAtGlobal` /
+  `selectWordAtGlobal` / `selectBlockAtGlobal` ignore points outside every
+  mounted surface (new `requireContainment`, default `true`) instead of
+  clamping onto the nearest markdown. Pass `requireContainment: false` for the
+  old clamping.
+- **CHANGED**: `ParagraphGestureHandler.hitTestInlineSpanWithPointerEvent`
+  returns null for a point outside the painter's box. A tap in the empty space
+  before right-to-left text used to snap onto the line's last glyph and open a
+  link ending it.
 - **CHANGED**: `MarkdownThemeData.copyWith` returns `MarkdownThemeData` instead
   of `ThemeExtension<MarkdownThemeData>` (callers gain, overriders must narrow).
 - **CHANGED**: `MarkdownRenderObject.updateSelection` takes an optional
   `markdown:`. `@meta.internal`, but `MarkdownWidget` subclasses that call it
   must now invoke it **before** `update` (see the registry fix below).
+- **CHANGED**: With an `imageResolver` set, `paragraphFromMarkdownSpans` may
+  emit `MarkdownImageSpan` (a `PlaceholderSpan`) children, so
+  `TextPainter.plainText` holds U+FFFC where the model has alt text.
+  `SelectableTextBlock.renderedText` and `SelectableFragment.length` now come
+  from the model text. Lay out / paint custom painters with
+  `layoutMarkdownText` / `paintMarkdownText`.
+- **CHANGED**: Code spans render in `Menlo` (iOS / macOS) / `Consolas`
+  (Windows) instead of the unresolvable `'monospace'`, with a fallback chain on
+  every platform (see *Monospace font resolution*). Expect golden diffs there.
+
+### Inline images & link icons
+
+- **ADDED**: `![alt](src)` images can render as pictures, and links can carry
+  an icon in front of their label (a site favicon). Opt-in through
+  `MarkdownThemeData.imageResolver` — without one, images keep rendering as
+  their alt text, so nothing is fetched behind the host's back (tracking
+  pixels).
+- **ADDED**: `MarkdownImage`, the picture interface: it reports the size of
+  its slot in the line (`layout`), paints itself into it (`paint`) and calls
+  `notifyListeners` when it loads, fails or animates. Implement it to control
+  sources, caching and appearance; `MarkdownImageResolver` maps a
+  `MarkdownImageRequest` (`kind`, `url`, `text` — the alt text or link
+  label — and `title`) to one; `MarkdownImageConstraints` carries the line's width and text style.
+- **ADDED**: `MarkdownProviderImage` (any Flutter `ImageProvider` — network,
+  file, asset, memory or a disk-cached third-party provider; `.icon` for a
+  text-sized link icon) and the ready-made `MarkdownProviderImageResolver`
+  (http(s) and `data:` images, `/favicon.ico` link icons, `baseUri` for
+  relative sources, swappable `imageProvider` / `faviconUri`).
+- **ADDED**: `MarkdownImageSpan`, `layoutMarkdownText` and
+  `paintMarkdownText` for custom block painters whose text comes from
+  `paragraphFromMarkdownSpans`; a painter that keeps calling plain
+  `TextPainter.layout` still lays out (a text-sized empty slot per picture).
+- Selection is unchanged: a picture counts as its alt text (a link icon as
+  nothing), so offsets, highlight and copied text match
+  `markdownBlockRenderedText` whether or not pictures are shown; a range
+  touching the alt text highlights the whole picture, and a double tap on it
+  selects it.
+- Pictures are owned by the rendered document: a request seen before reuses
+  the loaded image (streaming rebuilds and repeated images load once), and
+  images that leave the document are disposed. A size change re-lays out the
+  widget; any other change only repaints it.
+- A resolver (or `imageProvider` callback) that throws is reported through
+  `FlutterError.reportError` and the image falls back to its alt text; the
+  rest of the document still renders. A `null` result is remembered for the
+  request while it stays in the document. In-page anchors (`#section`) never
+  get a link icon, and `data:` image MIME types match case-insensitively.
+- Keep the resolver stable (a `const` resolver's `.call`, a field or a
+  top-level function): a different resolver drops and reloads every picture.
+- Known limitations: a failed load is not retried while its URL stays in the
+  document; an animated image re-records the document's cached picture on
+  every frame; a link icon that fails to load collapses, shifting its label
+  once. Keyboard character steps walk an image's alt text one code unit at a
+  time, so an endpoint can sit inside it — the whole picture highlights while
+  the copy holds part of the alt text.
+
+### Syntax highlighting
+- **FIXED**: Grammar rules marked `greedy` (Prism's semantics) now match
+  across tokens claimed by earlier rules. A comment marker inside a string
+  (`"a # b"` in Python / Bash, `'http://…'` in JS) no longer turns the rest
+  of the line into a comment, and Ruby / Elixir `#{…}` interpolation is
+  highlighted inside strings. Highlighting stays lossless.
+- **FIXED**: Tokenizing is linear in the number of tokens: each rule builds
+  its result in one pass instead of splicing per match. A 10,000-line C block
+  went from ~7 s to ~0.3 s; typical blocks are a little faster too. A greedy
+  rule whose matches keep starting inside other tokens falls back to plain
+  matching after a bounded number of tries.
+- **FIXED**: `HighlightThemes.githubDark` / `githubLight` color diffs:
+  inserted and deleted lines get GitHub's green / red, hunk headers (`coord`)
+  the function color. Previously a diff rendered uncolored.
+
+### Parser
+- **FIXED**: List items at uneven indents are kept: in `- a` / `    - b` /
+  `  - c`, `b` was dropped (the shallower `c` replaced `a`'s children instead
+  of joining them).
 
 ### Quote / alert nested fenced code
 - **FIXED**: Fenced code (` ```lang ` / `~~~`) inside a blockquote or GitHub
   alert is re-parsed as nested `MD$Code` in `MD$Quote.blocks` /
   `MD$Alert.blocks`, instead of being consumed as inline monospace by backtick
-  pairing (` `` ` + monospace + ` `` `).
+  pairing (` `` ` + monospace + ` `` `). The fenced code keeps its
+  indentation, fences inside nested quotes (`> > ```…`) are nested code too,
+  and a fence may follow the `>` after up to three spaces or a tab (lines
+  inside the code keep their indentation verbatim). Blank `>` lines around an
+  alert body add no extra gap.
 - **ADDED**: Optional `blocks` on `MD$Quote` / `MD$Alert` (empty for leaf
-  inline bodies). Render and `markdownBlockRenderedText` walk nested children
-  when present.
-- **FIXED**: Prose nested inside a quote (paragraphs/lists/headings beside a
-  fence) uses `quoteStyle` again; code/table chrome keeps the document theme.
-- **FIXED**: Nested children route through `MarkdownThemeData.builder` like
-  top-level blocks. A host that replaces the code painter (a fence with a copy
-  button, say) was silently getting the default one inside `> …`.
+  inline bodies). Render, `markdownBlockRenderedText` and `Markdown.text` walk
+  nested children when present (`Markdown.text` yields the children's span
+  text, not raw markup). Nested children route through
+  `MarkdownThemeData.builder` like top-level blocks, so a host that replaces
+  the code painter (a fence with a copy button, say) gets it inside `> …` too.
+  Prose nested inside a quote (paragraphs / lists / headings beside a fence)
+  uses `quoteStyle`; code / table chrome keeps the document theme. Links open
+  on tap in every nested child kind, in either text direction.
+- **FIXED**: A quote / alert whose nested table overflows still paints, and a
+  host-supplied non-selectable nested painter keeps selection offsets in sync
+  with `markdownBlockRenderedText`.
 
 ### Glyph-tight hit testing
 - **CHANGED**: Hover I-beam and link hit-testing use rendered **line/glyph
   boxes**, not the full max-width layout of a paragraph. Empty horizontal
-  gutter beside a short line is no longer I-beam / click-to-open.
+  gutter beside a short line (quote and alert bodies included) is no longer
+  I-beam / click-to-open. Glyph boxes are cached per `TextPainter` layout, so
+  hovering stays cheap over long fenced code blocks.
 - **CHANGED**: Gesture *starts* (`hitsSelectableContent`) stay **surface-
   bounds**. A press inside the document or bubble arms text selection.
   Drag-extend may still clamp outside glyphs.
@@ -56,18 +169,14 @@ extension points or reach into a default block painter's fields. Ordinary
 - **ADDED**: `SelectableBlockPainter.hitsRenderedTextAt`,
   `MarkdownSelectionSurface.hitsSelectableGlyphs`, and
   `MarkdownSelectionController.hitsSelectableGlyphs`.
-- **CHANGED**: Glyph boxes are cached per `TextPainter` layout. They are read on
-  every hover event (I-beam / link cursor); recomputing
-  `getBoxesForSelection` over a whole block allocated one box per run per line
-  on every mouse move (thousands of rects over a long fenced code block).
 
 ### Selection host gates
 - **ADDED**: `MarkdownSelectionScope.canStartSelectionAt` — optional host gate
   so enclosing UIs can refuse selection starts on chrome (links, code headers)
-  without the scope claiming the pointer. A refusal also un-arms the drag: the
-  recognizers still join the arena while a range is live (so a chrome tap can
-  dismiss it), and without this a long press / drag on refused chrome kept
-  extending the active selection from that point.
+  without the scope claiming the pointer. A refusal also un-arms the drag (the
+  recognizers still join the arena while a range is live, so a chrome tap can
+  dismiss it), so a long press / drag on refused chrome neither extends the
+  active selection nor shows the toolbar.
 - **ADDED**: `MarkdownSelectionScope.enableTouchGestures` — when false, touch /
   stylus / trackpad selection recognizers stay off; mouse multi-click, handles,
   toolbar, and keyboard remain. Focus loss also does not clear the range (host
@@ -79,24 +188,10 @@ extension points or reach into a default block painter's fields. Ordinary
   works. Focus loss also does not clear the range in that mode.
 - **ADDED**: `MarkdownSelectionScope.ownsSelectionChrome` — optional host gate
   so only the scope that owns the selection’s document paints handles/toolbar
-  when several scopes share one controller (chat per-body mounts).
-- **FIXED**: Disabled / non-owning sibling scopes no longer clear handle
-  leaders on every shared-controller surface. Clearing is scoped to leaders
-  that reference that scope’s own `LayerLink`s, so chat dual mounts keep
-  handles after non-collapsed range commits (including repeated handle-drag
-  settles).
-- **FIXED**: A scope that loses `ownsSelectionChrome` for the live selection
-  document now removes its own context-menu overlay (and does the same when
-  handles are disabled for that reason). Previously only handles were cleared,
-  so a prior bubble’s adaptive toolbar could linger after selection moved to a
-  sibling scope. `toolbarWanted` is left alone so the owning scope can still
-  restore on settle. A desktop right-click menu is unaffected: desktop has no
-  handles, but its menu survives overlay syncs such as a sibling update.
-- **FIXED**: Scroll / geometry toolbar restore is skipped while a selection
-  drag is active (`_dragGlobal`). Autoscroll `ScrollNotification`s must not
-  re-present the adaptive toolbar mid-gesture even when `toolbarWanted` was
-  re-armed (for example a host restoring a clamped range via the public
-  `selection` setter).
+  when several scopes share one controller (chat per-body mounts). A
+  non-owning or disabled sibling clears only handle leaders that reference its
+  own `LayerLink`s, and removes its own adaptive toolbar when ownership moves
+  away; `toolbarWanted` is left for the owning scope to restore on settle.
 - **ADDED**: `MarkdownSelectionSurface.hasSelectionHandleLeaders`,
   `clearSelectionHandleLayersIfLinked`, and
   `MarkdownSelectionScopeState.selectionHandleLeadersAttached` for observing
@@ -104,18 +199,20 @@ extension points or reach into a default block painter's fields. Ordinary
 - **CHANGED**: Flipping `enabled` from false → true with an existing
   non-collapsed range restores handles; when `toolbarWanted` is set, restores
   the toolbar. While disabled, the scope stays inert for chrome (no toolbar /
-  handles) but keeps `toolbarWanted` for that restore path.
+  handles) but keeps `toolbarWanted` for that restore path. Disabling the
+  scope mid-drag aborts the drag.
 
 ### Dynamic cursor resolution & span bounding boxes
 - **ADDED**: `MarkdownThemeData.cursorResolver` and
   `MarkdownWidget.cursorResolver` (`MarkdownCursorResolver`) — unopinionated
   hook to dynamically resolve hover mouse cursors per local offset, block
   index, and block model, falling back to default link/text/defer cursors when
-  returning null.
-- **ADDED**: `MarkdownSelectionSurface.localBoxesForRange` and
-  `MarkdownPainter.localBoxesForRange` — fast query returning content-local
-  bounding boxes for an arbitrary character range within a block, directly from
-  cached block painters without re-layout.
+  returning null. The hover cursor survives rebuilds that pass a new resolver
+  closure and re-resolves when the theme or resolver changes.
+- **ADDED**: `MarkdownSelectionSurface.localBoxesForRange` (backed by the
+  internal `MarkdownPainter.localBoxesForRange`) — fast query returning
+  content-local bounding boxes for an arbitrary character range within a block,
+  directly from cached block painters without re-layout.
 
 ### Registry / multi-body selection
 - **FIXED**: `removeDocument` defers while a surface for that id is mounted
@@ -148,6 +245,12 @@ extension points or reach into a default block painter's fields. Ordinary
   `removeDocument` flushing from `RenderObject.detach` threw
   "setState() called during build" in any host that rebuilds from the callback.
   Delivery is now coalesced to the end of the frame in those phases.
+- **FIXED**: `selectAll` skips documents with no blocks, so an empty streaming
+  message no longer turns it into a no-op.
+- **FIXED**: Reconciling a range onto a document with a duplicated block keeps
+  the copy nearest the old position.
+- **FIXED**: A drag update that lands on the current position no longer
+  notifies listeners.
 
 ### Selection chrome (SelectionArea parity)
 - **ADDED**: Read-only selection chrome on the controller /
@@ -161,13 +264,30 @@ extension points or reach into a default block painter's fields. Ordinary
     across gaps.
   - Soft-wrap affinity on handles; directed base/extent edges with reverse
     handle types; coincident-caret separation; handle proxies when an endpoint
-    surface unmounts (virtualization).
+    surface unmounts (virtualization), on the correct end for reversed
+    selections too.
   - Native `SelectionOverlay` handles + magnifier on touch; LeaderLayer follow
     across scroll / multi-widget hosts.
   - Keyboard Copy / Select-all / Shift-extend / Esc; adaptive Copy / Select-all
     toolbar with live re-anchoring.
   - Word / block granular multi-tap and long-press; link hand cursor / I-beam on
     selectable content.
+- **ADDED**: `MarkdownSelectionController.isSelectionReversed` (base after
+  extent in reading order), `selectionEndpointGlobalRect({base})` (global
+  caret rect of a mounted endpoint, null when unmounted, no proxying),
+  `selectionEndpointOverlaps(rect, {base})` and
+  `anySelectionEndpointOverlaps(rect)` (whether a mounted endpoint caret
+  intersects a global rect), and `toolbarWanted` (the toolbar-restore intent;
+  reset when the registry drops or collapses the range).
+- **CHANGED**: Toolbar hides while expanding (body or handle drag) and may
+  re-show on drag end; anchors recompute on selection change, host/ancestor
+  scroll, and mounted-surface layout change. Scroll-driven restores are
+  skipped while a drag is active.
+- **CHANGED**: Toolbar placement — both endpoints in clip use stock
+  above-preferring anchors; **bottom-only** endpoint prefers below that caret;
+  neither endpoint in clip (tall mid-viewport) top-pins so the below-fallback
+  cannot sink to the host bottom; empty intersection hides the overlay while
+  `toolbarWanted` restores on scroll-back / remount.
 - **CHANGED**: Desktop selection toolbar parity with stock Flutter:
   - On desktop (`macOS`, `Linux`, `Windows`), mouse drags, double/triple clicks,
     keyboard shortcuts (`Cmd/Ctrl+A`), and programmatic selection updates
@@ -176,12 +296,30 @@ extension points or reach into a default block painter's fields. Ordinary
     without mutating the active selection (no select-word / caret collapse).
   - Desktop context menu preserves its right-click anchor when triggering
     actions such as "Select all", rather than jumping to selection endpoints.
-  - Desktop context menu dismisses immediately upon scroll.
+  - Desktop context menu dismisses immediately upon scroll, but survives
+    streamed updates, sibling updates and resizes, with or without a
+    selection.
   - On mobile (`Android`, `iOS`), touch gestures and programmatic selection
     (`selectAll`, `selection = ...`) continue to present the adaptive toolbar
     and handles with action items.
+- **FIXED**: Selection highlight stays outside the glyph `Picture` cache —
+  under glyphs by default (sharp text), with a second pass **above** opaque
+  chrome (`selectionHighlightAboveCachedContent`) for code fences, table zebra
+  rows, and inline monospace / highlight backgrounds.
+- **FIXED**: Focus loss does not clear selection while a pointer drag is active
+  (list rebuilds during autoscroll); geometry walks defer off `performLayout`.
+- **FIXED**: `Esc` with no selection is no longer swallowed by the scope, so it
+  reaches ancestors (closing a dialog, say).
 
-### Autoscroll is scroll-protocol agnostic
+### Edge autoscroll while selecting
+- **ADDED**: Edge-zone autoscroll while dragging (body / handle / long-press)
+  near the padded viewport — host-union hard-stop, direction arming gate,
+  past-viewport max velocity while the union still allows that direction
+  (`MarkdownSelectionScope.autoscroll`, `MarkdownSelectionAutoscrollConfig`
+  with `copyWith` / `==`, default `edgeZone: 48`). Edge bands are capped at
+  half the viewport; speed is time-based, not tied to the pointer event rate;
+  a vertical edge drag only drives a vertical `Scrollable`; pointer cancel and
+  long-press cancel stop it. The scroll surface is resolved once per drag.
 - **ADDED**: `MarkdownAutoscrollTarget` — the scroll surface autoscroll drives,
   behind three members (`viewport`, `canScroll`, `applyScrollDelta`). Deltas are
   **screen-space content movement** (positive moves content up), never scroll
@@ -195,42 +333,21 @@ extension points or reach into a default block painter's fields. Ordinary
   that positions children itself, a transform canvas — can be driven without a
   `Scrollable` anywhere in the tree. Plus `MarkdownCallbackAutoscrollTarget` and
   `MarkdownAutoscrollViewport` (global bounds + band inset) for closure hosts.
-- **CHANGED**: `applyMarkdownSelectionAutoscroll` takes an optional `target:`;
-  `context:` is now optional and only used to resolve the built-in sliver
-  target. Band, host-union gate and arming logic no longer reference
-  `ScrollPosition` at all.
-- **FIXED**: The scroll surface is resolved **once per drag** and cached. It
-  used to walk the whole element subtree twice on every autoscroll frame (to
-  find the surface's element, then the nearest `Scrollable`).
 - **ADDED**: `MarkdownSelectionAutoscrollConfig.useHostUnionGate` (default
-  `true`, the existing behaviour). Turn it off when the markdown bodies **are**
-  the scrolling content and the host builds only what is visible: such a host's
-  mounted union is barely larger than the viewport, so the gate would veto a
-  drag that should keep paging through history. The target's `canScroll` and
-  the delta it reports applying are then the only stops.
-- **ADDED**: `MarkdownSelectionAutoscrollConfig.copyWith`, `==` / `hashCode`.
+  `true`). Turn it off when the markdown bodies **are** the scrolling content
+  and the host builds only what is visible: such a host's mounted union is
+  barely larger than the viewport, so the gate would veto a drag that should
+  keep paging through history. The target's `canScroll` and the delta it
+  reports applying are then the only stops.
 
-### Selection engine rework
-- **ADDED**: Edge-zone autoscroll while dragging (body / handle / long-press)
-  near the padded viewport — host-union hard-stop, direction arming gate,
-  past-viewport max velocity while the union still allows that direction
-  (`MarkdownSelectionScope.autoscroll`, default `edgeZone: 48`).
-- **CHANGED**: Toolbar hides while expanding (body or handle drag) and may
-  re-show on drag end; anchors recompute on selection change, host/ancestor
-  scroll, and mounted-surface layout change.
-- **CHANGED**: Toolbar placement — both endpoints in clip use stock
-  above-preferring anchors; **bottom-only** endpoint prefers below that caret;
-  neither endpoint in clip (tall mid-viewport) top-pins so the below-fallback
-  cannot sink to the host bottom; empty intersection hides the overlay while
-  `toolbarWanted` restores on scroll-back / remount.
-- **FIXED**: Selection highlight stays outside the glyph `Picture` cache —
-  under glyphs by default (sharp text), with a second pass **above** opaque
-  chrome (`selectionHighlightAboveCachedContent`) for code fences, table zebra
-  rows, and inline monospace / highlight backgrounds
-  (`markdownSpansPaintOpaqueBackground`).
-- **FIXED**: Focus loss does not clear selection while a pointer drag is active
-  (list rebuilds during autoscroll); geometry walks defer off `performLayout`
-  (`sizeAccessAllowed`).
+### Layout
+- **FIXED**: `MarkdownWidget` reports its intrinsic height and max intrinsic
+  width, so `IntrinsicHeight` (and similar) no longer collapses it to 0.
+- **FIXED**: A fenced code block too narrow for its padding is inert for
+  selection, so `selectAll` at tiny widths no longer crashes, and no longer
+  throws `TextPainter.paint called when text geometry was not yet calculated`
+  while painting (at widget widths of a few dozen pixels, less inside a quote
+  or alert).
 
 ### Right-to-left layout
 - **FIXED**: With `MarkdownThemeData.textDirection` set to
@@ -240,8 +357,9 @@ extension points or reach into a default block painter's fields. Ordinary
   Blocks now mirror: text aligns to the right edge, bullets and bars sit on
   the right, and the first table column is on the right (unaligned data
   cells start on the right; explicit `:--` / `--:` alignment stays physical).
-  Link taps and text selection follow the mirrored positions. Left-to-right
-  layout is unchanged.
+  Link taps, hit testing and text selection follow the mirrored positions,
+  under tight and min-width constraints too. Left-to-right layout is
+  unchanged.
 - **FIXED**: Selection handles on right-to-left text sit at the logical start
   (right edge) and end (left edge) of the selection. Each handle follows the
   `textDirection` of the document it sits on, not the ambient
@@ -260,16 +378,6 @@ extension points or reach into a default block painter's fields. Ordinary
 - **ADDED**: `ParagraphGestureHandler.hitTestInlineSpanWithPointerEvent` takes
   an optional `origin`, for painters whose text is not painted at the block
   origin.
-- **CHANGED**: `hitTestInlineSpanWithPointerEvent` returns null for a point
-  outside the painter's box. A tap in the empty space before right-to-left
-  text used to snap onto the line's last glyph and open a link ending it.
-- **FIXED**: A fenced code block narrower than its padding (at widget widths
-  of a few dozen pixels, less inside a quote or alert) threw
-  `TextPainter.paint called when text geometry was not yet calculated`.
-- **FIXED**: Links in blocks nested in a quote or alert body (bodies holding a
-  fenced block) open on tap in every child kind, lists and tables included,
-  and in right-to-left documents. Only paragraphs and headings did, and in
-  RTL not even those.
 - **FIXED**: A dry layout at other constraints, made after the real layout,
   left hit testing, highlights and link taps at the measured positions while
   the glyphs stayed put. The real layout is now restored after measuring.

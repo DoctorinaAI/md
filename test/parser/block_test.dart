@@ -101,6 +101,111 @@ void main() => group('Block parsing', () {
             'code',
           );
         });
+
+        test('quoted fence preserves code indentation', () {
+          final q = _blocks(
+            '> ```py\n'
+            '> def f():\n'
+            '>     return 1\n'
+            '> ```',
+          ).single as MD$Quote;
+          expect((q.blocks.single as MD$Code).text, 'def f():\n    return 1');
+        });
+
+        test('alert fence preserves code indentation', () {
+          final a = _blocks(
+            '> [!NOTE]\n'
+            '> ```py\n'
+            '> if x:\n'
+            '>     y()\n'
+            '> ```',
+          ).single as MD$Alert;
+          expect((a.blocks.single as MD$Code).text, 'if x:\n    y()');
+        });
+
+        test('quote marker without a space still nests a fence', () {
+          final q = _blocks('>```\n>  x\n>```').single as MD$Quote;
+          expect((q.blocks.single as MD$Code).text, ' x');
+        });
+
+        test('fence inside a nested quote is nested code', () {
+          final q = _blocks('> > ```\n> > a `b` c\n> > ```').single as MD$Quote;
+          final inner = q.blocks.single as MD$Quote;
+          expect((inner.blocks.single as MD$Code).text, 'a `b` c');
+          expect(markdownBlockRenderedText(q), 'a `b` c');
+        });
+
+        test('rendered text of a nested quote skips spacers', () {
+          final md = Markdown.fromString(
+            '> *a*\n>\n> ```\n> x\n> ```\n> b',
+          );
+          expect(markdownBlockRenderedText(md.blocks.single), 'a\nx\nb');
+        });
+
+        test('Markdown.text renders nested prose spans', () {
+          expect(
+            Markdown.fromString('> **bold** text\n> ```\n> x\n> ```').text,
+            'bold text\nx',
+          );
+          expect(
+            Markdown.fromString('> [!TIP]\n> _a_\n> ```\n> x\n> ```').text,
+            'a\nx',
+          );
+        });
+
+        test('CRLF quoted fence', () {
+          final q = _blocks('> ```\r\n> x\r\n> ```\r\n').first as MD$Quote;
+          expect((q.blocks.single as MD$Code).text, 'x');
+        });
+
+        test('an indented or tab-separated quoted fence still nests', () {
+          final spaced =
+              _blocks('> intro\n>  ```\n>  code\n>  ```').single as MD$Quote;
+          expect(spaced.blocks.last, isA<MD$Code>());
+          final tab = _blocks('>\t```\n>\tcode\n>\t```').single as MD$Quote;
+          // Code content keeps its tab verbatim.
+          expect((tab.blocks.single as MD$Code).text, '\tcode');
+          // An indented closing fence closes the block.
+          final close = _blocks('> ```\n> a\n>  ```\n> b').single as MD$Quote;
+          expect((close.blocks.first as MD$Code).text, 'a');
+          expect(close.blocks.last, isA<MD$Paragraph>());
+          // Four spaces is not a fence.
+          final code = _blocks('> a\n>     ```\n>     b').single as MD$Quote;
+          expect(code.blocks, isEmpty);
+        });
+
+        test('fence-like lines inside quoted code stay verbatim', () {
+          final tilde =
+              _blocks('> ```\n>   ~~~\n>   x\n> ```').single as MD$Quote;
+          expect((tilde.blocks.single as MD$Code).text, '  ~~~\n  x');
+          final ticks = _blocks('> ~~~\n>   ```js\n> ~~~').single as MD$Quote;
+          expect((ticks.blocks.single as MD$Code).text, '  ```js');
+          final tabs = _blocks('> ```\n>\t\tx\n> ```').single as MD$Quote;
+          expect((tabs.blocks.single as MD$Code).text, '\t\tx');
+        });
+
+        test('indented inline code in a quote is not a fence', () {
+          final q = _blocks('> say\n>  ```a``` b\n> more').single as MD$Quote;
+          expect(q.blocks, isEmpty);
+          expect(q.spans.map((s) => s.text).join(), contains('a'));
+          expect(q.spans.map((s) => s.text).join(), contains('more'));
+        });
+
+        test('uneven list indents keep every item', () {
+          final list = _blocks('- a\n    - b\n  - c\n- d').single as MD$List;
+          expect(list.items.map((i) => i.text), <String>['a', 'd']);
+          expect(
+            list.items.first.children.map((i) => i.text),
+            <String>['b', 'c'],
+          );
+          expect(markdownBlockRenderedText(list), 'a\nb\nc\nd');
+        });
+
+        test('blank lines around an alert body add no gaps', () {
+          final a =
+              _blocks('> [!TIP]\n>\n> ```\n> b\n> ```\n>').single as MD$Alert;
+          expect(a.blocks.single, isA<MD$Code>());
+        });
       });
 
       group('Fenced code', () {

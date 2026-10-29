@@ -64,9 +64,9 @@ final class MarkdownSelectionAutoscrollConfig {
   /// Extra inset before the bottom band starts.
   final double bottomPad;
 
-  /// When true, [MediaQuery.padding] / [MediaQuery.viewPadding] are added to
-  /// [topPad]/[bottomPad] so the edge zone starts before handles disappear
-  /// under app chrome.
+  /// When true, [MediaQueryData.padding] / [MediaQueryData.viewPadding] are
+  /// added to [topPad]/[bottomPad] so the edge zone starts before handles
+  /// disappear under app chrome.
   ///
   /// Only consulted by the built-in [Scrollable] resolver — a custom
   /// [targetResolver] reports its own [MarkdownAutoscrollViewport.padding].
@@ -448,7 +448,9 @@ double markdownAutoscrollVelocity({
   required MarkdownSelectionAutoscrollConfig config,
 }) {
   if (!config.enabled || clipHeight <= 0) return 0;
-  final edge = config.edgeZone;
+  // Bands may not overlap: past half the clip the top band would win and
+  // scroll toward start while the pointer sits nearer the bottom edge.
+  final edge = math.min(config.edgeZone, clipHeight / 2);
   final topThreshold = clipTopLocalY + edge;
   final bottomThreshold = clipTopLocalY + clipHeight - edge;
   // Allow up to [edge] past the clip so pad insets / finger jitter just
@@ -701,8 +703,11 @@ Duration _autoscrollNow(Duration? last) {
 /// Like [Scrollable.maybeOf], but also accepts a context whose widget *is* the
 /// [Scrollable] (maybeOf only walks ancestors).
 ScrollableState? _scrollableFor(BuildContext context) => switch (context) {
-      StatefulElement(state: final ScrollableState state) => state,
-      _ => Scrollable.maybeOf(context),
+      StatefulElement(state: final ScrollableState state)
+          when state.axisDirection == AxisDirection.down ||
+              state.axisDirection == AxisDirection.up =>
+        state,
+      _ => Scrollable.maybeOf(context, axis: Axis.vertical),
     };
 
 /// Convenience: depth fraction used by tests / diagnostics.

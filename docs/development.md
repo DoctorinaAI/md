@@ -1,7 +1,7 @@
 # Development
 
 Commands, CI, conventions, benchmarks, and repo layout. Package `flutter_md`
-(`0.2.0`); Dart `>=3.6.0 <4.0.0`, Flutter `>=3.29.0`.
+(`0.3.0`); Dart `>=3.6.0 <4.0.0`, Flutter `>=3.29.0`.
 
 ## Commands
 
@@ -59,7 +59,7 @@ job, steps in order (any non-zero fails):
 1. Checkout.
 2. **Setup** (`./.github/actions/setup`): sparse-checkout, `flutter pub get`, and a
    **CHANGELOG check** — the `version:` in `pubspec.yaml` must appear as a
-   `# <version>` heading in `CHANGELOG.md`, else exit 1.
+   `## <version>` heading in `CHANGELOG.md`, else exit 1.
 3. **Check code format** — the format gate command above.
 4. **Check analyzer** — `dart analyze --fatal-infos --fatal-warnings lib/ test/`.
 5. **Run unit tests** — `flutter test --coverage --concurrency=40 test/unit_test.dart`.
@@ -102,7 +102,7 @@ Base `package:flutter_lints/flutter.yaml`, plus `strict-casts`, `strict-raw-type
   inside `group('Unit', …)`. A new `*_test.dart` must be wired there or CI skips it.
 - **Doc comments required** on all public members (see the lint above).
 - **CHANGELOG discipline:** bump `pubspec.yaml` `version:` and add the matching
-  `# <version>` heading in `CHANGELOG.md` together.
+  `## <version>` heading in `CHANGELOG.md` together.
 
 ## Dependencies
 

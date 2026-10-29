@@ -12,7 +12,8 @@ canvas via one `RenderBox` and a list of `BlockPainter`s — **no widget per blo
 | File | Contents |
 |---|---|
 | `block_painter.dart` | The framework: `BlockPainter`, `SelectableBlockPainter`, mixins `SelectableTextBlock` / `MultiPainterSelectable` / `ParagraphGestureHandler`, class `SelectableFragment`, private `_distanceToRect`. |
-| `span_builder.dart` | `paragraphFromMarkdownSpans({spans, theme, textStyle})` → `TextSpan`; private `_buildTapRecognizer` (link taps from `span.extra['url']`). |
+| `span_builder.dart` | `paragraphFromMarkdownSpans({spans, theme, textStyle})` → `TextSpan`; private `_buildTapRecognizer` (link taps from `span.extra['url']`); emits a `MarkdownImageSpan` per image / link icon the theme's `imageResolver` resolves. |
+| `inline_image.dart` | `MarkdownImageSpan` (a `PlaceholderSpan`), `layoutMarkdownText` / `paintMarkdownText`, the model ↔ painter offset map, and the `@meta.internal` `MarkdownImagePool`. |
 | `markdown_painter.dart` | `MarkdownPainter` (`@meta.internal`) — the orchestrator. |
 | `markdown_render_object.dart` | `MarkdownRenderObject` (`@meta.internal`) — the `RenderBox`, also a `MarkdownSelectionSurface`; plus `_paintNothing`. |
 | `blocks/*.dart` | `BlockPainter$Paragraph, $Heading, $Quote, $Alert, $Code, $List` (+ private `_ListItemMetrics`), `$Table`, `$Divider`, `$Spacer`. |
@@ -78,7 +79,10 @@ use `size.width` for full-width backgrounds/rules and to bail when too narrow).
 ```dart
 String get renderedText;                    // MUST equal markdownBlockRenderedText(block)
 int offsetForLocalPosition(Offset local);   // block-local → rendered-text index
+(int, TextAffinity) positionAndAffinityForLocal(Offset local); // + soft-wrap side
 List<Rect> boxesForRange(int start, int end);// block-local highlight rects for [start, end)
+Rect caretRectFor(int offset, TextAffinity affinity); // block-local caret (handles)
+bool hitsRenderedTextAt(Offset local);      // glyph-tight hover / link hit test
 bool get selectionHighlightAboveCachedContent; // true ⇒ also paint highlight above Picture
 ```
 
@@ -87,9 +91,10 @@ Two mixins implement it for you:
 - **`SelectableTextBlock`** — a block backed by a **single `TextPainter`**. Supply
   `TextPainter get selectionPainter` and optionally override `Offset get
   selectionOrigin` (default `Offset.zero`) when glyphs aren't at the block origin.
-  It derives `renderedText`, `offsetForLocalPosition`, `boxesForRange` for you.
+  It derives `renderedText` and the hit-test / caret / highlight members for
+  you.
 - **`MultiPainterSelectable`** — a block whose text spans **several
-  `TextPainter`s** at different origins (lists, tables). Supply
+  `TextPainter`s** at different origins (lists, tables, quotes, alerts). Supply
   `List<SelectableFragment> get fragments` (in rendered-text order, each
   `textStart` matching the linearization; the gaps are the `\n`/`\t` separators)
   and `renderedText`. `SelectableFragment` is `(TextPainter painter, Offset
@@ -121,8 +126,9 @@ class MyBlock with ParagraphGestureHandler, SelectableTextBlock implements Block
   Size _size = Size.zero;
   @override Size get size => _size;
 
-  @override Size layout(double width) { painter.layout(maxWidth: width); return _size = painter.size; }
-  @override void paint(Canvas c, Size s, double dy) { /* decorate */ painter.paint(c, Offset(0, dy)); }
+  // layoutMarkdownText / paintMarkdownText also size and draw inline pictures.
+  @override Size layout(double width) { layoutMarkdownText(painter, maxWidth: width); return _size = painter.size; }
+  @override void paint(Canvas c, Size s, double dy) { /* decorate */ paintMarkdownText(painter, c, Offset(0, dy)); }
   @override void handleTapDown(PointerDownEvent e) {/* see BlockPainter$Paragraph */}
   @override void handleTapUp(PointerUpEvent e) {/* ... */}
   @override void dispose() => painter.dispose();
@@ -160,10 +166,13 @@ and expose `fragments` + `renderedText`.
 - **`$Heading`** — like `$Paragraph`, styled by `theme.headingStyleFor(level)`.
 - **`$Quote`** — body styled `theme.quoteStyle ?? textStyle`; one vertical accent
   bar per `indent` level (`lineIndent = 10`, `dividerColor`); text shifted right
-  by `lineIndent + indent*lineIndent` (also its `selectionOrigin`).
+  by `lineIndent + indent*lineIndent`. `MultiPainterSelectable`: a leaf body is
+  one fragment; with `MD$Quote.blocks` it stacks nested `children` painters
+  (built through `theme.builder`, prose themed via `quoteStyle`).
 - **`$Alert`** — GitHub admonition: tinted rounded background (accent α 0.10),
   left accent bar (width 4), bold colored title above body (`alert.title`,
-  `alertColorFor(type)`); body selectable via `selectionOrigin`.
+  `alertColorFor(type)`); body selectable via `MultiPainterSelectable` (title is
+  not), stacking nested `children` when `MD$Alert.blocks` is non-empty.
 - **`$Code`** — monospace `TextPainter` (raw text, no span parsing); rounded
   `surfaceColor` background (radius = padding 8); taps are no-ops; **no link taps**.
 - **`$List`** — recursive nested items (`_baseIndent = 8`, `_levelIndent = 16` per
@@ -178,7 +187,7 @@ and expose `fragments` + `renderedText`.
   no-op; not selectable.
 
 `$Divider`/`$Spacer` are not selectable; `$Code` is selectable but has no link
-taps; only `$List`/`$Table` use `MultiPainterSelectable`.
+taps; `$List`/`$Table`/`$Quote`/`$Alert` use `MultiPainterSelectable`.
 
 ## Theme customization (`MarkdownThemeData`)
 
@@ -215,14 +224,64 @@ chain is appended after it), `dividerColor`,
 `alertColors` (+ built-in GitHub palette fallback via `alertColorFor`),
 `textDirection`, `textScaler`, and `onLinkTap`.
 
+## Inline images (`lib/src/image.dart`, `render/inline_image.dart`)
+
+Pictures are painted, not widgets. `MarkdownThemeData.imageResolver` maps a
+`MarkdownImageRequest` (`image` for `![alt](src)`, `linkIcon` for a link) to a
+`MarkdownImage`, which reports its slot size (`layout`), paints into it
+(`paint`) and `notifyListeners()` on change. `paragraphFromMarkdownSpans`
+turns each resolved one into a `MarkdownImageSpan`; `layoutMarkdownText` sets
+the `TextPainter` placeholder dimensions from `MarkdownImage.layout`, and
+`paintMarkdownText` paints the text, then each picture into
+`TextPainter.inlinePlaceholderBoxes`. Every default text painter uses both;
+pictures land in the cached content `Picture`.
+
+**Offsets.** In the painter a picture is one U+FFFC; in the model it is its
+alt text (an icon: nothing). `SelectableTextBlock`, `MultiPainterSelectable`
+and `SelectableFragment.length` translate through `markdownModelOffset` /
+`markdownPainterOffset`, so `renderedText` still equals
+`markdownBlockRenderedText`. A range end inside the alt text snaps outward
+(the whole picture highlights); word boundaries and tap hit tests check the
+slot boxes first (`markdownWordBoundary`, `markdownSpanAtLocal`) because the
+nearest-caret lookup falls off a placeholder onto its neighbour.
+
+**Ownership.** `MarkdownPainter` owns a `MarkdownImagePool`. Painter builds and
+layouts run inside `pool.run`, where `resolveMarkdownImage` returns the image
+already resolved for an equal request — repeated pictures, list / table
+painters (rebuilt every layout) and streaming updates all reuse one loaded
+image. `update` starts a generation; after each layout `sweep` disposes images
+no block asked for. A different `imageResolver` clears the pool. The pool
+listens to each image: if an occurrence's `layout` size changed it reports a
+re-layout, otherwise a repaint; either way the cached picture is dropped. A
+notification while the pool is running (a synchronous load inside `layout`)
+is re-checked in a microtask, since the render object is mid-layout.
+A `null` resolution is pooled too (resolved once per resolver). A resolver
+that throws is reported via `FlutterError.reportError` and treated as `null`.
+Outside a pool (`paragraphFromMarkdownSpans` called by a host), the resolver
+is called directly and the caller owns the images.
+
+**Selection tint.** A block whose built text holds a `MarkdownImageSpan`
+reports `selectionHighlightAboveCachedContent` (checked with
+`markdownSpanHasImages`; lists learn it during layout, quotes / alerts ask
+their children), so the tint stays visible over opaque pictures. A resolver
+that returns `null` for everything leaves the flag as without one.
+
+**Known limitations.** Failed loads are not retried while the URL stays in
+the document; an animated image drops and re-records the document's glyph
+`Picture` every frame; keyboard character steps walk alt text one code unit at
+a time (an endpoint inside it highlights the whole picture but copies part of
+the alt text).
+
 ## Public vs internal
 
 Public (in `flutter_md.dart`'s `show` list): the framework
 (`BlockPainter`, `SelectableBlockPainter`, `SelectableTextBlock`,
 `MultiPainterSelectable`, `SelectableFragment`, `ParagraphGestureHandler`,
-`paragraphFromMarkdownSpans`) and the nine defaults (`BlockPainter$Paragraph …
-$Spacer`). Internal (`@meta.internal`, only via `src/render.dart`):
-`MarkdownPainter`, `MarkdownRenderObject`.
+`paragraphFromMarkdownSpans`, `MarkdownImageSpan`, `layoutMarkdownText`,
+`paintMarkdownText`), the nine defaults (`BlockPainter$Paragraph …
+$Spacer`) and everything in `image.dart`. Internal (`@meta.internal`, only via
+`src/render.dart`): `MarkdownPainter`, `MarkdownRenderObject`,
+`MarkdownImagePool` and the offset helpers of `inline_image.dart`.
 
 ## Invariants (repeated from [architecture](architecture.md), owned here)
 

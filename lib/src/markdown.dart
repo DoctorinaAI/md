@@ -56,67 +56,72 @@ final class Markdown {
     if (blocks.isEmpty) return markdown;
     final buffer = StringBuffer();
     for (var i = 0; i < blocks.length; i++) {
-      final block = blocks[i];
       if (i > 0) buffer.writeln();
-      switch (block) {
-        case MD$Paragraph(:List<MD$Span> spans):
-          for (final span in spans) {
-            buffer.write(span.text);
-          }
-        case MD$Heading(:List<MD$Span> spans):
-          for (final span in spans) {
-            buffer.write(span.text);
-          }
-        case MD$Quote(:List<MD$Span> spans, :List<MD$Block> blocks):
-          if (blocks.isEmpty) {
-            for (final span in spans) {
-              buffer.write(span.text);
-            }
-          } else {
-            for (var j = 0; j < blocks.length; j++) {
-              if (j > 0) buffer.writeln();
-              buffer.write(blocks[j].text);
-            }
-          }
-        case MD$Alert(:List<MD$Span> spans, :List<MD$Block> blocks):
-          if (blocks.isEmpty) {
-            for (final span in spans) {
-              buffer.write(span.text);
-            }
-          } else {
-            for (var j = 0; j < blocks.length; j++) {
-              if (j > 0) buffer.writeln();
-              buffer.write(blocks[j].text);
-            }
-          }
-        case MD$Code(:String text):
-          buffer.write(text);
-        case MD$List(:List<MD$ListItem> items):
-          for (var j = 0; j < items.length; j++) {
-            if (j > 0) buffer.writeln();
-            final item = items[j];
-            for (final span in item.spans) buffer.write(span.text);
-          }
-        case MD$Table(:List<MD$TableRow> rows):
-          for (var j = 0; j < rows.length; j++) {
-            if (j > 0) buffer.writeln();
-            final row = rows[j];
-            for (var k = 0; k < row.cells.length; k++) {
-              //if (k > 0) buffer.write(' | ');
-              final spans = row.cells[k];
-              for (final span in spans) {
-                buffer.write(span.text);
-              }
-            }
-          }
-        case MD$Divider():
-          buffer.write('---');
-        case MD$Spacer(:int count):
-          buffer.write('\n' * count);
-          break;
-      }
+      _writeBlockText(buffer, blocks[i]);
     }
     return buffer.toString();
+  }
+
+  /// Writes the plain text of [block] to [buffer], recursing into the nested
+  /// children of quotes and alerts.
+  static void _writeBlockText(StringBuffer buffer, MD$Block block) {
+    switch (block) {
+      case MD$Paragraph(:List<MD$Span> spans):
+        for (final span in spans) {
+          buffer.write(span.text);
+        }
+      case MD$Heading(:List<MD$Span> spans):
+        for (final span in spans) {
+          buffer.write(span.text);
+        }
+      case MD$Quote(:List<MD$Span> spans, :List<MD$Block> blocks):
+        if (blocks.isEmpty) {
+          for (final span in spans) {
+            buffer.write(span.text);
+          }
+        } else {
+          for (var j = 0; j < blocks.length; j++) {
+            if (j > 0) buffer.writeln();
+            _writeBlockText(buffer, blocks[j]);
+          }
+        }
+      case MD$Alert(:List<MD$Span> spans, :List<MD$Block> blocks):
+        if (blocks.isEmpty) {
+          for (final span in spans) {
+            buffer.write(span.text);
+          }
+        } else {
+          for (var j = 0; j < blocks.length; j++) {
+            if (j > 0) buffer.writeln();
+            _writeBlockText(buffer, blocks[j]);
+          }
+        }
+      case MD$Code(:String text):
+        buffer.write(text);
+      case MD$List(:List<MD$ListItem> items):
+        for (var j = 0; j < items.length; j++) {
+          if (j > 0) buffer.writeln();
+          final item = items[j];
+          for (final span in item.spans) buffer.write(span.text);
+        }
+      case MD$Table(:List<MD$TableRow> rows):
+        for (var j = 0; j < rows.length; j++) {
+          if (j > 0) buffer.writeln();
+          final row = rows[j];
+          for (var k = 0; k < row.cells.length; k++) {
+            //if (k > 0) buffer.write(' | ');
+            final spans = row.cells[k];
+            for (final span in spans) {
+              buffer.write(span.text);
+            }
+          }
+        }
+      case MD$Divider():
+        buffer.write('---');
+      case MD$Spacer(:int count):
+        buffer.write('\n' * count);
+        break;
+    }
   }
 
   @override

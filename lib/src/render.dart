@@ -6,6 +6,7 @@
 library;
 
 export 'render/block_painter.dart';
+export 'render/inline_image.dart';
 export 'render/markdown_painter.dart';
 export 'render/markdown_render_object.dart';
 export 'render/span_builder.dart';

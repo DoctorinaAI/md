@@ -50,6 +50,8 @@ void main() => group('StreamingMarkdownParser', () {
         'quote-fence-tilde': '> a\n> ~~~\n> x\n> ~~~\n> b',
         'quote-fence-empty': '> ```\n> ```\n\nafter',
         'quote-fence-nested-quote': '> > inner\n> ```\n> code\n> ```',
+        'quote-fence-indent': '> ```\n> a\n>     b\n> ```\n\nafter',
+        'nested-quote-fence': '> > ```\n> > x\n> > ```\n\nafter',
         'alert-fence': '> [!NOTE]\n> body\n> ```sh\n> echo hi\n> ```\n\nafter',
         'code-closed': '```dart\nvoid main() {}\n```\n\nafter code',
         'code-tilde': '~~~\nplain\n~~~\n\nafter',

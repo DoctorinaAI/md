@@ -1,6 +1,11 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_md/flutter_md.dart';
+import 'package:flutter_md/src/selection_autoscroll.dart'
+    show
+        MarkdownAutoscrollResult,
+        MarkdownAutoscrollSession,
+        applyMarkdownSelectionAutoscroll;
 import 'package:flutter_test/flutter_test.dart';
 
 /// A scroll protocol that is **not** a [Scrollable]: an anchor offset the host

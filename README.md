@@ -27,7 +27,8 @@ A high-performance, lightweight Markdown parser and renderer specifically design
   bundled (the rest tree-shake away)
 - **🎯 AI-Optimized**: Specifically designed for AI-generated content display
 - **🔧 Extensible**: Easy to extend with custom block and span renderers
-- **✅ Well Tested**: 370+ tests; parser and node model at ~100% line coverage
+- **✅ Well Tested**: 1,700+ tests; ~97% line coverage (parser and node
+  model ~100%)
 
 ## 📋 Supported Markdown Syntax
 
@@ -171,7 +172,8 @@ center, `---:` right):
 ![Image alt text](https://example.com/image.png)
 ```
 
-Images currently not displayed!
+Images render as their alt text unless the theme has an `imageResolver` — see
+[Images & link icons](#images--link-icons).
 
 ### Horizontal Rules
 
@@ -204,6 +206,11 @@ flutter pub get
 > **Upgrading from 0.0.x?** See the
 > [Migration guide: 0.0.x → 0.2.x](docs/migration/0.0.x-to-0.2.x.md). The upgrade
 > is almost entirely backward compatible — most apps need no code changes.
+>
+> **Upgrading from 0.2.x?** See the
+> [Migration guide: 0.2.x → 0.3.x](docs/migration/0.2.x-to-0.3.x.md). Only
+> custom painters, selection surfaces and quote / alert model readers need
+> changes.
 
 ## ✂️ Text Selection
 
@@ -428,9 +435,13 @@ MarkdownWidget(markdown: doc, theme: theme);
 - **Selection- and copy-safe.** The highlighter only *partitions* the source
   into colored spans; the concatenated text is byte-identical, so cross-block
   selection, offsets and "Copy as Markdown" stay aligned.
-- **Themes.** Use `HighlightThemes.githubDark` / `githubLight`, or implement
+- **Themes.** Use `HighlightThemes.githubDark` / `githubLight` (diffs
+  included: inserted / deleted lines in green / red), or implement
   `CodeHighlightTheme` (a `switch` from token type → `TextStyle`) for your own
   palette. Its `background` is applied to the code-block surface.
+- **Prism semantics.** Rules run in grammar order and `greedy` rules match
+  across earlier tokens, as in Prism — so `"a # b"` stays a string and
+  `"#{name}"` interpolation is highlighted.
 - **Demos & tooling.** `import 'package:flutter_md/highlight/all.dart';` exposes
   `allHighlightLanguages`, a ready map of every grammar keyed by tag and alias
   (`js`, `ts`, `sh`, …). It references everything, so unused languages can no
@@ -516,6 +527,77 @@ MarkdownTheme(
 
 Or you can use the `MarkdownThemeData.mergeTheme(Theme.of(context))` factory to create a theme that inherits from the application's theme.
 This approach allows you to easily support both light and dark themes, and keeps your markdown styling consistent with the rest of your application.
+
+### Images & link icons
+
+Pictures are opt-in, so rendering untrusted Markdown never fetches anything
+by itself. Install a resolver to show `![alt](src)` images and, optionally, a
+favicon in front of every link:
+
+```dart
+MarkdownThemeData(
+  textStyle: const TextStyle(fontSize: 14),
+  imageResolver: const MarkdownProviderImageResolver(
+    linkIcons: true, // favicon before each http(s) link
+    maxImageHeight: 320,
+  ).call,
+)
+```
+
+Create the resolver once (a `const`, a field or a top-level `final`), not
+inside `build`: a different resolver drops and reloads every picture.
+
+`MarkdownProviderImageResolver` loads through Flutter `ImageProvider`s, so
+swapping the source or adding a cache is one function:
+
+```dart
+MarkdownProviderImageResolver(
+  baseUri: Uri.parse('https://example.com/docs/'), // relative sources
+  imageProvider: (uri) => switch (uri.scheme) {
+    'file' => FileImage(File(uri.toFilePath())),
+    'http' || 'https' => CachedNetworkImageProvider(uri.toString()),
+    _ => null, // keep the alt text
+  },
+  faviconUri: (link) =>
+      Uri.parse('https://icons.duckduckgo.com/ip3/${link.host}.ico'),
+).call
+```
+
+To control how a picture looks or loads, implement `MarkdownImage` — it
+reports the size of its slot in the line, paints itself into it, and calls
+`notifyListeners()` when it changes — and return it from your own
+`MarkdownImageResolver`:
+
+```dart
+class Badge extends MarkdownImage {
+  @override
+  Size layout(MarkdownImageConstraints c) => Size.square(c.fontSize);
+
+  @override
+  void paint(Canvas canvas, Rect rect, MarkdownImageConstraints c) =>
+      canvas.drawCircle(rect.center, rect.shortestSide / 2,
+          Paint()..color = Colors.teal);
+}
+
+// A top-level function is a stable resolver.
+MarkdownImage? badges(MarkdownImageRequest request) =>
+    request.kind == MarkdownImageKind.linkIcon ? Badge() : null;
+
+MarkdownThemeData(
+  textStyle: const TextStyle(fontSize: 14),
+  imageResolver: badges,
+)
+```
+
+Return a new `MarkdownImage` from every call (the renderer owns and disposes
+it), or `null` to keep the alt text. A resolver that throws is reported via
+`FlutterError.reportError` and that image shows its alt text.
+
+Selection treats a picture as its alt text (a link icon as nothing), so copied
+text is the same with or without pictures. Building text yourself with
+`paragraphFromMarkdownSpans` outside a `MarkdownWidget`? Lay it out and paint
+it with `layoutMarkdownText` / `paintMarkdownText`, and dispose the
+`MarkdownImageSpan.image`s you get — no widget owns them.
 
 ### Custom Block Painters
 
