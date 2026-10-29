@@ -235,4 +235,60 @@ void main() {
           reason: 'Esc with nothing selected should fall through');
     });
   });
+  group('teardown', () {
+    // A host clears the controller from a body's dispose (chat_scroll_view
+    // does, when a message leaves the list). The scope above that body is
+    // deactivated by then and still listening: its listener must not look up
+    // an ancestor (Theme.of) or the clear throws.
+    for (final platform in <TargetPlatform>[
+      TargetPlatform.android,
+      TargetPlatform.macOS,
+    ]) {
+      testWidgets(
+          'a clear from a disposing child does not look up ancestors '
+          '(${platform.name})', (tester) async {
+        await _withPlatform(platform, () async {
+          final c = _ctrl('Hello selectable world');
+          addTearDown(c.dispose);
+          await tester.pumpWidget(MaterialApp(
+            home: MarkdownSelectionScope(
+              controller: c,
+              child: _ClearOnDispose(c),
+            ),
+          ));
+          c.selection = const MarkdownSelection(
+            base: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 0),
+            extent: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 5),
+          );
+          await tester.pump();
+
+          await tester.pumpWidget(const SizedBox());
+          expect(tester.takeException(), isNull);
+          expect(c.selection, isNull);
+        });
+      });
+    }
+  });
+}
+
+/// Clears [controller] when it is disposed, like a chat body that leaves the
+/// list.
+class _ClearOnDispose extends StatefulWidget {
+  const _ClearOnDispose(this.controller);
+
+  final MarkdownSelectionController controller;
+
+  @override
+  State<_ClearOnDispose> createState() => _ClearOnDisposeState();
+}
+
+class _ClearOnDisposeState extends State<_ClearOnDispose> {
+  @override
+  void dispose() {
+    widget.controller.clear();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox();
 }
