@@ -1,4 +1,5 @@
-import 'dart:ui' show Color, Offset, Rect, TextAffinity, TextRange;
+import 'dart:ui'
+    show Color, Offset, Rect, TextAffinity, TextDirection, TextRange;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart' show LayerLink;
@@ -498,6 +499,11 @@ abstract interface class MarkdownSelectionSurface {
 
   /// The surface's bounds in global (screen) coordinates.
   Rect get globalBounds;
+
+  /// The direction this surface lays its text out in. Orients selection
+  /// handles: a right-to-left selection starts on the right of its first line
+  /// and ends on the left of its last one.
+  TextDirection get textDirection;
 
   /// Maps a global point to a logical position, or null if outside any text.
   MarkdownPosition? positionForGlobal(Offset globalPosition);
@@ -1648,15 +1654,19 @@ class MarkdownSelectionController extends ChangeNotifier {
         if (surface == null) continue;
         final locals = surface.localSelectionRects();
         if (locals.isEmpty) continue;
+        // Reading start: the top line's left end, or its right end for RTL.
+        final rtl = surface.textDirection == TextDirection.rtl;
         var best = locals.first;
         for (final r in locals.skip(1)) {
-          if (r.top < best.top || (r.top == best.top && r.left < best.left)) {
+          if (r.top < best.top ||
+              (r.top == best.top &&
+                  (rtl ? r.right > best.right : r.left < best.left))) {
             best = r;
           }
         }
         return (
           surface,
-          Rect.fromLTWH(best.left, best.top, 0, best.height),
+          Rect.fromLTWH(rtl ? best.right : best.left, best.top, 0, best.height),
         );
       }
     } else {
@@ -1665,16 +1675,19 @@ class MarkdownSelectionController extends ChangeNotifier {
         if (surface == null) continue;
         final locals = surface.localSelectionRects();
         if (locals.isEmpty) continue;
+        // Reading end: the bottom line's right end, or its left end for RTL.
+        final rtl = surface.textDirection == TextDirection.rtl;
         var best = locals.first;
         for (final r in locals) {
           if (r.bottom > best.bottom ||
-              (r.bottom == best.bottom && r.right > best.right)) {
+              (r.bottom == best.bottom &&
+                  (rtl ? r.left < best.left : r.right > best.right))) {
             best = r;
           }
         }
         return (
           surface,
-          Rect.fromLTWH(best.right, best.top, 0, best.height),
+          Rect.fromLTWH(rtl ? best.left : best.right, best.top, 0, best.height),
         );
       }
     }

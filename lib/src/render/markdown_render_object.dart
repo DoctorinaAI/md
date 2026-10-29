@@ -138,6 +138,9 @@ class MarkdownRenderObject extends RenderBox
   Object get documentId => _documentId!;
 
   @override
+  TextDirection get textDirection => _theme.textDirection;
+
+  @override
   Rect get globalBounds => localToGlobal(Offset.zero) & size;
 
   @override
