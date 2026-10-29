@@ -36,6 +36,8 @@ benchmarks run under `dart run`.
 | `parser.dart` | `MarkdownDecoder` (a `Converter<String, Markdown>`); one hand-rolled line loop, perf-tuned | [parser](docs/parser.md) |
 | `nodes.dart` | `MD$*` immutable node tree, `MD$Style` bitmask, `.map()` dispatch | [parser](docs/parser.md) |
 | `markdown.dart` | `Markdown` model + `Markdown.fromString(...)` entry point | [parser](docs/parser.md) |
+| `image.dart` | `MarkdownImage` interface, `MarkdownImageRequest` / `Resolver`, `MarkdownProviderImage(+Resolver)` (`ImageProvider`-backed defaults) | [rendering](docs/rendering.md) |
+| `render/inline_image.dart` | `MarkdownImageSpan`, `layoutMarkdownText` / `paintMarkdownText`, model ↔ painter offset map, `MarkdownImagePool` (`@meta.internal`) | [rendering](docs/rendering.md) |
 | `theme.dart` | `MarkdownThemeData` (a `ThemeExtension`), `MarkdownTheme`; `builder`/`blockFilter`/`spanFilter` hooks | [rendering](docs/rendering.md) |
 | `render.dart` | **re-export barrel** for `render/` (keeps `src/render.dart` imports working) | [rendering](docs/rendering.md) |
 | `render/block_painter.dart` | `BlockPainter` framework: interfaces + mixins (`SelectableTextBlock`, `MultiPainterSelectable`, `ParagraphGestureHandler`, `SelectableFragment`) | [rendering](docs/rendering.md) |
@@ -101,6 +103,10 @@ Public API is the barrel `lib/flutter_md.dart` (`export … show …`). See
   values for co-hosted bodies.
 - Alert **title** is not selectable (body only). Keyboard word/line extension is
   block-approximate. `MarkdownSelectedBlock.sourceRange` is currently always null.
+- An inline picture is one U+FFFC in its `TextPainter` but its alt text in the
+  model: read `markdownModelText(painter)`, never `painter.plainText`, for
+  selection text, and lay out / paint with `layoutMarkdownText` /
+  `paintMarkdownText`.
 - `__x__` = **underline**, not bold. Soft line breaks are preserved inside
   paragraphs. Inline `$…$` math is **opt-in** (`inlineMath: true`).
 - `example/` is a separate package (`md_example`, `path: ../`).

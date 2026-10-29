@@ -30,7 +30,19 @@ class MarkdownRenderObject extends RenderBox
         _painter = MarkdownPainter(
           markdown: markdown,
           theme: theme,
-        );
+        ) {
+    _painter.onImageChanged = _handleImageChanged;
+  }
+
+  /// An inline picture loaded, failed or advanced a frame.
+  void _handleImageChanged(bool relayout) {
+    if (_disposed) return;
+    if (relayout) {
+      markNeedsLayout();
+    } else {
+      markNeedsPaint();
+    }
+  }
 
   /// Painter for rendering markdown content.
   final MarkdownPainter _painter;

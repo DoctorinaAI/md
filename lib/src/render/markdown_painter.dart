@@ -23,6 +23,7 @@ import 'blocks/paragraph.dart';
 import 'blocks/quote.dart';
 import 'blocks/spacer.dart';
 import 'blocks/table.dart';
+import 'inline_image.dart';
 
 /// A painter for rendering markdown content via blocks and spans.
 @meta.internal
@@ -31,11 +32,32 @@ class MarkdownPainter {
   MarkdownPainter({
     required Markdown markdown,
     required MarkdownThemeData theme,
+    this.onImageChanged,
   })  : _markdown = markdown,
         _theme = theme,
         _isEmpty = markdown.isEmpty,
         _size = Size.zero {
+    _images = MarkdownImagePool(_handleImageChanged);
     _rebuild();
+  }
+
+  /// Called when an inline picture changed after layout: `relayout` when its
+  /// size changed (the content must be laid out again), otherwise it only
+  /// needs a repaint. The cached picture is already invalidated.
+  void Function(bool relayout)? onImageChanged;
+
+  /// The inline pictures of this document, reused across rebuilds.
+  late final MarkdownImagePool _images;
+
+  /// The live inline pictures, for tests.
+  @visibleForTesting
+  MarkdownImagePool get debugImages => _images;
+
+  void _handleImageChanged(bool relayout) {
+    _lastSize = null;
+    _lastPicture = null;
+    if (relayout) _needsLayout = true;
+    onImageChanged?.call(relayout);
   }
 
   /// Is the markdown entity empty?
@@ -146,6 +168,11 @@ class MarkdownPainter {
   /// Rebuilds the block painters from the markdown blocks.
   /// This method is called whenever the markdown or theme changes.
   void _rebuild() {
+    _images.nextGeneration();
+    _images.run(_buildPainters);
+  }
+
+  void _buildPainters() {
     _needsLayout = true; // Mark that layout needs to be recalculated.
     _size = Size.zero; // Reset size before rebuilding.
     final filter = _theme.blockFilter;
@@ -374,6 +401,8 @@ class MarkdownPainter {
       return false;
     _lastSize = null;
     _lastPicture = null;
+    // Pictures resolved by another resolver are stale.
+    if (_theme.imageResolver != theme.imageResolver) _images.clear();
     _markdown = markdown;
     _theme = theme;
     _isEmpty = markdown.isEmpty;
@@ -413,14 +442,20 @@ class MarkdownPainter {
       // if it does not match the number of painters.
       _blockOffsets = Float32List(blocks.length);
     }
-    var size = _layoutBlocks(maxWidth);
+    _images.clearLayouts();
+    var size = _images.run(() => _layoutBlocks(maxWidth));
     var laidOutWidth = maxWidth;
     if (_theme.textDirection == TextDirection.rtl) {
       final target = math.max(size.width, minWidth);
       // Re-laying out at a width no smaller than every block's content keeps
       // the same line breaks; only the right edge moves.
-      if (target < maxWidth) size = _layoutBlocks(laidOutWidth = target);
+      if (target < maxWidth) {
+        _images.clearLayouts();
+        size = _images.run(() => _layoutBlocks(laidOutWidth = target));
+      }
     }
+    // Every block has asked for its pictures by now; drop the rest.
+    _images.sweep();
     // Right-to-left glyphs sit against the right edge of the width the
     // blocks were laid out at, which can exceed the content width (tight or
     // min-width constraints), so hit tests must accept that whole width.
@@ -576,6 +611,7 @@ class MarkdownPainter {
   }
 
   void dispose() {
+    _images.dispose();
     _lastPicture?.dispose();
     _lastPicture = null;
     for (final painter in _blockPainters) {

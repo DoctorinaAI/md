@@ -12,6 +12,7 @@ import '../../nodes.dart';
 import '../../selection.dart' show markdownBlockRenderedText;
 import '../../theme.dart';
 import '../block_painter.dart';
+import '../inline_image.dart';
 import '../span_builder.dart';
 
 /// A class for painting a GitHub-style alert (admonition) block in markdown.
@@ -45,7 +46,10 @@ class BlockPainter$Alert
                     c is SelectableBlockPainter &&
                     c.selectionHighlightAboveCachedContent,
               )
-            : markdownSpansPaintOpaqueBackground(spans),
+            : markdownSpansPaintOpaqueBackground(
+                spans,
+                images: theme.imageResolver != null,
+              ),
         titlePainter = TextPainter(
           text: TextSpan(
             text: alert.title,
@@ -150,11 +154,11 @@ class BlockPainter$Alert
   List<Offset> _childOrigins = const <Offset>[];
 
   /// Last span hit by the tap down event.
-  TextSpan? _lastSpan;
+  InlineSpan? _lastSpan;
 
   Offset get _bodyOrigin => Offset(_contentX(_bodyPainter!), _bodyTop);
 
-  TextSpan? _spanForPosition(Offset localPosition) {
+  InlineSpan? _spanForPosition(Offset localPosition) {
     if (!_hasBody) return null;
     if (_bodyPainter != null) {
       final local = localPosition - _bodyOrigin;
@@ -164,9 +168,7 @@ class BlockPainter$Alert
           local.dy > _bodyPainter.height) {
         return null;
       }
-      final position = _bodyPainter.getPositionForOffset(local);
-      final span = _bodyPainter.text?.getSpanForPosition(position);
-      return span is TextSpan ? span : null;
+      return markdownSpanAtLocal(_bodyPainter, local);
     }
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
@@ -175,9 +177,7 @@ class BlockPainter$Alert
           localPosition.dy >= top + child.size.height) {
         continue;
       }
-      final span =
-          _childSpanAt(child, localPosition - Offset(_columnLeft, top));
-      return span is TextSpan ? span : null;
+      return _childSpanAt(child, localPosition - Offset(_columnLeft, top));
     }
     return null;
   }
@@ -192,7 +192,8 @@ class BlockPainter$Alert
     if (_lastSpan == null) return;
     final span = _spanForPosition(event.localPosition);
     if (span != null && _lastSpan == span) {
-      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
+      if (markdownSpanRecognizer(span)
+          case TapGestureRecognizer(:final onTap)) {
         onTap?.call();
       }
     }
@@ -210,7 +211,7 @@ class BlockPainter$Alert
     double bodyWidth = 0;
     double bodyHeight = 0;
     if (_bodyPainter != null) {
-      _bodyPainter.layout(minWidth: 0, maxWidth: available);
+      layoutMarkdownText(_bodyPainter, maxWidth: available);
       _hasBody = _bodyPainter.text?.toPlainText().isNotEmpty ?? false;
       if (_hasBody) {
         bodyWidth = _bodyPainter.width;
@@ -218,7 +219,7 @@ class BlockPainter$Alert
         _fragments = <SelectableFragment>[
           SelectableFragment(_bodyPainter, _bodyOrigin, 0),
         ];
-        _renderedText = _bodyPainter.plainText;
+        _renderedText = markdownModelText(_bodyPainter);
       } else {
         _fragments = const <SelectableFragment>[];
         _renderedText = '';
@@ -307,7 +308,7 @@ class BlockPainter$Alert
     if (!_hasBody) return;
 
     if (_bodyPainter != null) {
-      _bodyPainter.paint(canvas, _bodyOrigin + Offset(0, offset));
+      paintMarkdownText(_bodyPainter, canvas, _bodyOrigin + Offset(0, offset));
       return;
     }
 
@@ -353,9 +354,7 @@ InlineSpan? _childSpanAt(BlockPainter child, Offset local) {
     final painter = fragment.painter;
     final inner = local - fragment.origin;
     if (!(Offset.zero & painter.size).contains(inner)) continue;
-    return painter.text?.getSpanForPosition(
-      painter.getPositionForOffset(inner),
-    );
+    return markdownSpanAtLocal(painter, inner);
   }
   return null;
 }

@@ -171,7 +171,8 @@ center, `---:` right):
 ![Image alt text](https://example.com/image.png)
 ```
 
-Images currently not displayed!
+Images render as their alt text unless the theme has an `imageResolver` — see
+[Images & link icons](#images--link-icons).
 
 ### Horizontal Rules
 
@@ -521,6 +522,64 @@ MarkdownTheme(
 
 Or you can use the `MarkdownThemeData.mergeTheme(Theme.of(context))` factory to create a theme that inherits from the application's theme.
 This approach allows you to easily support both light and dark themes, and keeps your markdown styling consistent with the rest of your application.
+
+### Images & link icons
+
+Pictures are opt-in, so rendering untrusted Markdown never fetches anything
+by itself. Install a resolver to show `![alt](src)` images and, optionally, a
+favicon in front of every link:
+
+```dart
+MarkdownThemeData(
+  textStyle: const TextStyle(fontSize: 14),
+  imageResolver: const MarkdownProviderImageResolver(
+    linkIcons: true, // favicon before each http(s) link
+    maxImageHeight: 320,
+  ).call,
+)
+```
+
+`MarkdownProviderImageResolver` loads through Flutter `ImageProvider`s, so
+swapping the source or adding a cache is one function:
+
+```dart
+MarkdownProviderImageResolver(
+  baseUri: Uri.parse('https://example.com/docs/'), // relative sources
+  imageProvider: (uri) => switch (uri.scheme) {
+    'file' => FileImage(File(uri.toFilePath())),
+    'http' || 'https' => CachedNetworkImageProvider(uri.toString()),
+    _ => null, // keep the alt text
+  },
+  faviconUri: (link) =>
+      Uri.parse('https://icons.duckduckgo.com/ip3/${link.host}.ico'),
+).call
+```
+
+To control how a picture looks or loads, implement `MarkdownImage` — it
+reports the size of its slot in the line, paints itself into it, and calls
+`notifyListeners()` when it changes — and return it from your own
+`MarkdownImageResolver`:
+
+```dart
+class Badge extends MarkdownImage {
+  @override
+  Size layout(MarkdownImageConstraints c) => Size.square(c.fontSize);
+
+  @override
+  void paint(Canvas canvas, Rect rect, MarkdownImageConstraints c) =>
+      canvas.drawCircle(rect.center, rect.shortestSide / 2,
+          Paint()..color = Colors.teal);
+}
+
+MarkdownThemeData(
+  textStyle: const TextStyle(fontSize: 14),
+  imageResolver: (request) =>
+      request.kind == MarkdownImageKind.linkIcon ? Badge() : null,
+)
+```
+
+Selection treats a picture as its alt text (a link icon as nothing), so copied
+text is the same with or without pictures.
 
 ### Custom Block Painters
 

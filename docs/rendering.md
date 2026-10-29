@@ -12,7 +12,8 @@ canvas via one `RenderBox` and a list of `BlockPainter`s — **no widget per blo
 | File | Contents |
 |---|---|
 | `block_painter.dart` | The framework: `BlockPainter`, `SelectableBlockPainter`, mixins `SelectableTextBlock` / `MultiPainterSelectable` / `ParagraphGestureHandler`, class `SelectableFragment`, private `_distanceToRect`. |
-| `span_builder.dart` | `paragraphFromMarkdownSpans({spans, theme, textStyle})` → `TextSpan`; private `_buildTapRecognizer` (link taps from `span.extra['url']`). |
+| `span_builder.dart` | `paragraphFromMarkdownSpans({spans, theme, textStyle})` → `TextSpan`; private `_buildTapRecognizer` (link taps from `span.extra['url']`); emits a `MarkdownImageSpan` per image / link icon the theme's `imageResolver` resolves. |
+| `inline_image.dart` | `MarkdownImageSpan` (a `PlaceholderSpan`), `layoutMarkdownText` / `paintMarkdownText`, the model ↔ painter offset map, and the `@meta.internal` `MarkdownImagePool`. |
 | `markdown_painter.dart` | `MarkdownPainter` (`@meta.internal`) — the orchestrator. |
 | `markdown_render_object.dart` | `MarkdownRenderObject` (`@meta.internal`) — the `RenderBox`, also a `MarkdownSelectionSurface`; plus `_paintNothing`. |
 | `blocks/*.dart` | `BlockPainter$Paragraph, $Heading, $Quote, $Alert, $Code, $List` (+ private `_ListItemMetrics`), `$Table`, `$Divider`, `$Spacer`. |
@@ -222,14 +223,48 @@ chain is appended after it), `dividerColor`,
 `alertColors` (+ built-in GitHub palette fallback via `alertColorFor`),
 `textDirection`, `textScaler`, and `onLinkTap`.
 
+## Inline images (`lib/src/image.dart`, `render/inline_image.dart`)
+
+Pictures are painted, not widgets. `MarkdownThemeData.imageResolver` maps a
+`MarkdownImageRequest` (`image` for `![alt](src)`, `linkIcon` for a link) to a
+`MarkdownImage`, which reports its slot size (`layout`), paints into it
+(`paint`) and `notifyListeners()` on change. `paragraphFromMarkdownSpans`
+turns each resolved one into a `MarkdownImageSpan`; `layoutMarkdownText` sets
+the `TextPainter` placeholder dimensions from `MarkdownImage.layout`, and
+`paintMarkdownText` paints the text, then each picture into
+`TextPainter.inlinePlaceholderBoxes`. Every default text painter uses both;
+pictures land in the cached content `Picture`.
+
+**Offsets.** In the painter a picture is one U+FFFC; in the model it is its
+alt text (an icon: nothing). `SelectableTextBlock`, `MultiPainterSelectable`
+and `SelectableFragment.length` translate through `markdownModelOffset` /
+`markdownPainterOffset`, so `renderedText` still equals
+`markdownBlockRenderedText`. A range end inside the alt text snaps outward
+(the whole picture highlights); word boundaries and tap hit tests check the
+slot boxes first (`markdownWordBoundary`, `markdownSpanAtLocal`) because the
+nearest-caret lookup falls off a placeholder onto its neighbour.
+
+**Ownership.** `MarkdownPainter` owns a `MarkdownImagePool`. Painter builds and
+layouts run inside `pool.run`, where `resolveMarkdownImage` returns the image
+already resolved for an equal request — repeated pictures, list / table
+painters (rebuilt every layout) and streaming updates all reuse one loaded
+image. `update` starts a generation; after each layout `sweep` disposes images
+no block asked for. A different `imageResolver` clears the pool. The pool
+listens to each image: if an occurrence's `layout` size changed it reports a
+re-layout, otherwise a repaint; either way the cached picture is dropped. A
+notification while the pool is running (a synchronous load inside `layout`)
+is re-checked in a microtask, since the render object is mid-layout.
+
 ## Public vs internal
 
 Public (in `flutter_md.dart`'s `show` list): the framework
 (`BlockPainter`, `SelectableBlockPainter`, `SelectableTextBlock`,
 `MultiPainterSelectable`, `SelectableFragment`, `ParagraphGestureHandler`,
-`paragraphFromMarkdownSpans`) and the nine defaults (`BlockPainter$Paragraph …
-$Spacer`). Internal (`@meta.internal`, only via `src/render.dart`):
-`MarkdownPainter`, `MarkdownRenderObject`.
+`paragraphFromMarkdownSpans`, `MarkdownImageSpan`, `layoutMarkdownText`,
+`paintMarkdownText`), the nine defaults (`BlockPainter$Paragraph …
+$Spacer`) and everything in `image.dart`. Internal (`@meta.internal`, only via
+`src/render.dart`): `MarkdownPainter`, `MarkdownRenderObject`,
+`MarkdownImagePool` and the offset helpers of `inline_image.dart`.
 
 ## Invariants (repeated from [architecture](architecture.md), owned here)
 

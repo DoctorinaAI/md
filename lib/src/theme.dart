@@ -101,6 +101,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     this.onLinkTap,
     this.highlighter,
     this.cursorResolver,
+    this.imageResolver,
   })  : monospaceFontFamily = monospaceFontFamily ??
             _defaultMonospaceFontFamily(defaultTargetPlatform),
         monospaceFontFamilyFallback =
@@ -136,6 +137,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     void Function(String title, String url)? onLinkTap,
     SyntaxHighlighter? highlighter,
     MarkdownCursorResolver? cursorResolver,
+    MarkdownImageResolver? imageResolver,
   }) {
     return MarkdownThemeData(
       textStyle: textStyle ??
@@ -174,6 +176,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       onLinkTap: onLinkTap,
       highlighter: highlighter,
       cursorResolver: cursorResolver,
+      imageResolver: imageResolver,
     );
   }
 
@@ -327,6 +330,19 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
   /// cursor for selectable documents, or deferred cursor otherwise).
   final MarkdownCursorResolver? cursorResolver;
 
+  /// Resolves the pictures shown inline: `![alt](src)` images and, when the
+  /// resolver returns one, an icon in front of each link (a site favicon).
+  ///
+  /// When `null` (the default), or when the resolver returns `null` for a
+  /// request, an image renders as its alt text and a link as its bare label.
+  /// [MarkdownProviderImageResolver] is a ready-made resolver backed by
+  /// [ImageProvider]s; return your own [MarkdownImage] to control loading,
+  /// caching and painting.
+  ///
+  /// Keep the resolver stable (a `const` resolver, or one stored outside
+  /// `build`): a different resolver drops every picture already loaded.
+  final MarkdownImageResolver? imageResolver;
+
   final List<TextStyle?> _headingStyles;
 
   /// Returns a [TextStyle] for the given heading level.
@@ -442,6 +458,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
     void Function(String title, String url)? onLinkTap,
     SyntaxHighlighter? highlighter,
     MarkdownCursorResolver? cursorResolver,
+    MarkdownImageResolver? imageResolver,
   }) =>
       MarkdownThemeData(
         textDirection: textDirection ?? this.textDirection,
@@ -472,6 +489,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
         onLinkTap: onLinkTap ?? this.onLinkTap,
         highlighter: highlighter ?? this.highlighter,
         cursorResolver: cursorResolver ?? this.cursorResolver,
+        imageResolver: imageResolver ?? this.imageResolver,
       );
 
   @override
@@ -516,6 +534,7 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
       onLinkTap: t < 0.5 ? onLinkTap : other?.onLinkTap,
       highlighter: t < 0.5 ? highlighter : other?.highlighter,
       cursorResolver: t < 0.5 ? cursorResolver : other?.cursorResolver,
+      imageResolver: t < 0.5 ? imageResolver : other?.imageResolver,
     );
   }
 

@@ -61,6 +61,36 @@ quote / alert model directly. Ordinary `MarkdownWidget` /
   (Windows) instead of the unresolvable `'monospace'`, with a fallback chain on
   every platform (see *Monospace font resolution*). Expect golden diffs there.
 
+### Inline images & link icons
+
+- **ADDED**: `![alt](src)` images can render as pictures, and links can carry
+  an icon in front of their label (a site favicon). Opt-in through
+  `MarkdownThemeData.imageResolver` — without one, images keep rendering as
+  their alt text, so nothing is fetched behind the host's back (tracking
+  pixels).
+- **ADDED**: `MarkdownImage`, the picture interface: it reports the size of
+  its slot in the line (`layout`), paints itself into it (`paint`) and calls
+  `notifyListeners` when it loads, fails or animates. Implement it to control
+  sources, caching and appearance; `MarkdownImageResolver` maps a
+  `MarkdownImageRequest` (kind, url, alt / label, title) to one.
+- **ADDED**: `MarkdownProviderImage` (any Flutter `ImageProvider` — network,
+  file, asset, memory or a disk-cached third-party provider; `.icon` for a
+  text-sized link icon) and the ready-made `MarkdownProviderImageResolver`
+  (http(s) and `data:` images, `/favicon.ico` link icons, `baseUri` for
+  relative sources, swappable `imageProvider` / `faviconUri`).
+- **ADDED**: `MarkdownImageSpan`, `layoutMarkdownText` and
+  `paintMarkdownText` for custom block painters whose text comes from
+  `paragraphFromMarkdownSpans`; a painter that keeps calling plain
+  `TextPainter.layout` still lays out (a text-sized empty slot per picture).
+- Selection is unchanged: a picture counts as its alt text (a link icon as
+  nothing), so offsets, highlight and copied text match
+  `markdownBlockRenderedText` whether or not pictures are shown; any part of
+  the alt text selects the whole picture, and a double tap on it selects it.
+- Pictures are owned by the rendered document: a request seen before reuses
+  the loaded image (streaming rebuilds and repeated images load once), and
+  images that leave the document are disposed. A size change re-lays out the
+  widget; any other change only repaints it.
+
 ### Quote / alert nested fenced code
 - **FIXED**: Fenced code (` ```lang ` / `~~~`) inside a blockquote or GitHub
   alert is re-parsed as nested `MD$Code` in `MD$Quote.blocks` /

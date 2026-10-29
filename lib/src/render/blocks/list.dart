@@ -11,6 +11,7 @@ import 'package:flutter/rendering.dart';
 import '../../nodes.dart';
 import '../../theme.dart';
 import '../block_painter.dart';
+import '../inline_image.dart';
 import '../span_builder.dart';
 
 /// A helper class to store layout information for a single list item.
@@ -54,7 +55,7 @@ class BlockPainter$List
   })  : _items = items,
         _painters = <_ListItemMetrics>[],
         _selectionHighlightAboveCachedContent =
-            _listItemsPaintOpaqueBackground(items);
+            _listItemsPaintOpaqueBackground(items, theme.imageResolver != null);
 
   /// Inline monospace/highlight fills in item text live in the content
   /// [Picture].
@@ -63,10 +64,15 @@ class BlockPainter$List
       _selectionHighlightAboveCachedContent;
   final bool _selectionHighlightAboveCachedContent;
 
-  static bool _listItemsPaintOpaqueBackground(List<MD$ListItem> items) {
+  static bool _listItemsPaintOpaqueBackground(
+    List<MD$ListItem> items,
+    bool images,
+  ) {
     for (final item in items) {
-      if (markdownSpansPaintOpaqueBackground(item.spans)) return true;
-      if (_listItemsPaintOpaqueBackground(item.children)) return true;
+      if (markdownSpansPaintOpaqueBackground(item.spans, images: images)) {
+        return true;
+      }
+      if (_listItemsPaintOpaqueBackground(item.children, images)) return true;
     }
     return false;
   }
@@ -102,10 +108,10 @@ class BlockPainter$List
       final contentOffset = metrics.contentOffset;
       final contentRect = contentOffset & metrics.contentPainter.size;
       if (contentRect.contains(localPosition)) {
-        final painterPosition = localPosition - contentOffset;
-        final textPosition =
-            metrics.contentPainter.getPositionForOffset(painterPosition);
-        return metrics.contentPainter.text?.getSpanForPosition(textPosition);
+        return markdownSpanAtLocal(
+          metrics.contentPainter,
+          localPosition - contentOffset,
+        );
       }
     }
     return null;
@@ -122,9 +128,9 @@ class BlockPainter$List
     if (_lastSpan == null) return; // No span was hit on tap down.
     final newSpan = _getSpanForPosition(event.localPosition);
     if (newSpan != null && _lastSpan == newSpan) {
-      if (newSpan
-          case TextSpan(recognizer: final TapGestureRecognizer recognizer)) {
-        recognizer.onTap?.call();
+      if (markdownSpanRecognizer(newSpan)
+          case TapGestureRecognizer(:final onTap)) {
+        onTap?.call();
       }
     }
 
@@ -165,7 +171,11 @@ class BlockPainter$List
           text: paragraphFromMarkdownSpans(spans: item.spans, theme: theme),
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
-        )..layout(maxWidth: math.max(0, width - indent - bulletPainter.width));
+        );
+        layoutMarkdownText(
+          contentPainter,
+          maxWidth: math.max(0, width - indent - bulletPainter.width),
+        );
 
         final bulletX = rtl ? width - indent - bulletPainter.width : indent;
         final metrics = _ListItemMetrics(
@@ -208,10 +218,10 @@ class BlockPainter$List
         metrics.contentOffset,
         textPos,
       ));
-      textPos += metrics.contentPainter.plainText.length;
+      textPos += markdownModelText(metrics.contentPainter).length;
     }
     _fragments = frags;
-    _renderedText = frags.map((f) => f.painter.plainText).join('\n');
+    _renderedText = frags.map((f) => markdownModelText(f.painter)).join('\n');
   }
 
   @override
@@ -219,7 +229,11 @@ class BlockPainter$List
     final dy = Offset(0, offset);
     for (final metrics in _painters) {
       metrics.bulletPainter.paint(canvas, metrics.offset + dy);
-      metrics.contentPainter.paint(canvas, metrics.contentOffset + dy);
+      paintMarkdownText(
+        metrics.contentPainter,
+        canvas,
+        metrics.contentOffset + dy,
+      );
     }
   }
 

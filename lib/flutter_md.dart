@@ -1,5 +1,6 @@
 library;
 
+export 'src/image.dart';
 export 'src/markdown.dart';
 export 'src/nodes.dart';
 export 'src/parser.dart';
@@ -13,6 +14,10 @@ export 'src/render.dart'
         SelectableFragment,
         ParagraphGestureHandler,
         paragraphFromMarkdownSpans,
+        // Inline images — lay out / paint text that may hold pictures.
+        MarkdownImageSpan,
+        layoutMarkdownText,
+        paintMarkdownText,
         // Default block painters — reuse, wrap or subclass them.
         BlockPainter$Paragraph,
         BlockPainter$Heading,

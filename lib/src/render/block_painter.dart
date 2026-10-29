@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:meta/meta.dart' as meta show internal;
 
+import 'inline_image.dart';
+
 /// A class for painting blocks in markdown.
 /// You can implement this interface to create custom block painters.
 abstract interface class BlockPainter {
@@ -111,7 +113,7 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
   bool get selectionHighlightAboveCachedContent => false;
 
   @override
-  String get renderedText => selectionPainter.plainText;
+  String get renderedText => markdownModelText(selectionPainter);
 
   @override
   int offsetForLocalPosition(Offset local) =>
@@ -119,15 +121,15 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
 
   @override
   (int, TextAffinity) positionAndAffinityForLocal(Offset local) {
-    final position =
-        selectionPainter.getPositionForOffset(local - selectionOrigin);
-    return (position.offset, position.affinity);
+    final painter = selectionPainter;
+    final position = painter.getPositionForOffset(local - selectionOrigin);
+    return (markdownModelOffset(painter, position.offset), position.affinity);
   }
 
   @override
   Rect caretRectFor(int offset, TextAffinity affinity) {
-    final len = selectionPainter.plainText.length;
-    final o = offset.clamp(0, len);
+    final len = renderedText.length;
+    final o = markdownPainterOffset(selectionPainter, offset.clamp(0, len));
     final position = TextPosition(offset: o, affinity: affinity);
     final caret = selectionPainter.getOffsetForCaret(position, Rect.zero);
     final height = selectionPainter.getFullHeightForCaret(position, Rect.zero);
@@ -140,17 +142,20 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
   }
 
   @override
-  List<Rect> boxesForRange(int start, int end) => selectionPainter
-      .getBoxesForSelection(TextSelection(baseOffset: start, extentOffset: end))
-      .map((box) => box.toRect().shift(selectionOrigin))
-      .toList(growable: false);
+  List<Rect> boxesForRange(int start, int end) {
+    final painter = selectionPainter;
+    return painter
+        .getBoxesForSelection(TextSelection(
+          baseOffset: markdownPainterOffset(painter, start),
+          extentOffset: markdownPainterOffset(painter, end, end: true),
+        ))
+        .map((box) => box.toRect().shift(selectionOrigin))
+        .toList(growable: false);
+  }
 
   @override
-  TextRange wordBoundaryForLocal(Offset local) {
-    final offset =
-        selectionPainter.getPositionForOffset(local - selectionOrigin).offset;
-    return selectionPainter.getWordBoundary(TextPosition(offset: offset));
-  }
+  TextRange wordBoundaryForLocal(Offset local) =>
+      markdownWordBoundary(selectionPainter, local - selectionOrigin);
 
   @override
   bool isLinkAtLocal(Offset local) =>
@@ -182,8 +187,9 @@ class SelectableFragment {
   /// Index of this run's first character in the block's rendered text.
   final int textStart;
 
-  /// Length of this run's text.
-  int get length => painter.plainText.length;
+  /// Length of this run's text (in the model's offset space, where an image
+  /// counts as its alt text).
+  int get length => markdownModelText(painter).length;
 
   /// One-past-the-last index of this run's text in the block's rendered text.
   int get textEnd => textStart + length;
@@ -218,9 +224,10 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
         (local.dx - fragment.origin.dx).clamp(0.0, fragment.painter.width);
     final dy =
         (local.dy - fragment.origin.dy).clamp(0.0, fragment.painter.height);
-    final position = fragment.painter.getPositionForOffset(Offset(dx, dy));
-    final offset =
-        fragment.textStart + position.offset.clamp(0, fragment.length);
+    final painter = fragment.painter;
+    final position = painter.getPositionForOffset(Offset(dx, dy));
+    final inner = markdownModelOffset(painter, position.offset);
+    final offset = fragment.textStart + inner.clamp(0, fragment.length);
     return (offset, position.affinity);
   }
 
@@ -228,7 +235,10 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
   Rect caretRectFor(int offset, TextAffinity affinity) {
     final fragment = _fragmentForOffset(offset);
     if (fragment == null) return Rect.zero;
-    final local = (offset - fragment.textStart).clamp(0, fragment.length);
+    final local = markdownPainterOffset(
+      fragment.painter,
+      (offset - fragment.textStart).clamp(0, fragment.length),
+    );
     final position = TextPosition(offset: local, affinity: affinity);
     final caret = fragment.painter.getOffsetForCaret(position, Rect.zero);
     final height = fragment.painter.getFullHeightForCaret(position, Rect.zero);
@@ -256,8 +266,11 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
       final localEnd =
           end.clamp(fragment.textStart, fragment.textEnd) - fragment.textStart;
       if (localEnd <= localStart) continue;
-      final boxes = fragment.painter.getBoxesForSelection(
-          TextSelection(baseOffset: localStart, extentOffset: localEnd));
+      final painter = fragment.painter;
+      final boxes = painter.getBoxesForSelection(TextSelection(
+        baseOffset: markdownPainterOffset(painter, localStart),
+        extentOffset: markdownPainterOffset(painter, localEnd, end: true),
+      ));
       for (final box in boxes) {
         out.add(box.toRect().shift(fragment.origin));
       }
@@ -269,13 +282,12 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
   TextRange wordBoundaryForLocal(Offset local) {
     final fragment = _nearestFragment(local);
     if (fragment == null) return const TextRange(start: 0, end: 0);
-    final inner =
-        fragment.painter.getPositionForOffset(local - fragment.origin).offset;
-    final wb = fragment.painter.getWordBoundary(TextPosition(offset: inner));
+    final word =
+        markdownWordBoundary(fragment.painter, local - fragment.origin);
     // Keep the word within its own fragment (never cross a cell/item boundary).
     return TextRange(
-      start: fragment.textStart + wb.start.clamp(0, fragment.length),
-      end: fragment.textStart + wb.end.clamp(0, fragment.length),
+      start: fragment.textStart + word.start.clamp(0, fragment.length),
+      end: fragment.textStart + word.end.clamp(0, fragment.length),
     );
   }
 
@@ -456,9 +468,7 @@ bool _spanHasRecognizerAt(TextPainter painter, Offset local) {
       local.dy > size.height) {
     return false;
   }
-  final span =
-      painter.text?.getSpanForPosition(painter.getPositionForOffset(local));
-  return span is TextSpan && span.recognizer != null;
+  return markdownSpanRecognizer(markdownSpanAtLocal(painter, local)) != null;
 }
 
 /// Shortest distance from [point] to [rect] (0 when the point is inside).
@@ -496,8 +506,6 @@ mixin ParagraphGestureHandler {
   }) {
     final local = event.localPosition - origin;
     if (!(Offset.zero & painter.size).contains(local)) return null;
-    final pos = painter.getPositionForOffset(local);
-    final span = painter.text?.getSpanForPosition(pos);
-    return span;
+    return markdownSpanAtLocal(painter, local);
   }
 }

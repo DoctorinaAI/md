@@ -12,6 +12,7 @@ import '../../nodes.dart';
 import '../../selection.dart' show markdownBlockRenderedText;
 import '../../theme.dart';
 import '../block_painter.dart';
+import '../inline_image.dart';
 import '../span_builder.dart';
 
 /// A class for painting a quote block in markdown.
@@ -48,7 +49,10 @@ class BlockPainter$Quote
                     c is SelectableBlockPainter &&
                     c.selectionHighlightAboveCachedContent,
               )
-            : markdownSpansPaintOpaqueBackground(spans),
+            : markdownSpansPaintOpaqueBackground(
+                spans,
+                images: theme.imageResolver != null,
+              ),
         _leafPainter = children.isEmpty
             ? TextPainter(
                 text: paragraphFromMarkdownSpans(
@@ -137,7 +141,7 @@ class BlockPainter$Quote
   List<Offset> _childOrigins = const <Offset>[];
 
   /// Last span hit by the tap down event.
-  TextSpan? _lastSpan;
+  InlineSpan? _lastSpan;
 
   /// Whether the last layout mirrored the block for right-to-left text.
   bool _rtl = false;
@@ -167,8 +171,7 @@ class BlockPainter$Quote
           local.dy > _leafPainter.height) {
         return null;
       }
-      final position = _leafPainter.getPositionForOffset(local);
-      return _leafPainter.text?.getSpanForPosition(position);
+      return markdownSpanAtLocal(_leafPainter, local);
     }
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
@@ -186,7 +189,7 @@ class BlockPainter$Quote
   void handleTapDown(PointerDownEvent event) {
     _lastSpan = null;
     final span = _spanForPosition(event.localPosition);
-    if (span case TextSpan textSpan) _lastSpan = textSpan;
+    _lastSpan = span;
   }
 
   @override
@@ -194,7 +197,8 @@ class BlockPainter$Quote
     if (_lastSpan == null) return;
     final span = _spanForPosition(event.localPosition);
     if (span != null && _lastSpan == span) {
-      if (span case TextSpan(recognizer: TapGestureRecognizer(:var onTap))) {
+      if (markdownSpanRecognizer(span)
+          case TapGestureRecognizer(:final onTap)) {
         onTap?.call();
       }
     }
@@ -207,7 +211,7 @@ class BlockPainter$Quote
     _width = width;
     final contentWidth = math.max(width - _contentLeft, 0.0);
     if (_leafPainter != null) {
-      _leafPainter.layout(minWidth: 0, maxWidth: contentWidth);
+      layoutMarkdownText(_leafPainter, maxWidth: contentWidth);
       _size = Size(
         _leafPainter.size.width + _contentLeft,
         _leafPainter.size.height,
@@ -215,7 +219,7 @@ class BlockPainter$Quote
       _fragments = <SelectableFragment>[
         SelectableFragment(_leafPainter, Offset(_leafLeft, 0), 0),
       ];
-      _renderedText = _leafPainter.plainText;
+      _renderedText = markdownModelText(_leafPainter);
       _childOffsets = const <double>[];
       _childOrigins = const <Offset>[];
       return _size;
@@ -274,7 +278,7 @@ class BlockPainter$Quote
     }
 
     if (_leafPainter != null) {
-      _leafPainter.paint(canvas, Offset(_leafLeft, offset));
+      paintMarkdownText(_leafPainter, canvas, Offset(_leafLeft, offset));
       return;
     }
 
@@ -319,9 +323,7 @@ InlineSpan? _childSpanAt(BlockPainter child, Offset local) {
     final painter = fragment.painter;
     final inner = local - fragment.origin;
     if (!(Offset.zero & painter.size).contains(inner)) continue;
-    return painter.text?.getSpanForPosition(
-      painter.getPositionForOffset(inner),
-    );
+    return markdownSpanAtLocal(painter, inner);
   }
   return null;
 }
