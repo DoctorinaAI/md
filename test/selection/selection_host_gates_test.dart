@@ -512,6 +512,13 @@ void main() {
         expect(controller.selection!.base.documentId, 'a');
         expect(scopeA.toolbarIsVisible, isTrue);
         expect(controller.toolbarWanted, isTrue);
+        final surfaceA = tester.renderObject(
+          find.byType(MarkdownWidget).first,
+        ) as MarkdownSelectionSurface;
+        final surfaceB = tester.renderObject(
+          find.byType(MarkdownWidget).at(1),
+        ) as MarkdownSelectionSurface;
+        expect(surfaceA.hasSelectionHandleLeaders, isTrue);
 
         // Retarget the live range onto B. Scope A no longer owns chrome for
         // the selection document and must drop its overlay; toolbarWanted
@@ -532,7 +539,19 @@ void main() {
           isTrue,
           reason: 'toolbarWanted is shared restore intent, not this scope',
         );
-        expect(scopeA.selectionHandleLeadersAttached, isFalse);
+        // selectionHandleLeadersAttached reports the endpoint surfaces, not
+        // the asking scope: B, the new owner, legitimately attaches handles
+        // there. What A must give up is its own leaders on its own surface.
+        expect(
+          surfaceA.hasSelectionHandleLeaders,
+          isFalse,
+          reason: 'the prior owner must clear its handles off its surface',
+        );
+        expect(
+          surfaceB.hasSelectionHandleLeaders,
+          isTrue,
+          reason: 'the new owner places the handles on its surface',
+        );
       });
     });
 
