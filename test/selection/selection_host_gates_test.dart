@@ -524,8 +524,7 @@ void main() {
         expect(
           scopeA.toolbarIsVisible,
           isFalse,
-          reason:
-              'prior owner must remove its context menu when the selection '
+          reason: 'prior owner must remove its context menu when the selection '
               'document moves to a sibling scope',
         );
         expect(

@@ -665,8 +665,7 @@ void main() {
         expect(
           state.toolbarIsVisible,
           isFalse,
-          reason:
-              'scroll geometry refresh must not show the toolbar while an '
+          reason: 'scroll geometry refresh must not show the toolbar while an '
               'expand drag is still active',
         );
 
