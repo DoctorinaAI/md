@@ -1,4 +1,4 @@
-import 'dart:ui' show Offset, Rect, TextAffinity;
+import 'dart:ui' show Offset, Rect, TextAffinity, TextDirection;
 
 import 'package:flutter/painting.dart' show TextRange, TextStyle;
 import 'package:flutter/rendering.dart' show LayerLink;
@@ -14,6 +14,9 @@ class _FakeSurface implements MarkdownSelectionSurface {
 
   @override
   Rect get globalBounds => Rect.zero;
+
+  @override
+  TextDirection get textDirection => TextDirection.ltr;
 
   @override
   MarkdownPosition? positionForGlobal(Offset globalPosition) => null;

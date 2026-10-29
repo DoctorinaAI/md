@@ -138,6 +138,9 @@ class MarkdownRenderObject extends RenderBox
   Object get documentId => _documentId!;
 
   @override
+  TextDirection get textDirection => _theme.textDirection;
+
+  @override
   Rect get globalBounds => localToGlobal(Offset.zero) & size;
 
   @override
@@ -367,15 +370,36 @@ class MarkdownRenderObject extends RenderBox
   // delegates to `_painter.layout(...)` which populates the painter's cached
   // layout as a side effect (not a "pure" dry layout). [performLayout] re-runs
   // the same layout, so the cached state is always finalized before [paint].
+  //
+  // That side effect must not outlive the measurement: a parent may dry-lay
+  // this out at other constraints after laying it out for real, and nothing
+  // re-runs [performLayout] when the real constraints have not changed. Hit
+  // testing, highlights and link taps would then use the measured positions
+  // (every x in a right-to-left document depends on the width) while the
+  // cached glyph picture stays at the real ones. So the real layout is put
+  // back whenever the measured constraints differ from it.
   @override
-  Size computeDryLayout(BoxConstraints constraints) =>
-      constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
+  Size computeDryLayout(BoxConstraints constraints) {
+    final measured = constraints.constrain(_painter.layout(
+      maxWidth: constraints.maxWidth,
+      minWidth: constraints.minWidth,
+    ));
+    if (hasSize && this.constraints != constraints) {
+      _painter.layout(
+        maxWidth: this.constraints.maxWidth,
+        minWidth: this.constraints.minWidth,
+      );
+    }
+    return measured;
+  }
 
   @override
   void performLayout() {
     // Set the size of the render box to match the painter's size.
-    size =
-        constraints.constrain(_painter.layout(maxWidth: constraints.maxWidth));
+    size = constraints.constrain(_painter.layout(
+      maxWidth: constraints.maxWidth,
+      minWidth: constraints.minWidth,
+    ));
   }
 
   @override

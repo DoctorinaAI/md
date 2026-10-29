@@ -100,7 +100,7 @@ class BlockPainter$Quote
           theme.copyWith(textStyle: theme.quoteStyle ?? theme.textStyle),
       };
 
-  /// Paint used for the vertical accent bar(s) on the left.
+  /// Paint used for the vertical accent bar(s) on the start side.
   final Paint linePaint;
 
   @override
@@ -121,11 +121,28 @@ class BlockPainter$Quote
   /// Last span hit by the tap down event.
   TextSpan? _lastSpan;
 
+  /// Whether the last layout mirrored the block for right-to-left text.
+  bool _rtl = false;
+
+  /// The width passed to the last [layout].
+  double _width = 0;
+
+  /// Inset from the start edge taken by the accent bars.
   double get _contentLeft => lineIndent + indent * lineIndent;
+
+  /// Block-local x of the content column's left edge: after the bars for
+  /// left-to-right text, or at `0` with the bars on the right for RTL.
+  double get _columnLeft => _rtl ? 0.0 : _contentLeft;
+
+  /// Block-local x where the leaf glyphs start: right-to-left text sits
+  /// against the bars on the right.
+  double get _leafLeft => _rtl
+      ? math.max(_width - _contentLeft - _leafPainter!.width, 0.0)
+      : _contentLeft;
 
   InlineSpan? _spanForPosition(Offset localPosition) {
     if (_leafPainter != null) {
-      final local = localPosition - Offset(_contentLeft, 0);
+      final local = localPosition - Offset(_leafLeft, 0);
       if (local.dx < 0 ||
           local.dy < 0 ||
           local.dx > _leafPainter.width ||
@@ -137,25 +154,12 @@ class BlockPainter$Quote
     }
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
-      final origin = Offset(_contentLeft, _childOffsets[i]);
-      final rect = origin & child.size;
-      if (!rect.contains(localPosition)) continue;
-      final inner = localPosition - origin;
-      if (child is BlockPainter$Quote) {
-        return child._spanForPosition(inner);
+      final top = _childOffsets[i];
+      if (localPosition.dy < top ||
+          localPosition.dy >= top + child.size.height) {
+        continue;
       }
-      if (child case final SelectableTextBlock textBlock) {
-        final painter = textBlock.selectionPainter;
-        final local = inner - textBlock.selectionOrigin;
-        if (local.dx < 0 ||
-            local.dy < 0 ||
-            local.dx > painter.width ||
-            local.dy > painter.height) {
-          continue;
-        }
-        final position = painter.getPositionForOffset(local);
-        return painter.text?.getSpanForPosition(position);
-      }
+      return _childSpanAt(child, localPosition - Offset(_columnLeft, top));
     }
     return null;
   }
@@ -181,6 +185,8 @@ class BlockPainter$Quote
 
   @override
   Size layout(double width) {
+    _rtl = theme.textDirection == TextDirection.rtl && width.isFinite;
+    _width = width;
     final contentWidth = math.max(width - _contentLeft, 0.0);
     if (_leafPainter != null) {
       _leafPainter.layout(minWidth: 0, maxWidth: contentWidth);
@@ -189,7 +195,7 @@ class BlockPainter$Quote
         _leafPainter.size.height,
       );
       _fragments = <SelectableFragment>[
-        SelectableFragment(_leafPainter, Offset(_contentLeft, 0), 0),
+        SelectableFragment(_leafPainter, Offset(_leafLeft, 0), 0),
       ];
       _renderedText = _leafPainter.plainText;
       _childOffsets = const <double>[];
@@ -217,7 +223,7 @@ class BlockPainter$Quote
     var textStart = 0;
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
-      final origin = Offset(_contentLeft, _childOffsets[i]);
+      final origin = Offset(_columnLeft, _childOffsets[i]);
       if (child is MultiPainterSelectable) {
         final text = child.renderedText;
         if (text.isNotEmpty) {
@@ -256,26 +262,21 @@ class BlockPainter$Quote
 
     // --- Draw vertical lines --- //
     for (var i = 1; i <= indent; i++) {
+      final x = _rtl ? _width - i * lineIndent : i * lineIndent;
       canvas.drawLine(
-        Offset(
-          i * lineIndent,
-          offset,
-        ),
-        Offset(
-          i * lineIndent,
-          offset + _size.height,
-        ),
+        Offset(x, offset),
+        Offset(x, offset + _size.height),
         linePaint,
       );
     }
 
     if (_leafPainter != null) {
-      _leafPainter.paint(canvas, Offset(_contentLeft, offset));
+      _leafPainter.paint(canvas, Offset(_leafLeft, offset));
       return;
     }
 
     canvas.save();
-    canvas.translate(_contentLeft, 0);
+    canvas.translate(_columnLeft, 0);
     final childWidth = size.width - _contentLeft;
     for (var i = 0; i < _children.length; i++) {
       _children[i].paint(
@@ -294,4 +295,30 @@ class BlockPainter$Quote
       child.dispose();
     }
   }
+}
+
+/// The span under [local] (block-local to [child]) among the text painters
+/// [child] exposes for selection, or null when no painter's box contains it.
+///
+/// Goes through the selection fragments rather than [child]'s size: a child
+/// sizes to its content, which right-to-left text right-aligns within the
+/// column, and a list or table child paints several painters.
+InlineSpan? _childSpanAt(BlockPainter child, Offset local) {
+  final fragments = switch (child) {
+    MultiPainterSelectable(:final fragments) => fragments,
+    SelectableTextBlock(:final selectionPainter, :final selectionOrigin) =>
+      <SelectableFragment>[
+        SelectableFragment(selectionPainter, selectionOrigin, 0),
+      ],
+    _ => const <SelectableFragment>[],
+  };
+  for (final fragment in fragments) {
+    final painter = fragment.painter;
+    final inner = local - fragment.origin;
+    if (!(Offset.zero & painter.size).contains(inner)) continue;
+    return painter.text?.getSpanForPosition(
+      painter.getPositionForOffset(inner),
+    );
+  }
+  return null;
 }

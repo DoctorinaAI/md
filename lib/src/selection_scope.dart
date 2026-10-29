@@ -507,21 +507,32 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     }
     _applyHandles(endpoints);
     if (context.findRenderObject() case final RenderBox box when box.hasSize) {
+      // Each handle follows the direction of the text it sits on, which is
+      // the surface's theme rather than the ambient Directionality: the two
+      // can differ, and one selection can span documents of both kinds.
+      final startRtl = _isRtl(endpoints.startSurface);
+      final endRtl = _isRtl(endpoints.endSurface);
       final startPoint = TextSelectionPoint(
-        box.globalToLocal(
-            Offset(endpoints.startGlobal.left, endpoints.startGlobal.bottom)),
-        TextDirection.ltr,
+        box.globalToLocal(Offset(
+          startRtl ? endpoints.startGlobal.right : endpoints.startGlobal.left,
+          endpoints.startGlobal.bottom,
+        )),
+        endpoints.startSurface.textDirection,
       );
       final endPoint = TextSelectionPoint(
-        box.globalToLocal(
-            Offset(endpoints.endGlobal.right, endpoints.endGlobal.bottom)),
-        TextDirection.ltr,
+        box.globalToLocal(Offset(
+          endRtl ? endpoints.endGlobal.left : endpoints.endGlobal.right,
+          endpoints.endGlobal.bottom,
+        )),
+        endpoints.endSurface.textDirection,
       );
+      // A right-to-left handle sits on the opposite side of its caret, and a
+      // reversed selection swaps the ends again; the two flips cancel out.
       final reversed = controller.isSelectionReversed;
-      final startType = reversed
+      final startType = reversed != startRtl
           ? TextSelectionHandleType.right
           : TextSelectionHandleType.left;
-      final endType = reversed
+      final endType = reversed != endRtl
           ? TextSelectionHandleType.left
           : TextSelectionHandleType.right;
       switch (_selectionOverlay) {
@@ -571,6 +582,12 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     }
   }
 
+  /// Whether [surface] lays its text out right-to-left, in which case a
+  /// selection starts at the right edge of its first box and ends at the left
+  /// edge of its last one.
+  static bool _isRtl(MarkdownSelectionSurface surface) =>
+      surface.textDirection == TextDirection.rtl;
+
   /// Assigns the two handle leader layers to their owning surfaces (and clears
   /// them on every other mounted surface) in a single pass, so nothing
   /// repaints needlessly.
@@ -580,8 +597,14 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   void _applyHandles(MarkdownHandleEndpoints e) {
     final startSurface = e.startSurface;
     final endSurface = e.endSurface;
-    final startLocal = Offset(e.startLocal.left, e.startLocal.bottom);
-    final endLocal = Offset(e.endLocal.right, e.endLocal.bottom);
+    final startLocal = Offset(
+      _isRtl(startSurface) ? e.startLocal.right : e.startLocal.left,
+      e.startLocal.bottom,
+    );
+    final endLocal = Offset(
+      _isRtl(endSurface) ? e.endLocal.left : e.endLocal.right,
+      e.endLocal.bottom,
+    );
     for (final surface in controller.mountedSurfaces) {
       final isStart = identical(surface, startSurface);
       final isEnd = identical(surface, endSurface);

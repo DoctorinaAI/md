@@ -33,7 +33,8 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
         painter = TextPainter(
           text: _buildSpan(text, language, theme),
           textAlign: TextAlign.start,
-          textDirection: theme.textDirection,
+          // Code reads left-to-right even inside right-to-left documents.
+          textDirection: TextDirection.ltr,
           textScaler: theme.textScaler,
         );
 
@@ -100,8 +101,10 @@ class BlockPainter$Code with SelectableTextBlock implements BlockPainter {
 
   @override
   void paint(Canvas canvas, Size size, double offset) {
-    // If the width is less than required do not paint anything.
-    if (size.width < _size.width) return;
+    // If the width is less than required do not paint anything. An empty size
+    // means [layout] was too narrow for the padding and skipped laying out
+    // the text, which must then not be painted either.
+    if (_size.isEmpty || size.width < _size.width) return;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(0, offset, size.width, _size.height),

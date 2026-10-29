@@ -82,7 +82,7 @@ class BlockPainter$Alert
   /// Padding around the alert's content, inside its rounded background.
   static const double padding = 10.0;
 
-  /// Width of the accent bar on the left edge.
+  /// Width of the accent bar on the start edge.
   static const double barWidth = 4.0;
 
   /// Gap between the accent bar and the content.
@@ -91,8 +91,24 @@ class BlockPainter$Alert
   /// Vertical gap between the title and the body.
   static const double titleGap = 4.0;
 
-  /// Left offset where the title/body content begins.
+  /// Inset from the start edge where the title/body content begins.
   double get _contentLeft => padding + barWidth + gap;
+
+  /// Whether the last layout mirrored the block for right-to-left text.
+  bool _rtl = false;
+
+  /// The width passed to the last [layout].
+  double _width = 0;
+
+  /// Block-local x of the content column's left edge: after the bar for
+  /// left-to-right text, or the trailing padding with the bar on the right
+  /// for RTL.
+  double get _columnLeft => _rtl ? padding : _contentLeft;
+
+  /// Block-local x where [painter]'s glyphs start: after the bar for
+  /// left-to-right text, or flush against the right-hand bar for RTL.
+  double _contentX(TextPainter painter) =>
+      _rtl ? math.max(_width - _contentLeft - painter.width, 0) : _contentLeft;
 
   @override
   Size get size => _size;
@@ -118,7 +134,7 @@ class BlockPainter$Alert
   /// Last span hit by the tap down event.
   TextSpan? _lastSpan;
 
-  Offset get _bodyOrigin => Offset(_contentLeft, _bodyTop);
+  Offset get _bodyOrigin => Offset(_contentX(_bodyPainter!), _bodyTop);
 
   TextSpan? _spanForPosition(Offset localPosition) {
     if (!_hasBody) return null;
@@ -136,22 +152,14 @@ class BlockPainter$Alert
     }
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
-      final origin = Offset(_contentLeft, _bodyTop + _childOffsets[i]);
-      if (!(origin & child.size).contains(localPosition)) continue;
-      final inner = localPosition - origin;
-      if (child case final SelectableTextBlock textBlock) {
-        final painter = textBlock.selectionPainter;
-        final local = inner - textBlock.selectionOrigin;
-        if (local.dx < 0 ||
-            local.dy < 0 ||
-            local.dx > painter.width ||
-            local.dy > painter.height) {
-          continue;
-        }
-        final position = painter.getPositionForOffset(local);
-        final span = painter.text?.getSpanForPosition(position);
-        return span is TextSpan ? span : null;
+      final top = _bodyTop + _childOffsets[i];
+      if (localPosition.dy < top ||
+          localPosition.dy >= top + child.size.height) {
+        continue;
       }
+      final span =
+          _childSpanAt(child, localPosition - Offset(_columnLeft, top));
+      return span is TextSpan ? span : null;
     }
     return null;
   }
@@ -175,6 +183,8 @@ class BlockPainter$Alert
 
   @override
   Size layout(double width) {
+    _rtl = theme.textDirection == TextDirection.rtl && width.isFinite;
+    _width = width;
     final available = math.max(0.0, width - _contentLeft - padding);
     titlePainter.layout(minWidth: 0, maxWidth: available);
     _bodyTop = padding + titlePainter.height + titleGap;
@@ -226,7 +236,7 @@ class BlockPainter$Alert
     var textStart = 0;
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
-      final origin = Offset(_contentLeft, _bodyTop + _childOffsets[i]);
+      final origin = Offset(_columnLeft, _bodyTop + _childOffsets[i]);
       if (child is MultiPainterSelectable) {
         final text = child.renderedText;
         if (text.isNotEmpty) {
@@ -269,10 +279,15 @@ class BlockPainter$Alert
         ..color = _accent.withValues(alpha: 0.10)
         ..style = PaintingStyle.fill,
     );
-    // Accent bar on the left.
+    // Accent bar on the start edge.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, offset, barWidth, _size.height),
+        Rect.fromLTWH(
+          _rtl ? size.width - barWidth : 0,
+          offset,
+          barWidth,
+          _size.height,
+        ),
         const Radius.circular(barWidth / 2),
       ),
       Paint()
@@ -280,7 +295,10 @@ class BlockPainter$Alert
         ..style = PaintingStyle.fill,
     );
 
-    titlePainter.paint(canvas, Offset(_contentLeft, offset + padding));
+    titlePainter.paint(
+      canvas,
+      Offset(_contentX(titlePainter), offset + padding),
+    );
     if (!_hasBody) return;
 
     if (_bodyPainter != null) {
@@ -289,7 +307,7 @@ class BlockPainter$Alert
     }
 
     canvas.save();
-    canvas.translate(_contentLeft, 0);
+    canvas.translate(_columnLeft, 0);
     final childWidth = size.width - _contentLeft - padding;
     for (var i = 0; i < _children.length; i++) {
       _children[i].paint(
@@ -309,4 +327,30 @@ class BlockPainter$Alert
       child.dispose();
     }
   }
+}
+
+/// The span under [local] (block-local to [child]) among the text painters
+/// [child] exposes for selection, or null when no painter's box contains it.
+///
+/// Goes through the selection fragments rather than [child]'s size: a child
+/// sizes to its content, which right-to-left text right-aligns within the
+/// column, and a list or table child paints several painters.
+InlineSpan? _childSpanAt(BlockPainter child, Offset local) {
+  final fragments = switch (child) {
+    MultiPainterSelectable(:final fragments) => fragments,
+    SelectableTextBlock(:final selectionPainter, :final selectionOrigin) =>
+      <SelectableFragment>[
+        SelectableFragment(selectionPainter, selectionOrigin, 0),
+      ],
+    _ => const <SelectableFragment>[],
+  };
+  for (final fragment in fragments) {
+    final painter = fragment.painter;
+    final inner = local - fragment.origin;
+    if (!(Offset.zero & painter.size).contains(inner)) continue;
+    return painter.text?.getSpanForPosition(
+      painter.getPositionForOffset(inner),
+    );
+  }
+  return null;
 }

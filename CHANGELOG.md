@@ -220,6 +220,48 @@ extension points or reach into a default block painter's fields. Ordinary
   (list rebuilds during autoscroll); geometry walks defer off `performLayout`
   (`sizeAccessAllowed`).
 
+### Right-to-left layout
+- **FIXED**: With `MarkdownThemeData.textDirection` set to
+  `TextDirection.rtl`, blocks were still laid out left-to-right: paragraphs
+  and headings sat against the left edge, list bullets, quote bars and the
+  alert accent bar were on the left, and table columns ran left to right.
+  Blocks now mirror: text aligns to the right edge, bullets and bars sit on
+  the right, and the first table column is on the right (unaligned data
+  cells start on the right; explicit `:--` / `--:` alignment stays physical).
+  Link taps and text selection follow the mirrored positions. Left-to-right
+  layout is unchanged.
+- **FIXED**: Selection handles on right-to-left text sit at the logical start
+  (right edge) and end (left edge) of the selection. Each handle follows the
+  `textDirection` of the document it sits on, not the ambient
+  `Directionality`: the two can differ, and one selection can span documents
+  of both directions. Proxy handles for a scrolled-off edge land on the
+  reading start / end of the visible selection in either direction.
+- **FIXED**: A table too wide to fit overflows past its end edge in either
+  direction, so the columns read first stay in view (to the left of the
+  widget for right-to-left text).
+- **FIXED**: Link taps inside quotes account for the quote's indent.
+- **CHANGED**: Under tight constraints (for example a fixed-width chat
+  bubble), right-to-left content aligns to the full width, like `Text`. Under
+  loose constraints the widget still sizes to its content.
+- **CHANGED**: Fenced code blocks always render left-to-right, even in
+  right-to-left documents.
+- **ADDED**: `ParagraphGestureHandler.hitTestInlineSpanWithPointerEvent` takes
+  an optional `origin`, for painters whose text is not painted at the block
+  origin.
+- **CHANGED**: `hitTestInlineSpanWithPointerEvent` returns null for a point
+  outside the painter's box. A tap in the empty space before right-to-left
+  text used to snap onto the line's last glyph and open a link ending it.
+- **FIXED**: A fenced code block narrower than its padding (at widget widths
+  of a few dozen pixels, less inside a quote or alert) threw
+  `TextPainter.paint called when text geometry was not yet calculated`.
+- **FIXED**: Links in blocks nested in a quote or alert body (bodies holding a
+  fenced block) open on tap in every child kind, lists and tables included,
+  and in right-to-left documents. Only paragraphs and headings did, and in
+  RTL not even those.
+- **FIXED**: A dry layout at other constraints, made after the real layout,
+  left hit testing, highlights and link taps at the measured positions while
+  the glyphs stayed put. The real layout is now restored after measuring.
+
 ### Monospace font resolution
 - **FIXED**: Inline `` `code` `` and fenced blocks pick a monospace family the
   host platform can actually resolve. Flutter hands the family straight to the
