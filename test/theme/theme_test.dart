@@ -460,10 +460,8 @@ void main() => group('MarkdownThemeData', () {
         });
 
         test('copyWith carries the override', () {
-          // The cast is only needed because copyWith still returns the base
-          // ThemeExtension here; DoctorinaAI/md#27 narrows it.
           final theme = MarkdownThemeData(textStyle: const TextStyle())
-              .copyWith(monospaceFontFamily: 'Fira Code') as MarkdownThemeData;
+              .copyWith(monospaceFontFamily: 'Fira Code');
           expect(theme.monospaceFontFamily, 'Fira Code');
         });
 
