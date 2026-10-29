@@ -502,9 +502,13 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   void _updateHandlesAndOverlay() {
     if (!_handlesEnabled) {
       _clearHandles();
-      // Losing chrome ownership (or disabled) must also drop a lingering
-      // context menu — handles alone were cleared before.
-      _contextMenuController.remove();
+      // Losing chrome ownership (or being disabled) must also drop a
+      // lingering context menu — handles alone were cleared before. A desktop
+      // platform has no handles either, but its menu (a right-click) is live
+      // and must survive an overlay sync.
+      if (!widget.enabled || !_ownsChromeForCurrentSelection) {
+        _contextMenuController.remove();
+      }
       return;
     }
     final endpoints = controller.selectionHandleEndpoints();

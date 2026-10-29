@@ -195,6 +195,85 @@ void main() {
       });
     });
 
+    for (final platform in <TargetPlatform>[
+      TargetPlatform.macOS,
+      TargetPlatform.windows,
+      TargetPlatform.linux,
+    ]) {
+      testWidgets(
+          'a right-click menu survives a sibling update on ${platform.name}',
+          (tester) async {
+        // Desktop platforms have no touch handles, so every overlay sync
+        // takes the no-handles path; it must not close a live menu. A sibling
+        // chat message streaming in text triggers exactly such a sync.
+        await _withPlatform(platform, () async {
+          final controller = MarkdownSelectionController()
+            ..setDocuments(<MarkdownDocumentRef>[
+              MarkdownDocumentRef(
+                id: 'a',
+                model: Markdown.fromString('Hello selectable world'),
+              ),
+              MarkdownDocumentRef(
+                id: 'b',
+                model: Markdown.fromString('Streaming'),
+                order: 1,
+              ),
+            ]);
+          addTearDown(controller.dispose);
+
+          await tester.pumpWidget(MaterialApp(
+            theme: ThemeData(platform: platform),
+            home: Scaffold(
+              body: MarkdownSelectionScope(
+                controller: controller,
+                child: const Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: 400,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[_Doc('a'), _Doc('b')],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ));
+          await tester.pumpAndSettle();
+
+          final box = tester.getRect(find.byType(MarkdownWidget).first);
+          await _mouseDrag(
+            tester,
+            box.topLeft + const Offset(2, 4),
+            box.topLeft + const Offset(40, 4),
+          );
+          final g = await tester.startGesture(
+            box.topLeft + const Offset(20, 4),
+            kind: PointerDeviceKind.mouse,
+            buttons: kSecondaryMouseButton,
+          );
+          await g.up();
+          await tester.pumpAndSettle();
+          expect(find.text('Copy'), findsOneWidget);
+
+          controller.setDocuments(<MarkdownDocumentRef>[
+            controller.documents.first,
+            MarkdownDocumentRef(
+              id: 'b',
+              model: Markdown.fromString('Streaming more text'),
+              order: 1,
+            ),
+          ]);
+          await tester.pumpAndSettle();
+          expect(
+            find.text('Copy'),
+            findsOneWidget,
+            reason: 'a sibling update must not close the right-click menu',
+          );
+        });
+      });
+    }
+
     testWidgets('a desktop mouse drag does not pop the toolbar',
         (tester) async {
       await _withPlatform(TargetPlatform.linux, () async {

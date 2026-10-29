@@ -90,7 +90,8 @@ extension points or reach into a default block painter's fields. Ordinary
   handles are disabled for that reason). Previously only handles were cleared,
   so a prior bubble’s adaptive toolbar could linger after selection moved to a
   sibling scope. `toolbarWanted` is left alone so the owning scope can still
-  restore on settle.
+  restore on settle. A desktop right-click menu is unaffected: desktop has no
+  handles, but its menu survives overlay syncs such as a sibling update.
 - **FIXED**: Scroll / geometry toolbar restore is skipped while a selection
   drag is active (`_dragGlobal`). Autoscroll `ScrollNotification`s must not
   re-present the adaptive toolbar mid-gesture even when `toolbarWanted` was
