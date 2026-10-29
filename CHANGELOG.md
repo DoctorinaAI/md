@@ -48,11 +48,11 @@ extension points or reach into a default block painter's fields. Ordinary
   boxes**, not the full max-width layout of a paragraph. Empty horizontal
   gutter beside a short line is no longer I-beam / click-to-open.
 - **CHANGED**: Gesture *starts* (`hitsSelectableContent`) stay **surface-
-  bounds** (press inside the document/bubble arms text selection — tdesktop
-  `PointState::Inside` parity). Drag-extend may still clamp outside glyphs.
+  bounds**. A press inside the document or bubble arms text selection.
+  Drag-extend may still clamp outside glyphs.
 - **CHANGED**: Mouse single-click that misses selectable content while a
-  non-collapsed range is active clears the selection (tdesktop empty
-  Selecting / dismiss parity), instead of leaving the old range.
+  non-collapsed range is active clears the selection, instead of leaving
+  the old range.
 - **ADDED**: `SelectableBlockPainter.hitsRenderedTextAt`,
   `MarkdownSelectionSurface.hitsSelectableGlyphs`, and
   `MarkdownSelectionController.hitsSelectableGlyphs`.
@@ -85,6 +85,17 @@ extension points or reach into a default block painter's fields. Ordinary
   that reference that scope’s own `LayerLink`s, so chat dual mounts keep
   handles after non-collapsed range commits (including repeated handle-drag
   settles).
+- **FIXED**: A scope that loses `ownsSelectionChrome` for the live selection
+  document now removes its own context-menu overlay (and does the same when
+  handles are disabled for that reason). Previously only handles were cleared,
+  so a prior bubble’s adaptive toolbar could linger after selection moved to a
+  sibling scope. `toolbarWanted` is left alone so the owning scope can still
+  restore on settle.
+- **FIXED**: Scroll / geometry toolbar restore is skipped while a selection
+  drag is active (`_dragGlobal`). Autoscroll `ScrollNotification`s must not
+  re-present the adaptive toolbar mid-gesture even when `toolbarWanted` was
+  re-armed (for example a host restoring a clamped range via the public
+  `selection` setter).
 - **ADDED**: `MarkdownSelectionSurface.hasSelectionHandleLeaders`,
   `clearSelectionHandleLayersIfLinked`, and
   `MarkdownSelectionScopeState.selectionHandleLeadersAttached` for observing
