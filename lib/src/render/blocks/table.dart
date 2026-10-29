@@ -249,7 +249,10 @@ class BlockPainter$Table
     // Column positions: left to right, or mirrored for right-to-left text so
     // the first column sits on the right and the table hugs the right edge.
     _rtl = theme.textDirection == TextDirection.rtl && width.isFinite;
-    _tableLeft = _rtl ? math.max(width - totalWidth, 0.0) : 0.0;
+    // A table too wide to fit overflows past the end edge, so its first
+    // columns stay in view: to the right for LTR, to the left (negative x)
+    // for RTL.
+    _tableLeft = _rtl ? width - totalWidth : 0.0;
     final lefts = List<double>.filled(columns, 0.0);
     var columnStart = 0.0;
     for (var c = 0; c < columns; c++) {
