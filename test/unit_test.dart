@@ -24,10 +24,12 @@ import 'selection/selection_handle_endpoints_test.dart'
     as selection_handle_endpoints_test;
 import 'selection/selection_handles_test.dart' as selection_handles_test;
 import 'selection/selection_keyboard_test.dart' as selection_keyboard_test;
+import 'selection/selection_rtl_test.dart' as selection_rtl_test;
 import 'selection/selection_test.dart' as selection_test;
 import 'selection/selection_widget_test.dart' as selection_widget_test;
 import 'theme/theme_test.dart' as theme_test;
 import 'widget/render_test.dart' as render_test;
+import 'widget/rtl_geometry_test.dart' as rtl_geometry_test;
 import 'widget/rtl_test.dart' as rtl_test;
 import 'widget/widget_test.dart' as widget_test;
 
@@ -48,6 +50,7 @@ void main() => group('Unit', () {
       markup_formatter_test.main();
       selection_widget_test.main();
       selection_keyboard_test.main();
+      selection_rtl_test.main();
       selection_handles_test.main();
       selection_handle_endpoints_test.main();
       selection_autoscroll_test.main();
@@ -58,5 +61,6 @@ void main() => group('Unit', () {
       selection_nested_blocks_test.main();
       render_test.main();
       rtl_test.main();
+      rtl_geometry_test.main();
       widget_test.main();
     });

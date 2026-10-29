@@ -230,8 +230,15 @@ extension points or reach into a default block painter's fields. Ordinary
   cells start on the right; explicit `:--` / `--:` alignment stays physical).
   Link taps and text selection follow the mirrored positions. Left-to-right
   layout is unchanged.
-- **FIXED**: Selection handles under a right-to-left `Directionality` sit at
-  the logical start (right edge) and end (left edge) of the selection.
+- **FIXED**: Selection handles on right-to-left text sit at the logical start
+  (right edge) and end (left edge) of the selection. Each handle follows the
+  `textDirection` of the document it sits on, not the ambient
+  `Directionality`: the two can differ, and one selection can span documents
+  of both directions. Proxy handles for a scrolled-off edge land on the
+  reading start / end of the visible selection in either direction.
+- **FIXED**: A table too wide to fit overflows past its end edge in either
+  direction, so the columns read first stay in view (to the left of the
+  widget for right-to-left text).
 - **FIXED**: Link taps inside quotes account for the quote's indent.
 - **CHANGED**: Under tight constraints (for example a fixed-width chat
   bubble), right-to-left content aligns to the full width, like `Text`. Under
@@ -241,6 +248,15 @@ extension points or reach into a default block painter's fields. Ordinary
 - **ADDED**: `ParagraphGestureHandler.hitTestInlineSpanWithPointerEvent` takes
   an optional `origin`, for painters whose text is not painted at the block
   origin.
+- **CHANGED**: `hitTestInlineSpanWithPointerEvent` returns null for a point
+  outside the painter's box. A tap in the empty space before right-to-left
+  text used to snap onto the line's last glyph and open a link ending it.
+- **FIXED**: A fenced code block narrower than its padding (at widget widths
+  of a few dozen pixels, less inside a quote or alert) threw
+  `TextPainter.paint called when text geometry was not yet calculated`.
+- **FIXED**: A dry layout at other constraints, made after the real layout,
+  left hit testing, highlights and link taps at the measured positions while
+  the glyphs stayed put. The real layout is now restored after measuring.
 
 ### Monospace font resolution
 - **FIXED**: Inline `` `code` `` and fenced blocks pick a monospace family the
