@@ -46,7 +46,24 @@ class BlockPainter$List
     required List<MD$ListItem> items,
     required this.theme,
   })  : _items = items,
-        _painters = <_ListItemMetrics>[];
+        _painters = <_ListItemMetrics>[],
+        _selectionHighlightAboveCachedContent =
+            _listItemsPaintOpaqueBackground(items);
+
+  /// Inline monospace/highlight fills in item text live in the content
+  /// [Picture].
+  @override
+  bool get selectionHighlightAboveCachedContent =>
+      _selectionHighlightAboveCachedContent;
+  final bool _selectionHighlightAboveCachedContent;
+
+  static bool _listItemsPaintOpaqueBackground(List<MD$ListItem> items) {
+    for (final item in items) {
+      if (markdownSpansPaintOpaqueBackground(item.spans)) return true;
+      if (_listItemsPaintOpaqueBackground(item.children)) return true;
+    }
+    return false;
+  }
 
   /// The theme used to style the list.
   final MarkdownThemeData theme;

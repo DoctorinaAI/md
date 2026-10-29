@@ -16,6 +16,7 @@ class MarkdownWidget extends LeafRenderObjectWidget {
     this.theme,
     this.controller,
     this.documentId,
+    this.cursorResolver,
     super.key, // ignore: unused_element
   });
 
@@ -33,6 +34,12 @@ class MarkdownWidget extends LeafRenderObjectWidget {
   /// only enabled when this is non-null AND a controller is available; the app
   /// must register this document's model with the controller.
   final Object? documentId;
+
+  /// An optional callback to dynamically resolve the mouse cursor based on
+  /// hover offset, hit block index, and hit block model.
+  ///
+  /// When non-null, overrides [MarkdownThemeData.cursorResolver].
+  final MarkdownCursorResolver? cursorResolver;
 
   MarkdownThemeData _resolveTheme(BuildContext context) =>
       theme ??
@@ -53,6 +60,7 @@ class MarkdownWidget extends LeafRenderObjectWidget {
   RenderObject createRenderObject(BuildContext context) => MarkdownRenderObject(
         markdown: markdown,
         theme: _resolveTheme(context),
+        cursorResolver: cursorResolver,
       )..updateSelection(_resolveController(context), documentId);
 
   @override
@@ -60,8 +68,20 @@ class MarkdownWidget extends LeafRenderObjectWidget {
     BuildContext context,
     MarkdownRenderObject renderObject,
   ) {
+    // Rewire the selection registry FIRST: a recycled element (a virtualized
+    // chat list reusing a slot) changes [documentId] and [markdown] together,
+    // and [update]'s registry write must land on the incoming id — not
+    // overwrite the outgoing document's model with this one's body.
     renderObject
-      ..update(markdown: markdown, theme: _resolveTheme(context))
-      ..updateSelection(_resolveController(context), documentId);
+      ..updateSelection(
+        _resolveController(context),
+        documentId,
+        markdown: markdown,
+      )
+      ..update(
+        markdown: markdown,
+        theme: _resolveTheme(context),
+        cursorResolver: cursorResolver,
+      );
   }
 }

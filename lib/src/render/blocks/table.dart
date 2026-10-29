@@ -39,6 +39,11 @@ class BlockPainter$Table
           ..color =
               theme.surfaceColor ?? const Color.fromARGB(255, 235, 235, 235);
 
+  /// Zebra row fills (and cell inline chrome) sit in the content [Picture];
+  /// highlight must paint above that picture or it disappears under the fill.
+  @override
+  bool get selectionHighlightAboveCachedContent => true;
+
   /// Padding for table cells.
   static const double padding = 8.0;
 

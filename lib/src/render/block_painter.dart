@@ -59,6 +59,15 @@ abstract interface class SelectableBlockPainter implements BlockPainter {
   /// Maps a block-local [local] offset to a rendered-text index.
   int offsetForLocalPosition(Offset local);
 
+  /// Maps a block-local [local] point to a rendered-text index and the
+  /// [TextAffinity] from [TextPainter.getPositionForOffset]. Affinity matters
+  /// at soft-wrap boundaries (same offset, end of one visual line vs start of
+  /// the next) so handles stay on the line under the pointer.
+  (int, TextAffinity) positionAndAffinityForLocal(Offset local);
+
+  /// Block-local caret rect for [offset] with [affinity] (soft-wrap aware).
+  Rect caretRectFor(int offset, TextAffinity affinity);
+
   /// Highlight rectangles (block-local) for the rendered range `[start, end)`.
   List<Rect> boxesForRange(int start, int end);
 
@@ -71,6 +80,20 @@ abstract interface class SelectableBlockPainter implements BlockPainter {
   /// Whether an actionable link (a span carrying a tap recognizer) sits under
   /// the block-local [local] point — used to show the click (hand) cursor.
   bool isLinkAtLocal(Offset local);
+
+  /// Whether [local] lies over rendered glyph ink (line boxes), not empty
+  /// layout gutter inside the block's max-width.
+  ///
+  /// Gesture starts and hover I-beam must use this; drag-extend may still map
+  /// nearby points via [positionAndAffinityForLocal].
+  bool hitsRenderedTextAt(Offset local);
+
+  /// When true, the selection highlight is also painted *above* the cached
+  /// content picture so an opaque block background (e.g. a code fence) does
+  /// not hide it. Default text blocks leave this false so glyphs stay on top
+  /// of the highlight — matching [SelectableRegion] / [SelectionArea] paint
+  /// order (sharp text, no washed-out overlay).
+  bool get selectionHighlightAboveCachedContent;
 }
 
 /// Provides [SelectableBlockPainter] for a block backed by a single
@@ -84,11 +107,36 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
   Offset get selectionOrigin => Offset.zero;
 
   @override
+  bool get selectionHighlightAboveCachedContent => false;
+
+  @override
   String get renderedText => selectionPainter.plainText;
 
   @override
   int offsetForLocalPosition(Offset local) =>
-      selectionPainter.getPositionForOffset(local - selectionOrigin).offset;
+      positionAndAffinityForLocal(local).$1;
+
+  @override
+  (int, TextAffinity) positionAndAffinityForLocal(Offset local) {
+    final position =
+        selectionPainter.getPositionForOffset(local - selectionOrigin);
+    return (position.offset, position.affinity);
+  }
+
+  @override
+  Rect caretRectFor(int offset, TextAffinity affinity) {
+    final len = selectionPainter.plainText.length;
+    final o = offset.clamp(0, len);
+    final position = TextPosition(offset: o, affinity: affinity);
+    final caret = selectionPainter.getOffsetForCaret(position, Rect.zero);
+    final height = selectionPainter.getFullHeightForCaret(position, Rect.zero);
+    return Rect.fromLTWH(
+      selectionOrigin.dx + caret.dx,
+      selectionOrigin.dy + caret.dy,
+      0,
+      height,
+    );
+  }
 
   @override
   List<Rect> boxesForRange(int start, int end) => selectionPainter
@@ -105,7 +153,14 @@ mixin SelectableTextBlock implements SelectableBlockPainter {
 
   @override
   bool isLinkAtLocal(Offset local) =>
+      hitsRenderedTextAt(local) &&
       _spanHasRecognizerAt(selectionPainter, local - selectionOrigin);
+
+  @override
+  bool hitsRenderedTextAt(Offset local) => _painterHitsGlyphBoxes(
+        selectionPainter,
+        local - selectionOrigin,
+      );
 }
 
 /// One selectable text run inside a multi-painter block (a list item or a table
@@ -146,12 +201,49 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
   List<SelectableFragment> get fragments;
 
   @override
-  int offsetForLocalPosition(Offset local) {
+  bool get selectionHighlightAboveCachedContent => false;
+
+  @override
+  int offsetForLocalPosition(Offset local) =>
+      positionAndAffinityForLocal(local).$1;
+
+  @override
+  (int, TextAffinity) positionAndAffinityForLocal(Offset local) {
     final fragment = _nearestFragment(local);
-    if (fragment == null) return 0;
-    final inner =
-        fragment.painter.getPositionForOffset(local - fragment.origin).offset;
-    return fragment.textStart + inner.clamp(0, fragment.length);
+    if (fragment == null) {
+      return (0, TextAffinity.downstream);
+    }
+    final dx =
+        (local.dx - fragment.origin.dx).clamp(0.0, fragment.painter.width);
+    final dy =
+        (local.dy - fragment.origin.dy).clamp(0.0, fragment.painter.height);
+    final position = fragment.painter.getPositionForOffset(Offset(dx, dy));
+    final offset =
+        fragment.textStart + position.offset.clamp(0, fragment.length);
+    return (offset, position.affinity);
+  }
+
+  @override
+  Rect caretRectFor(int offset, TextAffinity affinity) {
+    final fragment = _fragmentForOffset(offset);
+    if (fragment == null) return Rect.zero;
+    final local = (offset - fragment.textStart).clamp(0, fragment.length);
+    final position = TextPosition(offset: local, affinity: affinity);
+    final caret = fragment.painter.getOffsetForCaret(position, Rect.zero);
+    final height = fragment.painter.getFullHeightForCaret(position, Rect.zero);
+    return Rect.fromLTWH(
+      fragment.origin.dx + caret.dx,
+      fragment.origin.dy + caret.dy,
+      0,
+      height,
+    );
+  }
+
+  SelectableFragment? _fragmentForOffset(int offset) {
+    for (final fragment in fragments) {
+      if (offset <= fragment.textEnd) return fragment;
+    }
+    return fragments.isEmpty ? null : fragments.last;
   }
 
   @override
@@ -189,8 +281,26 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
   @override
   bool isLinkAtLocal(Offset local) {
     for (final fragment in fragments) {
+      if (!(fragment.origin & fragment.painter.size).contains(local)) {
+        continue;
+      }
+      final inner = local - fragment.origin;
+      // Prefer glyph-tight link hits inside the fragment layout box.
+      if (_painterHitsGlyphBoxes(fragment.painter, inner) &&
+          _spanHasRecognizerAt(fragment.painter, inner)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @override
+  bool hitsRenderedTextAt(Offset local) {
+    // Lists/tables: each fragment's layout box is the hit target (cell / item
+    // run). Paragraph gutters use glyph boxes via [SelectableTextBlock].
+    for (final fragment in fragments) {
       if ((fragment.origin & fragment.painter.size).contains(local)) {
-        return _spanHasRecognizerAt(fragment.painter, local - fragment.origin);
+        return true;
       }
     }
     return false;
@@ -210,6 +320,52 @@ mixin MultiPainterSelectable implements SelectableBlockPainter {
     }
     return best;
   }
+}
+
+/// Whether [local] (text-painter coordinates) lies inside any glyph line box
+/// of [painter]'s full rendered range.
+bool _painterHitsGlyphBoxes(TextPainter painter, Offset local) {
+  for (final rect in _glyphBoxesOf(painter)) {
+    if (rect.contains(local)) return true;
+  }
+  return false;
+}
+
+/// Cached glyph boxes of one [TextPainter] layout.
+final class _GlyphBoxes {
+  const _GlyphBoxes(this.size, this.text, this.rects);
+
+  final Size size;
+  final String text;
+  final List<Rect> rects;
+}
+
+/// Glyph boxes are re-read on **every hover event** (I-beam / link cursor) and
+/// on every glyph-tight hit test. `getBoxesForSelection` over a whole block
+/// allocates one box per run per line, so a long fenced code block would
+/// rebuild thousands of rects per mouse move without this cache.
+///
+/// Keyed on the painter; invalidated when its laid-out size or plain text
+/// changes. [TextPainter.plainText] is memoised by the painter itself, so the
+/// identity check is O(1).
+final Expando<_GlyphBoxes> _glyphBoxCache = Expando<_GlyphBoxes>('glyphBoxes');
+
+List<Rect> _glyphBoxesOf(TextPainter painter) {
+  final plain = painter.plainText;
+  if (plain.isEmpty) return const <Rect>[];
+  final size = painter.size;
+  final cached = _glyphBoxCache[painter];
+  if (cached != null && cached.size == size && identical(cached.text, plain)) {
+    return cached.rects;
+  }
+  final rects = <Rect>[
+    for (final box in painter.getBoxesForSelection(
+      TextSelection(baseOffset: 0, extentOffset: plain.length),
+    ))
+      box.toRect(),
+  ];
+  _glyphBoxCache[painter] = _GlyphBoxes(size, plain, rects);
+  return rects;
 }
 
 /// Whether the span under a text-local [local] point in [painter] carries a tap

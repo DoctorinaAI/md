@@ -375,10 +375,15 @@ final class MD$Heading extends MD$Block {
 final class MD$Quote extends MD$Block {
   /// Creates a new instance of [MD$Quote].
   /// {@macro markdown_block}
+  ///
+  /// When the quote body contains fenced code (or other nested block
+  /// structure), [blocks] holds the children and [spans] is empty. Plain
+  /// quotes keep the historical leaf shape: non-empty [spans], empty [blocks].
   const MD$Quote({
     required this.indent,
     required this.text,
     required this.spans,
+    this.blocks = const <MD$Block>[],
   });
 
   @override
@@ -393,7 +398,13 @@ final class MD$Quote extends MD$Block {
   final String text;
 
   /// The inline text spans within the quote.
+  ///
+  /// Empty when [blocks] is non-empty (nested block structure).
   final List<MD$Span> spans;
+
+  /// Nested block children when the quote body was re-parsed as blocks
+  /// (e.g. a fenced code block inside `>`). Empty for leaf inline quotes.
+  final List<MD$Block> blocks;
 
   @override
   T map<T>({
@@ -418,10 +429,15 @@ final class MD$Quote extends MD$Block {
 final class MD$Alert extends MD$Block {
   /// Creates a new instance of [MD$Alert].
   /// {@macro markdown_block}
+  ///
+  /// When the alert body contains fenced code (or other nested block
+  /// structure), [blocks] holds the children and [spans] is empty. Plain
+  /// alert bodies keep non-empty [spans] and empty [blocks].
   const MD$Alert({
     required this.alert,
     required this.text,
     required this.spans,
+    this.blocks = const <MD$Block>[],
   });
 
   @override
@@ -434,7 +450,13 @@ final class MD$Alert extends MD$Block {
   final String text;
 
   /// The inline text spans within the alert body.
+  ///
+  /// Empty when [blocks] is non-empty (nested block structure).
   final List<MD$Span> spans;
+
+  /// Nested block children when the alert body was re-parsed as blocks
+  /// (e.g. a fenced code block inside `> [!NOTE]`). Empty for leaf bodies.
+  final List<MD$Block> blocks;
 
   @override
   T map<T>({

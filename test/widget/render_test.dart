@@ -78,13 +78,53 @@ void main() {
       });
     });
 
-    testWidgets('task lists render without exceptions', (tester) async {
+    testWidgets('quote with nested fenced code renders', (tester) async {
       await _pumpMarkdown(
         tester,
-        '- [ ] todo\n- [x] done\n- normal item\n  - [ ] nested todo',
+        '> Before the fence.\n'
+        '>\n'
+        '> ```bash\n'
+        '> echo ok\n'
+        '> ```\n'
+        '>\n'
+        '> After the fence.',
+        theme: MarkdownThemeData(
+          textStyle: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 14),
+          quoteStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
+        ),
       );
       expect(tester.takeException(), isNull);
       expect(_mdSize(tester).height, greaterThan(0));
+    });
+
+    test('nested quote prose children inherit quoteStyle', () {
+      const quoteColor = Color(0xFF9E9E9E);
+      const bodyColor = Color(0xFFFFFFFF);
+      final theme = MarkdownThemeData(
+        textStyle: const TextStyle(color: bodyColor, fontSize: 14),
+        quoteStyle: const TextStyle(color: quoteColor, fontSize: 14),
+      );
+      final md = Markdown.fromString(
+        '> prose line\n'
+        '> ```\n'
+        '> code\n'
+        '> ```',
+      );
+      final quote = md.blocks.single as MD$Quote;
+      final para = quote.blocks.whereType<MD$Paragraph>().single;
+      final code = quote.blocks.whereType<MD$Code>().single;
+
+      final proseTheme = BlockPainter$Quote.inheritFrom(theme, para);
+      final codeTheme = BlockPainter$Quote.inheritFrom(theme, code);
+      expect(proseTheme.textStyle.color, quoteColor);
+      expect(codeTheme.textStyle.color, bodyColor);
+
+      final painter = BlockPainter$Paragraph(
+        spans: para.spans,
+        theme: proseTheme,
+      )..layout(400);
+      final root = painter.painter.text! as TextSpan;
+      expect(root.style?.color, quoteColor);
     });
 
     testWidgets('aligned tables render without exceptions', (tester) async {
