@@ -194,7 +194,12 @@ Styling: `textStyle`, per-level `h1Style..h6Style` (+ cached `headingStyleFor`),
 `textStyleFor(MD$Style)` (cached mapping of the bitmask → bold/italic/underline/
 strikethrough/monospace + highlight/monospace backgrounds + link color),
 `linkColor`/`linkStyle`, `surfaceColor` (code/table/quote backgrounds),
-`highlightBackgroundColor`, `monospaceBackgroundColor`, `dividerColor`,
+`highlightBackgroundColor`, `monospaceBackgroundColor`,
+`monospaceFontFamily`/`monospaceFontFamilyFallback` (platform-resolved by
+default — `monospace` on Android/Fuchsia/Linux/web, `Menlo` on iOS/macOS,
+`Consolas` on Windows, from `ThemeData.platform` under `mergeTheme`; one knob
+for both inline `` `code` `` and fenced blocks, and `textStyle`'s own fallback
+chain is appended after it), `dividerColor`,
 `alertColors` (+ built-in GitHub palette fallback via `alertColorFor`),
 `textDirection`, `textScaler`, and `onLinkTap`.
 

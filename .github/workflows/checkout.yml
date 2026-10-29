@@ -92,6 +92,25 @@ jobs:
         run: |
           find lib test -name "*.dart" ! -name "*.*.dart" -print0 | xargs -0 dart format --set-exit-if-changed --line-length 80 -o none
 
+      - name: 🔍 Check what would be published
+        id: check-published-files
+        timeout-minutes: 2
+        # A .pubignore replaces the .gitignore of its own directory for
+        # `pub publish`, so a rule forgotten there uploads credentials or
+        # build output to pub.dev. This is the last line of defence.
+        run: |
+          flutter pub publish --dry-run > /tmp/publish-set.txt 2>&1 || true
+          sed -E 's/.*[├└]── //; s/ \([^)]*\)$//' /tmp/publish-set.txt |
+            grep -iE '^([^ ]+\.(key|pem|p12|jks|keystore)|[^ ]+\.vm\.json|credentials\.json|service-account[^ ]*\.json|build|coverage|reports|node_modules)$' \
+            > /tmp/leaked.txt || true
+          if [ -s /tmp/leaked.txt ]; then
+            echo "::error::Files that must never reach pub.dev are in the published set:"
+            cat /tmp/leaked.txt
+            echo "Add them to .pubignore - it replaces .gitignore for pub."
+            exit 1
+          fi
+          echo "The published file set is clean."
+
       - name: 📈 Check analyzer
         id: check-analyzer
         timeout-minutes: 1
