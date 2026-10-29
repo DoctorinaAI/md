@@ -348,7 +348,20 @@ void main() {
       'quote': '> ציטוט [קישור](https://x.example)',
       'nested quote': '> - פריט [קישור](https://x.example)',
       'alert': '> [!TIP]\n> גוף [קישור](https://x.example)',
-      'alert with children': '> [!TIP]\n> - פריט [קישור](https://x.example)',
+      // A fence in the body makes the body nested blocks rather than
+      // inline spans; the link then sits in a child after it.
+      'quote with children':
+          '> ```\n> x\n> ```\n> גוף [קישור](https://x.example)',
+      'quote with a list child':
+          '> ```\n> x\n> ```\n> - פריט [קישור](https://x.example)',
+      'alert with children':
+          '> [!TIP]\n> ```\n> x\n> ```\n> גוף [קישור](https://x.example)',
+      'quote with a nested quote child':
+          '> ```\n> x\n> ```\n> > מקונן [קישור](https://x.example)',
+      'alert with a table child': '> [!TIP]\n> ```\n> x\n> ```\n'
+          '> | א | ב |\n> |---|---|\n> | 1 | [קישור](https://x.example) |',
+      'alert with a list child':
+          '> [!TIP]\n> ```\n> x\n> ```\n> - פריט [קישור](https://x.example)',
     };
 
     for (final MapEntry(key: name, value: source) in samples.entries) {
@@ -381,9 +394,28 @@ void main() {
           final render = tester.renderObject<RenderBox>(
             find.byType(MarkdownWidget),
           ) as MarkdownSelectionSurface;
-          final rendered = markdownBlockRenderedText(
-            Markdown.fromString(source).blocks.single,
-          );
+          final block = Markdown.fromString(source).blocks.single;
+          if (name.contains('child')) {
+            // Guard the sample itself: it must really nest blocks of the
+            // named kind, or this would only test the leaf path again.
+            final nested = switch (block) {
+              MD$Quote(:final blocks) || MD$Alert(:final blocks) => blocks,
+              _ => const <MD$Block>[],
+            };
+            expect(nested, isNotEmpty, reason: 'no nested blocks');
+            final kind = switch (name) {
+              String n when n.contains('list') => MD$List,
+              String n when n.contains('table') => MD$Table,
+              String n when n.contains('quote child') => MD$Quote,
+              _ => MD$Paragraph,
+            };
+            expect(
+              nested.map((b) => b.runtimeType),
+              contains(kind),
+              reason: 'nested: $nested',
+            );
+          }
+          final rendered = markdownBlockRenderedText(block);
           final start = rendered.indexOf('קישור');
           expect(start, greaterThanOrEqualTo(0), reason: rendered);
           final boxes = render.localBoxesForRange(0, start, start + 5);

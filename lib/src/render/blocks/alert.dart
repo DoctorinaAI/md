@@ -152,22 +152,14 @@ class BlockPainter$Alert
     }
     for (var i = 0; i < _children.length; i++) {
       final child = _children[i];
-      final origin = Offset(_columnLeft, _bodyTop + _childOffsets[i]);
-      if (!(origin & child.size).contains(localPosition)) continue;
-      final inner = localPosition - origin;
-      if (child case final SelectableTextBlock textBlock) {
-        final painter = textBlock.selectionPainter;
-        final local = inner - textBlock.selectionOrigin;
-        if (local.dx < 0 ||
-            local.dy < 0 ||
-            local.dx > painter.width ||
-            local.dy > painter.height) {
-          continue;
-        }
-        final position = painter.getPositionForOffset(local);
-        final span = painter.text?.getSpanForPosition(position);
-        return span is TextSpan ? span : null;
+      final top = _bodyTop + _childOffsets[i];
+      if (localPosition.dy < top ||
+          localPosition.dy >= top + child.size.height) {
+        continue;
       }
+      final span =
+          _childSpanAt(child, localPosition - Offset(_columnLeft, top));
+      return span is TextSpan ? span : null;
     }
     return null;
   }
@@ -335,4 +327,30 @@ class BlockPainter$Alert
       child.dispose();
     }
   }
+}
+
+/// The span under [local] (block-local to [child]) among the text painters
+/// [child] exposes for selection, or null when no painter's box contains it.
+///
+/// Goes through the selection fragments rather than [child]'s size: a child
+/// sizes to its content, which right-to-left text right-aligns within the
+/// column, and a list or table child paints several painters.
+InlineSpan? _childSpanAt(BlockPainter child, Offset local) {
+  final fragments = switch (child) {
+    MultiPainterSelectable(:final fragments) => fragments,
+    SelectableTextBlock(:final selectionPainter, :final selectionOrigin) =>
+      <SelectableFragment>[
+        SelectableFragment(selectionPainter, selectionOrigin, 0),
+      ],
+    _ => const <SelectableFragment>[],
+  };
+  for (final fragment in fragments) {
+    final painter = fragment.painter;
+    final inner = local - fragment.origin;
+    if (!(Offset.zero & painter.size).contains(inner)) continue;
+    return painter.text?.getSpanForPosition(
+      painter.getPositionForOffset(inner),
+    );
+  }
+  return null;
 }

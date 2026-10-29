@@ -254,6 +254,10 @@ extension points or reach into a default block painter's fields. Ordinary
 - **FIXED**: A fenced code block narrower than its padding (at widget widths
   of a few dozen pixels, less inside a quote or alert) threw
   `TextPainter.paint called when text geometry was not yet calculated`.
+- **FIXED**: Links in blocks nested in a quote or alert body (bodies holding a
+  fenced block) open on tap in every child kind, lists and tables included,
+  and in right-to-left documents. Only paragraphs and headings did, and in
+  RTL not even those.
 - **FIXED**: A dry layout at other constraints, made after the real layout,
   left hit testing, highlights and link taps at the measured positions while
   the glyphs stayed put. The real layout is now restored after measuring.
