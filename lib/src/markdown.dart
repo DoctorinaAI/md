@@ -67,13 +67,27 @@ final class Markdown {
           for (final span in spans) {
             buffer.write(span.text);
           }
-        case MD$Quote(:List<MD$Span> spans):
-          for (final span in spans) {
-            buffer.write(span.text);
+        case MD$Quote(:List<MD$Span> spans, :List<MD$Block> blocks):
+          if (blocks.isEmpty) {
+            for (final span in spans) {
+              buffer.write(span.text);
+            }
+          } else {
+            for (var j = 0; j < blocks.length; j++) {
+              if (j > 0) buffer.writeln();
+              buffer.write(blocks[j].text);
+            }
           }
-        case MD$Alert(:List<MD$Span> spans):
-          for (final span in spans) {
-            buffer.write(span.text);
+        case MD$Alert(:List<MD$Span> spans, :List<MD$Block> blocks):
+          if (blocks.isEmpty) {
+            for (final span in spans) {
+              buffer.write(span.text);
+            }
+          } else {
+            for (var j = 0; j < blocks.length; j++) {
+              if (j > 0) buffer.writeln();
+              buffer.write(blocks[j].text);
+            }
           }
         case MD$Code(:String text):
           buffer.write(text);

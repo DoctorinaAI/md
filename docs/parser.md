@@ -47,8 +47,8 @@ signature — a breaking change to every override.
 |---|---|---|
 | `MD$Paragraph` | `paragraph` | `text`, `List<MD$Span> spans` |
 | `MD$Heading` | `heading` | `int level` (1–6), `text`, `spans` |
-| `MD$Quote` | `quote` | `int indent` (**always 1** — nested `>>` not modeled yet), `text`, `spans` |
-| `MD$Alert` | `alert` | `MD$AlertType alert`, `text` (body), `spans` (body only) |
+| `MD$Quote` | `quote` | `int indent` (**always 1** — nested `>>` not modeled yet), `text`, `spans` (leaf) **or** `blocks` (when the body contains a fence / nested structure; then `spans` is empty) |
+| `MD$Alert` | `alert` | `MD$AlertType alert`, `text` (body), `spans` (body only) **or** `blocks` when the body contains a fence |
 | `MD$Code` | `code` | `String? language` (may be `''`), `text` (raw, never span-parsed) |
 | `MD$List` | `list` | `text` (raw slice), `List<MD$ListItem> items` |
 | `MD$Divider` | `divider` | none; `text == '---'` |
@@ -131,7 +131,10 @@ Block-level:
 - **Tables** with a delimiter row encoding per-column alignment (`:--`, `:-:`,
   `--:`); malformed/ragged tables fall back to paragraph.
 - **Alerts** — a blockquote whose first line is `[!NOTE|TIP|IMPORTANT|WARNING|CAUTION]`;
-  unknown markers fall back to a plain quote.
+  unknown markers fall back to a plain quote. Alert/quote bodies that contain a
+  fenced code line (` ``` ` / `~~~`) are **re-parsed as nested blocks**
+  (`MD$Quote.blocks` / `MD$Alert.blocks`) so fences stay `MD$Code` instead of
+  being misread as inline monospace by `_parseInlineSpans`.
 - **Thematic breaks** `---`/`***`/`___` (3+ markers); **ATX headings** `#`–`######`
   (`#hashtag` and 7+ `#` are paragraphs; trailing `#` stripped); **fenced code**
   ` ``` ` / `~~~` with a language label; unterminated fences run to EOF.
@@ -148,7 +151,8 @@ Block-level:
   Tree assembly is a recursive `traverse` over a flat list with a shared mutable
   offset closure (note the intermediate record misspells the field `intent`).
 - `MD$Quote.indent` is hardcoded to 1; alert bodies are trimmed (`skip(1).join('\n').trim()`)
-  while quote bodies keep raw `join('\n')`.
+  while quote bodies keep raw `join('\n')`. Plain quotes/alerts stay leaf `spans`;
+  a body that contains a fence line is re-parsed into `blocks` (spans empty).
 - `MD$Code.language` can be `''` (not null) for a bare fence; `MD$Code.text` is raw.
 - `MD$Table.alignments` may be shorter than the column count — always use
   `alignmentFor(i)`, never index directly.

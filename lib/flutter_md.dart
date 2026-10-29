@@ -25,6 +25,7 @@ export 'src/render.dart'
         BlockPainter$Spacer;
 export 'src/highlight/engine.dart' show CodeHighlightTheme, SyntaxHighlighter;
 export 'src/selection.dart';
+export 'src/selection_autoscroll.dart';
 export 'src/selection_scope.dart';
 export 'src/theme.dart';
 export 'src/widget.dart';
