@@ -378,3 +378,113 @@ P
 SPACER count=1
 @@@ newlines-only
 SPACER count=3
+@@@ patho-star-run-no-closer
+P
+  [0,42] style=0 "a****************************************b"
+@@@ patho-underscore-run-no-closer
+P
+  [0,42] style=0 "a________________________________________b"
+@@@ patho-tilde-run-no-closer
+P
+  [0,42] style=0 "a~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~b"
+@@@ patho-equals-run-no-closer
+P
+  [0,42] style=0 "a========================================b"
+@@@ patho-pipe-run-no-closer
+P
+  [0,42] style=0 "a||||||||||||||||||||||||||||||||||||||||b"
+@@@ patho-bold-openers-no-closer
+P
+  [0,40] style=0 "**a **a **a **a **a **a **a **a **a **a "
+@@@ patho-italic-openers-closer-at-end
+P
+  [1,31] style=1 "x *x *x *x *x *x *x *x *x *x x"
+@@@ patho-mixed-openers-escapes
+P
+  [1,6] style=1 "a *b "
+  [9,12] style=3 "c \\"
+  [15,41] style=1 "d _e __f ~~g ==h ||i _j x*"
+  [43,46] style=0 " y*"
+@@@ patho-marker-run-boundaries
+P
+  [3,4] style=3 "a"
+  [6,7] style=1 "*"
+  [8,11] style=0 " b "
+  [15,20] style=0 "c*** "
+  [22,23] style=4 "d"
+  [25,31] style=0 "_ e___"
+@@@ patho-escaped-backslash-backtick
+P
+  [0,26] style=0 "a\\`\\`\\`\\`\\`\\`\\`\\`\\`\\`\\`\\`b"
+@@@ patho-escaped-backticks-then-real
+P
+  [0,5] style=0 "` x \\"
+  [8,11] style=16 " y "
+  [12,18] style=0 " z ` w"
+@@@ patho-label-openers-one-closer
+P
+  [0,31] style=0 "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]"
+@@@ patho-image-openers-one-closer
+P
+  [0,31] style=0 "![![![![![![![![![![![![![![![]"
+@@@ patho-label-openers-then-link
+P
+  [0,6] style=0 "[[[a] "
+  [6,12] style=32 "b" {href="u", type="link", url="u"}
+  [12,19] style=0 " [[c]] "
+  [19,26] style=64 "d" {src="e", type="image", url="e"}
+@@@ patho-table-rows-no-separator
+P
+  [0,59] style=0 "| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |"
+@@@ patho-table-one-bad-last-row
+P
+  [0,73] style=0 "| h | i |\n|---|---|\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b | c |"
+@@@ patho-table-stacked-pairs-bad-row
+P
+  [0,45] style=0 "|h|\n|-|\n|h|\n|-|\n|h|\n|-|\n|h|\n|-|\n|h|\n|-|\n|a|b|"
+@@@ patho-table-runs-of-counts
+P
+  [0,33] style=0 "| a | b |\n|---|---|\n| 1 | 2 |\n|x|"
+TABLE aligns=[center]
+  header
+    cell0
+      [0,1] style=0 "a"
+  row
+    cell0
+      [0,1] style=0 "1"
+  row
+    cell0
+      [0,1] style=0 "2"
+SPACER count=1
+TABLE aligns=[none,none,none]
+  header
+    cell0
+      [0,1] style=0 "a"
+    cell1
+      [0,1] style=0 "b"
+    cell2
+      [0,1] style=0 "c"
+  row
+    cell0
+      [0,1] style=0 "1"
+    cell1
+      [0,1] style=0 "2"
+    cell2
+      [0,1] style=0 "3"
+@@@ patho-table-cells-with-markers
+TABLE aligns=[none,none]
+  header
+    cell0
+      [0,2] style=0 "*a"
+    cell1
+      [0,2] style=0 "b*"
+  row
+    cell0
+      [0,2] style=0 "`c"
+    cell1
+      [0,2] style=0 "d`"
+  row
+    cell0
+      [0,2] style=0 "[e"
+    cell1
+      [0,5] style=0 "f](g)"

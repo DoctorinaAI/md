@@ -137,6 +137,10 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   /// start of a list item, e.g. `[ ] todo`, `[x] done`, `[X] done`.
   static final RegExp _taskPattern = RegExp(r'^\[([ xX])\](?:[ \t]+(.*))?$');
 
+  /// A regular expression pattern to match one table delimiter cell: dashes
+  /// with an optional leading and/or trailing `:`, e.g. `---`, `:-:`, `--:`.
+  static final RegExp _tableDelimiterCellPattern = RegExp(r'^:?-+:?$');
+
   /// Strips a single leading `>` (and one optional following space) from a
   /// blockquote line, matching the historical trim behavior.
   static String _stripQuoteMarker(String line) => line.substring(1).trim();
@@ -234,7 +238,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
     for (final raw in inner) {
       final cell = raw.trim();
       // Each delimiter cell must be dashes with optional leading/trailing `:`.
-      if (!RegExp(r'^:?-+:?$').hasMatch(cell)) return null;
+      if (!_tableDelimiterCellPattern.hasMatch(cell)) return null;
       final left = cell.startsWith(':');
       final right = cell.endsWith(':');
       aligns.add(left && right
@@ -266,6 +270,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
     if (lines.isEmpty) return const Markdown.empty();
     final blocks = Queue<MD$Block>(); // Queue to accumulate blocks
     final length = lines.length;
+    _TableRuns? tableRuns; // Built on the first `|` line, if any.
 
     // Resolve the inline-math replacement table once; `null` disables math and
     // keeps `_parseInlineSpans` from touching it at all.
@@ -522,20 +527,23 @@ class MarkdownDecoder extends Converter<String, Markdown> {
           );
         }
 
-        final header = textToRow(line);
         // The delimiter row also carries per-column alignment.
         final alignments =
             lines.length > i + 1 ? _parseTableAlignments(lines[i + 1]) : null;
-        final rows = <MD$TableRow>[];
-        var j = i + 2; // Skip the header and separator line
-        for (; j < length && lines[j].startsWith('|'); j++)
-          rows.add(textToRow(lines[j]));
-        // Validate
-        final columns = header.cells.length;
+        // Validate on cell counts before formatting any cell: a rejected
+        // table hands its first line to the paragraph and the next line is
+        // tried as a table again, so per-candidate work must stay O(1).
+        final runs = tableRuns ??= _TableRuns(lines);
+        final columns = runs.cells[i];
+        final j = runs.rowsEnd(i + 2); // Skip the header and separator line
         if (columns > 0 &&
             alignments != null &&
-            rows.every((row) => row.cells.length == columns)) {
+            runs.allCellsEqual(i + 2, j, columns)) {
           // All rows have the same number of cells as the header
+          final header = textToRow(line);
+          final rows = <MD$TableRow>[
+            for (var k = i + 2; k < j; k++) textToRow(lines[k]),
+          ];
           final text = lines.sublist(i, j).join('\n');
           pushBlock(MD$Table(
             text: text,
@@ -893,18 +901,27 @@ bool _isWordChar(int c) =>
     (c >= 0x61 && c <= 0x7A) || // a-z
     c >= 0x80; // Treat non-ASCII (Cyrillic, CJK, emoji, ...) as word chars.
 
-/// Whether there is a non-escaped closing backtick at or after [from].
-bool _hasClosingBacktick(List<int> codes, int length, int from) {
-  for (var j = from; j < length; j++) {
-    if (codes[j] == 0x60 /* ` */ && codes[j - 1] != 0x5C /* \ */) return true;
+/// The index of the last backtick that can close a code span (one not
+/// preceded by `\`), or -1. A backtick has a closer ahead exactly when this
+/// index is past it, so each backtick is checked in O(1) instead of rescanning
+/// the rest of the text.
+int _lastClosingBacktick(List<int> codes, int length) {
+  for (var j = length - 1; j > 0; j--) {
+    if (codes[j] == 0x60 /* ` */ && codes[j - 1] != 0x5C /* \ */) return j;
   }
-  return false;
+  return -1;
 }
 
-/// Whether a valid closing emphasis delimiter for [ch] (of run length
-/// [markerLen]) exists at or after [from]. A closer must be right-flanking
-/// (preceded by a non-space); underscore closers must also be at a word
-/// boundary. Escaped characters are skipped.
+/// The index of the last valid closing emphasis delimiter for [ch] (of run
+/// length [markerLen]), or -1. A closer must be right-flanking (preceded by a
+/// non-space); underscore closers must also be at a word boundary. Escaped
+/// characters are skipped.
+///
+/// An opener has a closer ahead exactly when this index is at or past the end
+/// of its marker, so each opener is checked in O(1) instead of rescanning the
+/// rest of the text (quadratic for runs of markers that never close).
+/// Whether a position closes depends only on its neighbours, so scanning once
+/// from the start finds the same closers as a scan from any opener.
 ///
 /// Right-flanking is a property of the whole delimiter *run*, not the
 /// individual marker character: the deciding character is the one immediately
@@ -913,9 +930,9 @@ bool _hasClosingBacktick(List<int> codes, int length, int from) {
 /// whose boundary is not right-flanking cannot close from any of its inner
 /// delimiters either, so e.g. `a **bold ** x` (the closing `**` follows a
 /// space) stays literal instead of degrading into a lopsided italic.
-bool _hasEmphasisCloser(
-    List<int> codes, int length, int from, int ch, int markerLen) {
-  for (var j = from; j < length; j++) {
+int _lastEmphasisCloser(List<int> codes, int length, int ch, int markerLen) {
+  var last = -1;
+  for (var j = 0; j < length; j++) {
     if (codes[j] == 0x5C /* \ */) {
       j++; // Skip the escaped character.
       continue;
@@ -924,22 +941,23 @@ bool _hasEmphasisCloser(
     if (markerLen == 2) {
       if (j + 1 < length && codes[j + 1] == ch) {
         if (j > 0 && !_isInlineSpace(codes[j - 1]) && codes[j - 1] != ch)
-          return true;
+          last = j;
         j++; // Consume the delimiter pair.
       }
     } else if (j > 0 && !_isInlineSpace(codes[j - 1]) && codes[j - 1] != ch) {
-      if (ch != 0x5F /* _ */) return true;
       // Underscore: also require a word boundary after the closer.
       final after = j + 1;
-      if (after >= length || !_isWordChar(codes[after])) return true;
+      if (ch != 0x5F /* _ */ || after >= length || !_isWordChar(codes[after]))
+        last = j;
     }
   }
-  return false;
+  return last;
 }
 
 /// Validates an emphasis marker occurrence against CommonMark-inspired
-/// flanking and word-boundary rules. Returns `true` when the marker should
-/// toggle the style; `false` leaves it as literal text.
+/// flanking and word-boundary rules. Returns `true` when the marker may
+/// toggle the style; `false` leaves it as literal text. An opener must also
+/// have a closer ahead, which the caller checks via [_lastEmphasisCloser].
 bool _emphasisValid(
     List<int> codes, int length, int i, int ch, int markerLen, bool isOpen) {
   if (isOpen) {
@@ -948,8 +966,7 @@ bool _emphasisValid(
     if (after >= length || _isInlineSpace(codes[after])) return false;
     // Underscore cannot open inside a word (e.g. snake_case).
     if (ch == 0x5F /* _ */ && i > 0 && _isWordChar(codes[i - 1])) return false;
-    // Require a matching closer somewhere ahead.
-    return _hasEmphasisCloser(codes, length, after, ch, markerLen);
+    return true;
   } else {
     // Right-flanking: a non-space must immediately precede the marker.
     if (i == 0 || _isInlineSpace(codes[i - 1])) return false;
@@ -1039,8 +1056,14 @@ List<MD$Span> _parseInlineSpans(String text, {Map<String, String>? math}) {
       if (labelEnd == -1) break;
 
       // Check if the next character is a '(' for the URL
+      // Without a '(' this is not a link. Every '[' before [labelEnd] would
+      // find the same ']' and fail the same way, so resume after it rather
+      // than rescanning the label once per '['.
       final urlIdx = labelEnd + 1;
-      if (urlIdx >= codes.length || codes[urlIdx] != url$start) continue;
+      if (urlIdx >= codes.length || codes[urlIdx] != url$start) {
+        i = labelEnd;
+        continue;
+      }
 
       // find closing ')'
       var urlEnd = -1;
@@ -1102,6 +1125,11 @@ List<MD$Span> _parseInlineSpans(String text, {Map<String, String>? math}) {
   var start = 0; // Start index for the current span
   var mask = MD$Style.none; // Current style mask
   final spans = <MD$Span>[];
+
+  // Closer positions, computed on first use: the last closing backtick, and
+  // the last emphasis closer keyed by `marker << 2 | run length`.
+  int? lastBacktick;
+  Map<int, int>? lastCloser;
 
   var hasExcluded = false; // Flag to check if we have excluded characters
   // Backslash indices to drop from the current span, in ascending order. This
@@ -1223,7 +1251,8 @@ List<MD$Span> _parseInlineSpans(String text, {Map<String, String>? math}) {
           i++; // Double backtick is not supported; skip the next character.
           continue;
         }
-        if (!_hasClosingBacktick(codes, length, i + 1)) continue; // literal `
+        if ((lastBacktick ??= _lastClosingBacktick(codes, length)) <= i)
+          continue; // literal `
         maybePushSpan(i);
         mask ^= MD$Style.monospace;
         start = i + 1;
@@ -1252,6 +1281,10 @@ List<MD$Span> _parseInlineSpans(String text, {Map<String, String>? math}) {
       // instead of leaking their style to the end of the line.
       final isOpen = !mask.contains(emphasis.style);
       if (!_emphasisValid(codes, length, i, ch, emphasis.len, isOpen)) continue;
+      if (isOpen &&
+          ((lastCloser ??= <int, int>{})[ch << 2 | emphasis.len] ??=
+                  _lastEmphasisCloser(codes, length, ch, emphasis.len)) <
+              i + emphasis.len) continue; // No closer ahead: literal marker.
 
       maybePushSpan(i);
       mask ^= emphasis.style;
@@ -1265,6 +1298,54 @@ List<MD$Span> _parseInlineSpans(String text, {Map<String, String>? math}) {
   // This function would parse inline spans like bold, italic, links, etc.
   // For now, it returns an empty list as a placeholder.
   return spans;
+}
+
+/// Table cell counts for every line of a document, so checking whether a
+/// candidate table's rows all match its header costs O(1). Without it, a run
+/// of `|` lines that keeps failing validation re-reads every following row
+/// once per line (quadratic).
+class _TableRuns {
+  _TableRuns(List<String> lines)
+      : cells = Int32List(lines.length),
+        _sameEnd = Int32List(lines.length),
+        _rowsEnd = Int32List(lines.length) {
+    final length = lines.length;
+    for (var k = 0; k < length; k++) {
+      final line = lines[k];
+      if (!line.startsWith('|')) {
+        cells[k] = -1;
+        continue;
+      }
+      // `line.split('|')` yields pipes + 1 parts; the outer two are not cells.
+      var pipes = 0;
+      for (var c = 0; c < line.length; c++) {
+        if (line.codeUnitAt(c) == 0x7C /* | */) pipes++;
+      }
+      cells[k] = pipes - 1;
+    }
+    for (var k = length - 1; k >= 0; k--) {
+      final next = k + 1 < length;
+      _sameEnd[k] = next && cells[k + 1] == cells[k] ? _sameEnd[k + 1] : k + 1;
+      _rowsEnd[k] = cells[k] < 0 ? k : (next ? _rowsEnd[k + 1] : length);
+    }
+  }
+
+  /// The cell count of each line, or -1 when it does not start with `|`.
+  final Int32List cells;
+
+  /// For each line, the index just past its run of lines with equal [cells].
+  final Int32List _sameEnd;
+
+  /// For each line, the index of the first line at or after it not starting
+  /// with `|`.
+  final Int32List _rowsEnd;
+
+  /// The index of the first line at or after [from] not starting with `|`.
+  int rowsEnd(int from) => from < cells.length ? _rowsEnd[from] : cells.length;
+
+  /// Whether every line in `[from, to)` has exactly [count] cells.
+  bool allCellsEqual(int from, int to, int count) =>
+      from >= to || (cells[from] == count && _sameEnd[from] >= to);
 }
 
 // =============================================================================

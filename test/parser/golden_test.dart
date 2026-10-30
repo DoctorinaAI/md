@@ -338,4 +338,34 @@ const Map<String, String> _corpus = <String, String>{
   'empty': '',
   'whitespace-only': '   \t  ',
   'newlines-only': '\n\n\n',
+
+  // Pathological shapes (kept small; pins output across linear rewrites).
+  'patho-star-run-no-closer': r'a****************************************b',
+  'patho-underscore-run-no-closer':
+      r'a________________________________________b',
+  'patho-tilde-run-no-closer': r'a~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~b',
+  'patho-equals-run-no-closer': r'a========================================b',
+  'patho-pipe-run-no-closer': r'a||||||||||||||||||||||||||||||||||||||||b',
+  'patho-bold-openers-no-closer': r'**a **a **a **a **a **a **a **a **a **a ',
+  'patho-italic-openers-closer-at-end': r'*x *x *x *x *x *x *x *x *x *x x*',
+  'patho-mixed-openers-escapes':
+      r'*a \*b **c \\**d _e __f ~~g ==h ||i \_j x** y*',
+  'patho-marker-run-boundaries': r'***a**** b ****c*** __d___ e___',
+  'patho-escaped-backslash-backtick': r'a\\`\\`\\`\\`\\`\\`\\`\\`\\`\\`\\`\\`b',
+  'patho-escaped-backticks-then-real': r'\` x \\` y ` z \` w',
+  'patho-label-openers-one-closer': r'[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]',
+  'patho-image-openers-one-closer': r'![![![![![![![![![![![![![![![]',
+  'patho-label-openers-then-link': r'[[[a] [b](u) [[c]] ![d](e)',
+  'patho-table-rows-no-separator':
+      '| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n',
+  'patho-table-one-bad-last-row':
+      '| h | i |\n|---|---|\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n'
+          '| a | b | c |\n',
+  'patho-table-stacked-pairs-bad-row':
+      '|h|\n|-|\n|h|\n|-|\n|h|\n|-|\n|h|\n|-|\n|h|\n|-|\n|a|b|\n',
+  'patho-table-runs-of-counts':
+      '| a | b |\n|---|---|\n| 1 | 2 |\n|x|\n| a |\n|:-:|\n| 1 |\n| 2 |\n\n'
+          '|a|b|c|\n|-|-|-|\n|1|2|3|',
+  'patho-table-cells-with-markers':
+      '| *a | b* |\n|---|---|\n| `c | d` |\n| [e | f](g) |',
 };
