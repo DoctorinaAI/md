@@ -8,6 +8,17 @@
 
 A high-performance, lightweight Markdown parser and renderer specifically designed for Flutter applications. Perfect for displaying formatted text from AI assistants like ChatGPT, Gemini, and other LLMs.
 
+## 🎮 Live Demo
+
+**[Open the demo](https://doctorinaai.github.io/md/)**. It is the [example app](example/) built for the web, so it runs in the browser with nothing to install.
+
+[![The flutter_md demo: Markdown source on the left, the rendered result on the right](docs/images/demo.png)](https://doctorinaai.github.io/md/)
+
+- **Editor**: type Markdown and see it rendered next to the source
+- **Selection**: select and copy text across blocks
+- **Chat**: selection across messages, and a reply streamed token by token
+- **Highlight**: syntax highlighting of code blocks
+
 ## 🌟 Features
 
 - **🚀 High Performance**: Hand-tuned single-pass parser with minimal allocations
@@ -212,6 +223,53 @@ flutter pub get
 > custom painters, selection surfaces and quote / alert model readers need
 > changes.
 
+### Example
+
+Parse the text once and pass the model to `MarkdownWidget`:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_md/flutter_md.dart';
+
+void main() => runApp(const ExampleApp());
+
+class ExampleApp extends StatelessWidget {
+  const ExampleApp({super.key});
+
+  static final Markdown _markdown = Markdown.fromString('''
+# Hello, **flutter_md**
+
+A paragraph with *emphasis*, `inline code` and a
+[link](https://pub.dev/packages/flutter_md).
+
+- [x] Parse
+- [x] Render
+- [ ] Ship
+''');
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+        home: Scaffold(
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: MarkdownWidget(markdown: _markdown),
+            ),
+          ),
+        ),
+      );
+}
+```
+
+Selection, streaming, highlighting and theming are covered below. See them
+working in the [live demo](https://doctorinaai.github.io/md/), or run the
+[example app](example/) from a clone of this repository:
+
+```bash
+cd example
+flutter run
+```
+
 ## ✂️ Text Selection
 
 Selection is anchored on the immutable Markdown model, not on the render
@@ -389,7 +447,10 @@ llmTokenStream
   (or `.toMarkdown(decoder: ...)`).
 - **Fast.** Replaying a whole message token-by-token is **3–14× faster** than
   the full-reparse approach, and the gap grows with message length
-  (`benchmark/streaming_benchmark.dart`).
+  (`benchmark/streaming_benchmark.dart`). Rendering keeps up: a repaint lays out
+  only the blocks that changed, so a chunk of an 8 KB document takes about
+  **0.3 ms** on an iPad Pro and **0.7 ms** on a Galaxy S22 Ultra
+  ([numbers](docs/benchmarks.md)).
 - **Reusable.** `parser.reset()` clears state for the next message;
   `parser.source` is the raw text accumulated so far, `parser.current` the
   parsed model without adding anything.
@@ -617,6 +678,13 @@ MarkdownThemeData(
 
 ### Performance Optimization
 
+A document too long to parse within a frame can be parsed in slices, pausing
+for the UI between them:
+
+```dart
+final markdown = await Markdown.fromStringAsync(veryLongText);
+```
+
 For large markdown documents or frequently changing content:
 
 ```dart
@@ -649,19 +717,22 @@ hot path with a plain text fast path) and a custom render object that lays the
 whole document into one cached `ui.Picture` instead of a deep tree of per-block
 widgets.
 
-Head-to-head against `flutter_markdown` and `gpt_markdown` on the same machine
-(i7-13700K) with identical styles — full tables and methodology in
-[`benchmark_compare/RESULTS.md`](benchmark_compare/RESULTS.md):
+Head-to-head against `flutter_markdown` and `gpt_markdown` with identical
+styles, on an iPad Pro (M2), a Galaxy S22 Ultra and a MacBook Pro (M3 Max) — devices,
+versions, full tables and method in [`docs/benchmarks.md`](docs/benchmarks.md):
 
-- **Parsing** — **~18× faster** than the `markdown` package that backs
+- **Parsing** — **~27× faster** than the `markdown` package that backs
   `flutter_markdown` (`gpt_markdown` has no standalone parser), sustaining
-  ~60 MB/s on mixed documents.
-- **Rendering** (string → painted pixels) — **~6.6× faster than
-  `flutter_markdown` and ~15.6× faster than `gpt_markdown`** on a large document
-  (1.2–1.6× on small chat bubbles).
-- **Scrolling** — 60 fps with **zero dropped frames** in profile mode, and the
-  lowest UI-thread frame-build cost of the three (99th-percentile frame build
-  **1.6 ms** vs 4.8 / 9.4 ms).
+  ~75 MB/s on mixed documents.
+- **Rendering** — on a large document the first frame builds **~2× faster** on
+  real devices (~6× and ~7.5× in the headless `flutter test` benchmark). Small
+  chat bubbles are roughly even.
+- **Streaming** — a chunk of a growing 8 KB document costs **0.3 ms** at the median
+  on the iPad and **0.7 ms** on the phone, because unchanged blocks keep their
+  laid-out text.
+- **Scrolling** — no frame over budget on any of the three devices, and the
+  lowest UI-thread build cost of the three libraries (99th percentile **3.3 ms**
+  vs 6.3 / 5.6 ms on the iPad).
 
 ```bash
 # In-repo parser micro-benchmarks:
@@ -751,7 +822,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🔗 Links
 
 - [Documentation](https://pub.dev/documentation/flutter_md/latest/)
-- [Example App](https://github.com/DoctorinaAI/md/tree/main/example)
+- [Live Demo](https://doctorinaai.github.io/md/)
+- [Example App](https://github.com/DoctorinaAI/md/tree/master/example)
 - [Issue Tracker](https://github.com/DoctorinaAI/md/issues)
 - [Pub.dev Package](https://pub.dev/packages/flutter_md)
 
