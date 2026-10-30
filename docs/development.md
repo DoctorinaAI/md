@@ -33,6 +33,7 @@ dart run benchmark/parse_benchmark.dart       # single mixed doc vs Google `mark
 dart run benchmark/compare.dart --save        # write baseline → benchmark/.baseline.txt (uncommitted)
 dart run benchmark/compare.dart               # compare current vs saved baseline, prints delta %
 dart compile exe benchmark/parser_benchmark.dart -o /tmp/pb && /tmp/pb   # stabler AOT numbers
+dart run benchmark/hostile_benchmark.dart     # scaling on quadratic-prone inputs (growth column: 8x = linear)
 
 flutter test benchmark/render_benchmark.dart                                    # vs benchmark/.render_baseline.txt
 flutter test benchmark/render_benchmark.dart --dart-define=RENDER_BASELINE=save # record new baseline

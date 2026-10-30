@@ -1,5 +1,17 @@
 ## Unreleased
 
+### Parser
+- **FIXED**: A paragraph with more than 65535 links or images hung the parser
+  in an endless loop. Links are now matched by a cursor, with no size limit.
+- **FIXED**: Hostile input no longer freezes the UI. Parsing is linear for
+  unclosed emphasis markers, backticks after an escaped backslash, tables that
+  fail validation, label openers, spaces inside a heading (32 KB took more than
+  15 seconds), deeply nested `>` (8 KB with a fence took more than 20 seconds)
+  and unclosed `^{` / `_{` in inline math.
+- **CHANGED**: A fenced code block is parsed as nested blocks down to 32 quote
+  levels. Below that the quote body is inline text, so input cannot overflow
+  the stack however deep it nests.
+
 ### Selection
 - **FIXED**: "Looking up a deactivated widget's ancestor is unsafe" from
   `MarkdownSelectionScope`'s controller listener. Since the desktop-menu fix in

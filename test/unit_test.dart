@@ -8,6 +8,7 @@ import 'parser/block_test.dart' as block_test;
 import 'parser/edge_cases_test.dart' as edge_cases_test;
 import 'parser/gfm_test.dart' as gfm_test;
 import 'parser/golden_test.dart' as golden_test;
+import 'parser/hostile_input_test.dart' as hostile_input_test;
 import 'parser/inline_test.dart' as inline_test;
 import 'parser/math_test.dart' as math_test;
 import 'parser/parser_test.dart' as parser_test;
@@ -50,6 +51,7 @@ import 'widget/widget_test.dart' as widget_test;
 
 void main() => group('Unit', () {
       parser_test.main();
+      hostile_input_test.main();
       block_test.main();
       inline_test.main();
       gfm_test.main();
