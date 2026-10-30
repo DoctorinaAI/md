@@ -374,10 +374,91 @@ def f(x): return x
           TextSpan(children: highlighter.highlight(src, 'diff', base)),
         );
         Color? lineColor(String line) =>
-            frags.firstWhere((f) => f.$1.startsWith(line)).$2.color;
+            frags.firstWhere((f) => f.$1.contains(line)).$2.color;
         expect(lineColor('old'), deleted);
         expect(lineColor('new'), inserted);
       }
+    });
+  });
+
+  group('Highlight › span runs', () {
+    const base = TextStyle(fontSize: 14, color: Color(0xFFC9D1D9));
+    final highlighter = MarkdownHighlighter(
+      languages: {
+        'dart': allHighlightLanguages['dart']!,
+        'python': allHighlightLanguages['python']!,
+      },
+      theme: HighlightThemes.githubDark,
+    );
+
+    test('spans are flat and neighbours differ', () {
+      const code = 'final a = <int>[1, 2, 3]; // c\nfinal b = a.map((x) => x);';
+      final spans = highlighter.highlight(code, 'dart', base);
+      expect(TextSpan(children: spans).toPlainText(), code);
+      final styles = <TextStyle?>[];
+      for (final span in spans.cast<TextSpan>()) {
+        expect(span.children, isNull);
+        styles.add(span.style);
+      }
+      for (var i = 1; i < styles.length; i++) {
+        expect(styles[i], isNot(styles[i - 1]), reason: 'span $i');
+      }
+    });
+
+    test('punctuation in the foreground color costs no span', () {
+      final spans = highlighter.highlight('(((,,,)))', 'dart', base);
+      expect(spans, hasLength(1));
+      expect((spans.single as TextSpan).style, isNull);
+    });
+
+    test('blanks join colored text but not italic comments', () {
+      final words = highlighter.highlight('final const', 'dart', base);
+      expect(words, hasLength(1));
+      expect((words.single as TextSpan).text, 'final const');
+
+      final frags = _fragments(
+        TextSpan(
+          children: highlighter.highlight('final  // c\n  final', 'dart', base),
+        ),
+      );
+      final comment = frags.firstWhere((f) => f.$1.contains('//'));
+      expect(comment.$1, '// c');
+      expect(comment.$2.fontStyle, FontStyle.italic);
+    });
+
+    test('a nested token keeps the style of its parent', () {
+      final frags = _fragments(
+        TextSpan(children: highlighter.highlight(r"'a$b'", 'dart', base)),
+        base,
+      );
+      expect(frags.map((f) => f.$1).join(), r"'a$b'");
+      expect(frags.first.$2.color, isNot(base.color));
+    });
+
+    test('a repeated request returns the same spans, new input new ones', () {
+      const code = 'final a = 1;';
+      final first = highlighter.highlight(code, 'dart', base);
+      expect(highlighter.highlight(code, 'dart', base), same(first));
+      expect(highlighter.highlight(code, 'DART', base), same(first));
+      expect(highlighter.highlight(code, 'python', base), isNot(same(first)));
+      expect(
+        highlighter.highlight(code, 'dart', base.copyWith(fontSize: 20)),
+        isNot(same(first)),
+      );
+    });
+
+    test('the cache is bounded, and oversized code is not kept', () {
+      final huge = 'a' * ((1 << 18) + 1);
+      final first = highlighter.highlight(huge, 'dart', base);
+      expect(highlighter.highlight(huge, 'dart', base), isNot(same(first)));
+
+      const code = 'final evicted = 1;';
+      final kept = highlighter.highlight(code, 'dart', base);
+      final filler = 'b' * (1 << 17);
+      highlighter
+        ..highlight('$filler 1', 'dart', base)
+        ..highlight('$filler 2', 'dart', base);
+      expect(highlighter.highlight(code, 'dart', base), isNot(same(kept)));
     });
   });
 
