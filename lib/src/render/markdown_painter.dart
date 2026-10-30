@@ -13,6 +13,7 @@ import 'package:meta/meta.dart' as meta show internal;
 import '../markdown.dart';
 import '../nodes.dart';
 import '../theme.dart';
+import 'block_identity.dart';
 import 'block_painter.dart';
 import 'blocks/alert.dart';
 import 'blocks/code.dart';
@@ -55,6 +56,7 @@ class MarkdownPainter {
 
   void _handleImageChanged(bool relayout) {
     _lastSize = null;
+    _lastPicture?.dispose();
     _lastPicture = null;
     if (relayout) _needsLayout = true;
     onImageChanged?.call(relayout);
@@ -167,20 +169,22 @@ class MarkdownPainter {
 
   /// Rebuilds the block painters from the markdown blocks.
   /// This method is called whenever the markdown or theme changes.
-  void _rebuild() {
+  ///
+  /// The first [kept] painters, already built for the same blocks, stay.
+  void _rebuild({int kept = 0}) {
     _images.nextGeneration();
-    _images.run(_buildPainters);
+    _images.run(() => _buildPainters(kept));
   }
 
-  void _buildPainters() {
+  void _buildPainters(int kept) {
     _needsLayout = true; // Mark that layout needs to be recalculated.
     _size = Size.zero; // Reset size before rebuilding.
     final filter = _theme.blockFilter;
     final builder = _theme.builder ?? _defaultBlockBuilder;
     final blocks = _markdown.blocks;
-    final painters = <BlockPainter>[];
-    final sources = <int>[];
-    for (var i = 0; i < blocks.length; i++) {
+    final painters = <BlockPainter>[..._blockPainters.take(kept)];
+    final sources = <int>[for (var i = 0; i < kept; i++) i];
+    for (var i = kept; i < blocks.length; i++) {
       final block = blocks[i];
       if (filter != null && !filter(block)) continue;
       painters
@@ -399,15 +403,61 @@ class MarkdownPainter {
   }) {
     if (identical(_markdown, markdown) && identical(_theme, theme))
       return false;
+    final kept = _reusablePainters(markdown, theme);
+    if (!_needsLayout &&
+        kept == _blockPainters.length &&
+        kept == markdown.blocks.length &&
+        _canReusePainters(theme)) {
+      // Nothing to draw differently: a parent rebuilt, or the same text was
+      // parsed again. Layout and the cached picture stay valid.
+      _markdown = markdown;
+      _theme = theme;
+      return false;
+    }
     _lastSize = null;
+    _lastPicture?.dispose();
     _lastPicture = null;
+    _keptBlocks = kept;
+    if (kept < _prefixBlocks) _dropPrefixPicture();
+    // A host builder may hand out a painter it still holds on to.
+    if (_theme.builder == null) {
+      for (final painter in _blockPainters.skip(kept)) {
+        painter.dispose();
+      }
+    }
     // Pictures resolved by another resolver are stale.
     if (_theme.imageResolver != theme.imageResolver) _images.clear();
     _markdown = markdown;
     _theme = theme;
     _isEmpty = markdown.isEmpty;
-    _rebuild();
+    _rebuild(kept: kept);
     return true; // Indicate that the painter was updated.
+  }
+
+  /// Whether painters built for the current theme may serve [theme]. Hooks can
+  /// depend on outside state, and pictures are tracked per document generation,
+  /// so a theme with any of them always builds anew.
+  bool _canReusePainters(MarkdownThemeData theme) =>
+      theme.builder == null &&
+      theme.imageResolver == null &&
+      theme.blockFilter == null &&
+      theme.spanFilter == null &&
+      _theme.paintsLike(theme);
+
+  /// How many leading painters can stay when moving to [markdown] and [theme].
+  ///
+  /// A streamed document only changes at its end, so this keeps the shaped text
+  /// of everything before it. The comparison stops at the first difference and
+  /// costs far less than laying a block out again.
+  int _reusablePainters(Markdown markdown, MarkdownThemeData theme) {
+    if (!_canReusePainters(theme)) return 0;
+    final before = _markdown.blocks, after = markdown.blocks;
+    final limit = math.min(before.length, after.length);
+    var kept = 0;
+    while (kept < limit && markdownBlocksSame(before[kept], after[kept])) {
+      kept++;
+    }
+    return kept;
   }
 
   /// Invalidate cached layouts when system fonts change.
@@ -415,7 +465,10 @@ class MarkdownPainter {
   void invalidateLayout() {
     _needsLayout = true;
     _lastSize = null;
+    _lastPicture?.dispose();
     _lastPicture = null;
+    _keptBlocks = 0;
+    _dropPrefixPicture();
     // Dispose and rebuild all block painters to recreate TextPainters
     // with the new system fonts
     for (final painter in _blockPainters) {
@@ -462,6 +515,8 @@ class MarkdownPainter {
     // min-width constraints), so hit tests must accept that whole width.
     _hitWidth =
         laidOutWidth.isFinite ? math.max(size.width, laidOutWidth) : size.width;
+    if (laidOutWidth != _prefixLayoutWidth) _dropPrefixPicture();
+    _prefixLayoutWidth = laidOutWidth;
     _needsLayout = false; // No need to layout if the markdown is empty.
     return _size = size;
   }
@@ -567,6 +622,52 @@ class MarkdownPainter {
   @visibleForTesting
   Picture? get debugCachedPicture => _lastPicture;
 
+  /// How many leading painters the last [update] kept. Only those can get into
+  /// [_prefixPicture]: a document that is streamed changes after them.
+  int _keptBlocks = 0;
+
+  /// The first [_prefixBlocks] blocks already recorded, so that a streamed
+  /// chunk records only what follows them instead of the whole document.
+  Picture? _prefixPicture;
+  int _prefixBlocks = 0;
+  double? _prefixWidth;
+  double? _prefixLayoutWidth;
+
+  /// Prefixes shorter than this are cheaper to record again than to keep.
+  static const int _minPrefixGrowth = 16;
+
+  /// The recorded prefix, for tests.
+  @visibleForTesting
+  int get debugPrefixBlocks => _prefixBlocks;
+
+  void _dropPrefixPicture() {
+    _prefixPicture?.dispose();
+    _prefixPicture = null;
+    _prefixBlocks = 0;
+    _prefixWidth = null;
+  }
+
+  /// Records the kept blocks again once they outgrow the prefix by a quarter,
+  /// always flat, so the picture never nests deeper than one level and the
+  /// total recording work stays proportional to the blocks that arrived.
+  void _updatePrefixPicture(Size size) {
+    if (_prefixWidth != size.width) _dropPrefixPicture();
+    final growth = _keptBlocks - _prefixBlocks;
+    if (growth < _minPrefixGrowth || growth * 4 < _prefixBlocks) return;
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
+    var offset = .0;
+    for (var i = 0; i < _keptBlocks; i++) {
+      final painter = _blockPainters[i];
+      painter.paint(canvas, size, offset);
+      offset += painter.size.height;
+    }
+    _prefixPicture?.dispose();
+    _prefixPicture = recorder.endRecording();
+    _prefixBlocks = _keptBlocks;
+    _prefixWidth = size.width;
+  }
+
   /// The markdown content to paint.
   void paint(Canvas canvas, Size size) {
     assert(
@@ -595,7 +696,20 @@ class MarkdownPainter {
     // Paint each block painter on the canvas.
     var overflow = _size.height > size.height;
     var offset = .0;
-    for (var painter in _blockPainters) {
+    var first = 0;
+    if (!overflow) {
+      _updatePrefixPicture(size);
+      final prefix = _prefixPicture;
+      if (prefix != null) {
+        $canvas.drawPicture(prefix);
+        first = _prefixBlocks;
+        for (var i = 0; i < first; i++) {
+          offset += _blockPainters[i].size.height;
+        }
+      }
+    }
+    for (var i = first; i < _blockPainters.length; i++) {
+      final painter = _blockPainters[i];
       if (overflow && offset > size.height) {
         // If the painter's height exceeds the available height,
         // we stop painting further blocks.
@@ -607,6 +721,7 @@ class MarkdownPainter {
 
     final picture = recorder.endRecording();
     canvas.drawPicture(picture);
+    _lastPicture?.dispose();
     _lastSize = size;
     _lastPicture = picture;
   }
@@ -615,6 +730,7 @@ class MarkdownPainter {
     _images.dispose();
     _lastPicture?.dispose();
     _lastPicture = null;
+    _dropPrefixPicture();
     for (final painter in _blockPainters) {
       painter.dispose();
     }

@@ -106,12 +106,28 @@ class BlockPainter$Table
   List<List<TextPainter>> _cellPainters = const [];
 
   @override
-  List<SelectableFragment> get fragments => _fragments;
-  List<SelectableFragment> _fragments = const <SelectableFragment>[];
+  List<SelectableFragment> get fragments {
+    if (_fragments == null) _rebuildFragments();
+    return _fragments!;
+  }
+
+  List<SelectableFragment>? _fragments = const <SelectableFragment>[];
 
   @override
-  String get renderedText => _renderedText;
-  String _renderedText = '';
+  String get renderedText {
+    if (_renderedText == null) _rebuildFragments();
+    return _renderedText!;
+  }
+
+  String? _renderedText = '';
+
+  /// The width of the last layout, when it can be reused as is.
+  double? _laidOutWidth;
+
+  /// The natural and minimum column widths, once measured. They do not depend
+  /// on the layout width unless the table holds pictures.
+  List<double>? _naturalWidths;
+  List<double>? _minimumWidths;
 
   /// Last span hit by the tap down event.
   InlineSpan? _lastSpan;
@@ -181,58 +197,56 @@ class BlockPainter$Table
   Size layout(double width) {
     if (columns < 1) return _size = Size.zero;
 
-    // Dispose old painters
-    for (final row in _cellPainters) {
-      for (final painter in row) {
-        painter.dispose();
-      }
-    }
+    // Pictures can change size between two layouts at one width.
+    if (width == _laidOutWidth) return _size;
+    final fixedContent = theme.imageResolver == null;
+    _laidOutWidth = fixedContent ? width : null;
 
     final allRows = [header, ...rows];
-    final naturalWidths = List<double>.filled(columns, 0.0);
     final headerStyle = theme.textStyle.copyWith(fontWeight: FontWeight.bold);
 
-    // Create painters for each row and column and calculate natural widths
-    _cellPainters = List.generate(allRows.length, (r) {
-      final row = allRows[r];
-      return List.generate(columns, (c) {
-        if (c >= row.cells.length) {
-          return TextPainter(textDirection: theme.textDirection);
-        }
-        final cell = row.cells[c];
-        final textPainter = TextPainter(
-          text: paragraphFromMarkdownSpans(
-              spans: cell,
-              theme: theme,
-              textStyle: r == 0 ? headerStyle : null),
-          textAlign: switch (_columnAlign(c)) {
-            MD$TableColumnAlign.left => TextAlign.left,
-            MD$TableColumnAlign.center => TextAlign.center,
-            MD$TableColumnAlign.right => TextAlign.right,
-            MD$TableColumnAlign.none =>
-              (r == 0) ? TextAlign.center : TextAlign.start,
-          },
-          textDirection: theme.textDirection,
-          textScaler: theme.textScaler,
-        );
-
-        // Calculate natural width
-        layoutMarkdownText(textPainter);
-        naturalWidths[c] =
-            math.max(naturalWidths[c], textPainter.width + padding * 2);
-
-        return textPainter;
+    // The painters are built once: the text of a cell is the same at any width.
+    if (_cellPainters.isEmpty) {
+      _cellPainters = List.generate(allRows.length, (r) {
+        final row = allRows[r];
+        return List.generate(columns, (c) {
+          if (c >= row.cells.length) {
+            return TextPainter(textDirection: theme.textDirection);
+          }
+          return TextPainter(
+            text: paragraphFromMarkdownSpans(
+                spans: row.cells[c],
+                theme: theme,
+                textStyle: r == 0 ? headerStyle : null),
+            textAlign: switch (_columnAlign(c)) {
+              MD$TableColumnAlign.left => TextAlign.left,
+              MD$TableColumnAlign.center => TextAlign.center,
+              MD$TableColumnAlign.right => TextAlign.right,
+              MD$TableColumnAlign.none =>
+                (r == 0) ? TextAlign.center : TextAlign.start,
+            },
+            textDirection: theme.textDirection,
+            textScaler: theme.textScaler,
+          );
+        });
       });
-    });
+    }
+
+    final naturalWidths = _naturalWidths ?? _measureNaturalWidths(width);
+    if (fixedContent) _naturalWidths = naturalWidths;
 
     // A table that fits keeps its natural widths, so the minimum widths, which
     // cost a paragraph per cell, are only measured for one that does not.
-    _columnWidths.setAll(
-      0,
-      naturalWidths.reduce((a, b) => a + b) <= width
-          ? naturalWidths
-          : _distributeWidths(naturalWidths, _minWidths(headerStyle), width),
-    );
+    if (naturalWidths.reduce((a, b) => a + b) <= width) {
+      _columnWidths.setAll(0, naturalWidths);
+    } else {
+      final minWidths = _minimumWidths ?? _minWidths(headerStyle);
+      if (fixedContent) _minimumWidths = minWidths;
+      _columnWidths.setAll(
+        0,
+        _distributeWidths(naturalWidths, minWidths, width),
+      );
+    }
 
     final totalWidth = _columnWidths.reduce((a, b) => a + b);
 
@@ -297,9 +311,34 @@ class BlockPainter$Table
     }
     _borderPoints = points;
 
-    _rebuildFragments(allRows);
+    _fragments = null;
+    _renderedText = null;
 
     return _size = Size(totalWidth, totalHeight);
+  }
+
+  /// Lays out each cell once and returns the width each column would take
+  /// without wrapping, padding included.
+  List<double> _measureNaturalWidths(double width) {
+    final natural = List<double>.filled(columns, 0.0);
+    // The natural width of a paragraph does not depend on the width it is laid
+    // out at, but a finite one spares centered text a second pass, and a cell
+    // that fits its column keeps this layout. A picture does scale with it.
+    final measureWidth = theme.imageResolver == null && width.isFinite
+        ? math.max(0.0, width)
+        : double.infinity;
+    for (final row in _cellPainters) {
+      for (var c = 0; c < columns; c++) {
+        final painter = row[c];
+        if (painter.text == null) continue;
+        layoutMarkdownText(painter, maxWidth: measureWidth);
+        natural[c] = math.max(
+          natural[c],
+          painter.maxIntrinsicWidth + padding * 2,
+        );
+      }
+    }
+    return natural;
   }
 
   /// The width of each column's longest word plus padding, which the column
@@ -334,7 +373,8 @@ class BlockPainter$Table
   /// Rebuilds the selectable fragments (row-major: cells joined by `\t`, rows by
   /// `\n`) so they line up with `markdownBlockRenderedText`. Only the cells that
   /// exist in the source row contribute text, matching the painted cells.
-  void _rebuildFragments(List<MD$TableRow> allRows) {
+  void _rebuildFragments() {
+    final allRows = [header, ...rows];
     final frags = <SelectableFragment>[];
     final text = StringBuffer();
     var rowTop = 0.0;
@@ -426,7 +466,9 @@ class BlockPainter$Table
       }
     }
     _cellPainters = const [];
+    _laidOutWidth = null;
     _fragments = const <SelectableFragment>[];
+    _renderedText = '';
   }
 
   /// Helper function to distribute widths among columns, respecting minimums.

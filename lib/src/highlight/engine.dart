@@ -171,6 +171,15 @@ final class MarkdownHighlighter implements SyntaxHighlighter {
   /// The theme used to color tokens.
   final CodeHighlightTheme theme;
 
+  /// The latest results, oldest first, holding at most [_maxCachedLength] code
+  /// units of code. Block painters are rebuilt whenever a list item scrolls
+  /// back into view and, under some themes, on every streamed chunk, for code
+  /// that has not changed.
+  final Map<(String, String, TextStyle), List<InlineSpan>> _cache =
+      <(String, String, TextStyle), List<InlineSpan>>{};
+  int _cachedLength = 0;
+  static const int _maxCachedLength = 1 << 18;
+
   @override
   Color? backgroundFor(String? language) => theme.background;
 
@@ -189,7 +198,19 @@ final class MarkdownHighlighter implements SyntaxHighlighter {
     final grammar =
         language == null ? null : _languages[language.toLowerCase()];
     if (grammar == null) return <InlineSpan>[TextSpan(text: code)];
-    return _spansFor(_tokenize(code, grammar), theme);
+    final key = (language!.toLowerCase(), code, baseStyle);
+    final cached = _cache.remove(key);
+    if (cached != null) return _cache[key] = cached;
+    final spans = _spansFor(_tokenize(code, grammar), theme, baseStyle);
+    if (code.length > _maxCachedLength) return spans;
+    _cache[key] = spans;
+    _cachedLength += code.length;
+    while (_cachedLength > _maxCachedLength) {
+      final oldest = _cache.keys.first;
+      _cachedLength -= oldest.$2.length;
+      _cache.remove(oldest);
+    }
+    return spans;
   }
 }
 
@@ -427,20 +448,124 @@ List<_Node>? _applyRule(String text, GrammarToken rule, int depth) {
   return out;
 }
 
-/// Converts the tokenized tree into [InlineSpan]s, resolving each token's style
-/// from [theme]. Container spans carry no text of their own; children inherit
-/// the enclosing style, so token colors compose down the tree.
-List<InlineSpan> _spansFor(List<_Node> nodes, CodeHighlightTheme theme) {
-  final out = <InlineSpan>[];
-  for (final node in nodes) {
-    switch (node) {
-      case _Text(:final text):
-        out.add(TextSpan(text: text));
-      case _Span(:final type, :final alias, :final children):
-        final style = (alias == null ? null : theme.styleFor(alias)) ??
-            theme.styleFor(type);
-        out.add(TextSpan(style: style, children: _spansFor(children, theme)));
+/// The style of a token at some depth of the tree, resolved once per path of
+/// token types: a code block has thousands of tokens but few distinct paths.
+final class _Resolved {
+  _Resolved(this.style, {required TextStyle base})
+      : plain = style == null || base.merge(style) == base,
+        colorOnly = style == null ||
+            (style.foreground == null &&
+                base.foreground == null &&
+                base.merge(style).copyWith(color: base.color) == base);
+
+  /// The style relative to the code block's base, `null` at the root.
+  final TextStyle? style;
+
+  /// Whether this paints exactly like the base style.
+  final bool plain;
+
+  /// Whether this differs from the base by color at most, so white space
+  /// painted in it looks the same as in any other such style.
+  final bool colorOnly;
+
+  final Map<String, _Resolved> _children = <String, _Resolved>{};
+
+  _Resolved child(_Span span, CodeHighlightTheme theme, TextStyle base) =>
+      _children[span.alias == null
+          ? span.type
+          : '${span.type} ${span.alias}'] ??= () {
+        final own = (span.alias == null ? null : theme.styleFor(span.alias!)) ??
+            theme.styleFor(span.type);
+        final parent = style;
+        return _Resolved(
+          parent == null || own == null ? parent ?? own : parent.merge(own),
+          base: base,
+        );
+      }();
+}
+
+/// Whether [text] holds only spaces and line breaks.
+bool _isBlank(String text) {
+  for (var i = 0; i < text.length; i++) {
+    switch (text.codeUnitAt(i)) {
+      case 0x20 || 0x09 || 0x0A || 0x0D:
+        continue;
+      default:
+        return false;
     }
   }
+  return true;
+}
+
+/// Converts the tokenized tree into a flat list of [TextSpan]s with one span
+/// per run of text painted alike. Every span pushes a style into the paragraph
+/// and paints separately, so tokens that do not change what is on screen
+/// (punctuation in the foreground color, the blanks between two words) must not
+/// cost a span.
+List<InlineSpan> _spansFor(
+  List<_Node> nodes,
+  CodeHighlightTheme theme,
+  TextStyle base,
+) {
+  final out = <InlineSpan>[];
+  final run = StringBuffer();
+  var runBlank = true;
+  _Resolved? runStyle;
+
+  void flush() {
+    if (run.isEmpty) return;
+    final style = runStyle;
+    out.add(TextSpan(
+      text: run.toString(),
+      style: style == null || style.plain ? null : style.style,
+    ));
+    run.clear();
+    runBlank = true;
+  }
+
+  void write(String text, _Resolved resolved) {
+    if (text.isEmpty) return;
+    final blank = _isBlank(text);
+    final current = runStyle;
+    if (current == null) {
+      runStyle = resolved;
+    } else if (!identical(current, resolved) &&
+        !(current.plain && resolved.plain) &&
+        current.style != resolved.style) {
+      // Blanks show no color: they join the run on the left, and a run of them
+      // takes the color of what follows.
+      if (resolved.colorOnly && current.colorOnly) {
+        if (blank) {
+          run.write(text);
+          return;
+        }
+        if (runBlank) {
+          runStyle = resolved;
+          runBlank = false;
+          run.write(text);
+          return;
+        }
+      }
+      flush();
+      runStyle = resolved;
+    }
+    runBlank = runBlank && blank;
+    run.write(text);
+  }
+
+  final root = _Resolved(null, base: base);
+  void visit(List<_Node> nodes, _Resolved parent) {
+    for (final node in nodes) {
+      switch (node) {
+        case _Text(:final text):
+          write(text, parent);
+        case _Span(:final children):
+          visit(children, parent.child(node, theme, base));
+      }
+    }
+  }
+
+  visit(nodes, root);
+  flush();
   return out;
 }
