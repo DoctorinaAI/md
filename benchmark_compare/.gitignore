@@ -6,6 +6,9 @@ pubspec.lock
 # Generated platform scaffolding (regenerate with:
 #   flutter create --platforms=linux --project-name md_benchmark_compare .)
 linux/
+macos/
+ios/
+android/
 .metadata
 .flutter-plugins-dependencies
 *.iml

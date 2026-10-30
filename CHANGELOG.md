@@ -1,16 +1,40 @@
-## Unreleased
+## 0.3.1
 
 ### Rendering
-- **IMPROVED**: Layout is cheaper with identical output: up to 22% off a first
-  frame of a large mixed document, up to 14% on lists. A table that fits no
+- **IMPROVED**: Highlighted code blocks are cheaper with identical pixels:
+  `MarkdownHighlighter.highlight` returns a flat list with one span per run of
+  text painted alike. On real devices the first display is 20-31% cheaper and a
+  streamed chunk 20-40%. Code reading the nested token spans sees flat ones.
+- **IMPROVED**: `MarkdownHighlighter` keeps its latest results (up to 256 KB of
+  code), so a block seen before is not tokenized again.
+- **IMPROVED**: Layout is cheaper with identical output: in the headless
+  benchmark, up to 22% off a first frame of a large mixed document and up to
+  14% on lists. A table that fits no
   longer measures the longest word of every cell, list items with the same
   marker share one laid-out painter, and unstyled spans skip re-encoding the
   parent style.
+- **IMPROVED**: Streaming is 5–8× cheaper per chunk on real devices. An update
+  keeps the painters of the unchanged blocks at the start of the document, and
+  records only what follows them. Applies to a theme without `builder`,
+  `imageResolver`, `blockFilter` or `spanFilter`.
+- **IMPROVED**: Relayout at a new width is 16–24× cheaper: lists and tables keep
+  their text painters across layouts instead of rebuilding them.
+- **IMPROVED**: Rebuilding a parent no longer lays out a document whose text and
+  theme values did not change, even when the `Markdown` or theme is a new object.
+- **FIXED**: `MarkdownPainter.update` released replaced block painters and
+  pictures only on garbage collection; it now disposes them. A painter from a
+  host `builder` is still left to the host.
 - **CHANGED**: `paragraphFromMarkdownSpans` leaves `style` null on an unstyled
   child span, which inherits the parent `TextSpan`'s style. The result looks
   the same; code reading `child.style` directly sees null.
 
 ### Parser
+- **ADDED**: `Markdown.fromStringAsync` and `MarkdownDecoder.convertAsync` parse
+  a long document in slices of 4 ms by default, pausing until the end of the
+  frame when one is on the way. The result equals that of the sync parse. For
+  5 MB, the longest gap between frames falls from 129 to 19 ms on an iPad Pro
+  and from 258 to 34 ms on a Galaxy S22 Ultra, for 2-3 times the total time. A
+  single huge block is still parsed in one go.
 - **FIXED**: A paragraph with more than 65535 links or images hung the parser
   in an endless loop. Links are now matched by a cursor, with no size limit.
 - **FIXED**: Hostile input no longer freezes the UI. Parsing is linear for
@@ -29,6 +53,11 @@
   selection or re-registers documents from a widget's `dispose` (a chat body
   leaving a virtualized list) notifies while the scope above that body is
   deactivated. The scope now reads the platform in `didChangeDependencies`.
+
+### Benchmarks
+- **ADDED**: [`docs/benchmarks.md`](docs/benchmarks.md): results per device with
+  hardware, versions and method, for an iPad Pro, a Galaxy S22 Ultra and a
+  MacBook Pro. The on-device suite is `benchmark_compare/tool/device_bench.sh`.
 
 ## 0.3.0
 

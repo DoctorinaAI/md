@@ -1,0 +1,43 @@
+Running Gradle task 'assembleProfile'...                           17.2s
+✓ Built build/app/outputs/flutter-apk/app-profile.apk (33.8MB)
+Installing build/app/outputs/flutter-apk/app-profile.apk...         4.6s
+VMServiceFlutterDriver: Connecting to Flutter application at http://127.0.0.1:54603/ULWAB1TEwV4=/
+VMServiceFlutterDriver: Isolate found with number: 4586639550440387
+VMServiceFlutterDriver: Isolate 4586639550440387 is runnable.
+VMServiceFlutterDriver: Isolate is paused at start.
+VMServiceFlutterDriver: Attempting to resume isolate
+I/flutter (15572): 00:00 +0: parse
+VMServiceFlutterDriver: Connected to Flutter application.
+I/BLASTBufferQueue(15572): [c0284b3 SurfaceView[dev.plugfox.md_benchmark_compare/dev.plugfox.md_benchmark_compare.MainActivity]@0#1](f:0,a:0,s:0) onFrameAvailable the first frame is available
+I/SurfaceView(15572): 201491635 finishedDrawing
+D/VRI[MainActivity]@22d264(15572): Setup new sync=wmsSync-VRI[MainActivity]@22d264#1
+I/VRI[MainActivity]@22d264(15572): Creating new active sync group VRI[MainActivity]@22d264#2
+D/VRI[MainActivity]@22d264(15572): Draw frame after cancel
+D/VRI[MainActivity]@22d264(15572): registerCallbacksForSync syncBuffer=false
+D/SurfaceView(15572): 201491635 updateSurfacePosition RenderWorker, frameNr = 1, position = [0, 0, 720, 1544] surfaceSize = 720x1544
+I/SV[201491635 MainActivity](15572): uSP: rtp = Rect(0, 0 - 720, 1544) rtsw = 720 rtsh = 1544
+I/SV[201491635 MainActivity](15572): onSSPAndSRT: pl = 0 pt = 0 sx = 1.0 sy = 1.0
+I/SV[201491635 MainActivity](15572): aOrMT: VRI[MainActivity]@22d264 t = android.view.SurfaceControl$Transaction@b48d41d fN = 1 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionChanged:1932 android.graphics.RenderNode$CompositePositionUpdateListener.positionChanged:401 
+I/VRI[MainActivity]@22d264(15572): mWNT: t=0xb40000788dd6e6d0 mBlastBufferQueue=0xb40000782ddfbb50 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SurfaceView.applyOrMergeTransaction:1863 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionChanged:1932 
+D/VRI[MainActivity]@22d264(15572): Received frameDrawingCallback syncResult=0 frameNum=1.
+I/VRI[MainActivity]@22d264(15572): mWNT: t=0xb40000788dd7e650 mBlastBufferQueue=0xb40000782ddfbb50 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$12.onFrameDraw:15441 android.view.ThreadedRenderer$1.onFrameDraw:718 <bottom of call stack> 
+I/VRI[MainActivity]@22d264(15572): Setting up sync and frameCommitCallback
+I/GSC     (15572): SID[82] : 3fbab2d0b9a11634, Kind: 1, time : 1.971 ms
+I/GSC     (15572): SID[83] : 9fb7104710fc7e74, Kind: 0, time : 6.635 ms
+I/GSC     (15572): SID[84] : fe6ff4e467193f9c, Kind: 1, time : 1.333 ms
+I/GSC     (15572): SID[85] : 9fb7104710fc7e74, Kind: 0, time : 2.912 ms
+I/BLASTBufferQueue(15572): [VRI[MainActivity]@22d264#0](f:0,a:0,s:0) onFrameAvailable the first frame is available
+I/VRI[MainActivity]@22d264(15572): Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+D/HWUI    (15572): CFMS:: SetUp Pid : 15572    Tid : 15596
+D/VRI[MainActivity]@22d264(15572): reportDrawFinished seqId=0
+D/VRI[MainActivity]@22d264(15572): mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb4000078add67d30}
+D/InputMethodManagerUtils(15572): startInputInner - Id : 0
+I/InputMethodManager(15572): startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+I/InputMethodManager(15572): handleMessage: setImeVisibility visible=false
+D/InsetsController(15572): hide(ime(), fromIme=false)
+I/ImeTracker(15572): dev.plugfox.md_benchmark_compare:89b893e: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+D/InputTransport(15572): Input channel constructed: 'ClientS', fd=174
+D/ProfileInstaller(15572): Installing profile for dev.plugfox.md_benchmark_compare
+I/flutter (15572): 00:12 +1: (tearDownAll)
+I/flutter (15572): 00:12 +2: All tests passed!
+All tests passed.
