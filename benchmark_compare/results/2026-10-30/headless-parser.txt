@@ -1,0 +1,16 @@
+
+Parser: flutter_md vs `markdown` pkg (flutter_markdown engine)
+Lower us/op is better; speedup = markdown-pkg / flutter_md.
+
+| scenario       |   bytes | flutter_md us/op | flutter_md MB/s | markdown-pkg us/op | speedup |
+| -------------- | ------: | ---------------: | --------------: | -----------------: | ------: |
+| simple         |     340 |             3.03 |           112.2 |             111.35 |  36.74x |
+| inline         |     388 |             4.34 |            89.4 |             129.34 |  29.80x |
+| lists          |     344 |             5.82 |            59.1 |             129.79 |  22.30x |
+| table          |     471 |             8.14 |            57.9 |             143.63 |  17.65x |
+| code           |     290 |             1.36 |           212.5 |              32.61 |  23.89x |
+| quotes         |     315 |             3.30 |            95.6 |             101.44 |  30.77x |
+| complex        |    1030 |            13.88 |            74.2 |             375.91 |  27.07x |
+| complex_large  |    8256 |           108.51 |            76.1 |            3041.56 |  28.03x |
+| TOTAL          |         |           148.39 |                 |            4065.65 |  27.40x |
+
