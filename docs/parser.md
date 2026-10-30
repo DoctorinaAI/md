@@ -150,6 +150,8 @@ Block-level:
 - List `indent` is a **column width**, capped at 8; 9+ leading spaces end the list.
   Tree assembly is a recursive `traverse` over a flat list with a shared mutable
   offset closure (note the intermediate record misspells the field `intent`).
+- Quote bodies are re-parsed as blocks down to 32 levels (`_maxQuoteDepth`);
+  a deeper body with a fence stays inline text, which bounds the recursion.
 - `MD$Quote.indent` is hardcoded to 1; alert bodies are trimmed (`skip(1).join('\n').trim()`)
   while quote bodies keep raw `join('\n')`. Plain quotes/alerts stay leaf `spans`;
   a body that contains a fence line is re-parsed into `blocks` (spans empty).
