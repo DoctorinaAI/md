@@ -1,0 +1,66 @@
+name: Deploy demo to GitHub Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - "lib/**"
+      - "example/lib/**"
+      - "example/web/**"
+      - "example/pubspec.yaml"
+      - "pubspec.yaml"
+      - ".github/workflows/pages.yml"
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: "Build the example app"
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/plugfox/flutter:stable
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/
+
+      - name: 🚂 Setup dependencies
+        timeout-minutes: 5
+        uses: ./.github/actions/setup
+
+      - name: 🏗️ Build for the web
+        timeout-minutes: 10
+        working-directory: example
+        # The site lives at https://doctorinaai.github.io/md/.
+        run: flutter build web --release --base-href /md/
+
+      - name: 📤 Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: example/build/web
+
+  deploy:
+    name: "Deploy to GitHub Pages"
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 🚀 Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
