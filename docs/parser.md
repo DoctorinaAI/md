@@ -12,7 +12,16 @@ Three ways from `String` to `Markdown`:
 Markdown.fromString(src);                       // convenience factory; inlineMath: false
 markdownDecoder.convert(src);                   // shared const MarkdownDecoder()
 const MarkdownDecoder(inlineMath: true).convert(src);
+await Markdown.fromStringAsync(src);            // in slices, for a very long document
 ```
+
+`convertAsync` runs the same block loop as `convert`; `_BlockLoop` holds what it
+needs to stop between two lines and resume. Between slices it awaits `yieldToUi`,
+chosen by a conditional import so the parser still runs under plain `dart run`:
+`yield_to_ui_flutter.dart` waits for the end of the frame when one is on its way
+(at most 100 ms, as frames stop in the background) and otherwise, like
+`yield_to_ui.dart`, gives the event loop a turn. A nested quote, a table's cell
+counts and a single block's inline parse are not split.
 
 - `MarkdownDecoder extends Converter<String, Markdown>` — `const
   MarkdownDecoder({bool inlineMath = false, Map<String, String>? mathReplacements})`.

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'markdown.dart';
 import 'nodes.dart';
+import 'yield_to_ui.dart' if (dart.library.ui) 'yield_to_ui_flutter.dart';
 
 /// Decodes Markdown formatted strings
 /// into a list of [MD$Block] objects.
@@ -312,20 +313,57 @@ class MarkdownDecoder extends Converter<String, Markdown> {
   @override
   Markdown convert(String input) => _convert(input, 0);
 
+  /// Parses [input] like [convert], without holding the UI for long: after
+  /// each [budget] of work it pauses, until the end of the frame when one is on
+  /// its way (a background isolate just gives the event loop a turn).
+  ///
+  /// The result equals that of [convert]. Pauses fall between lines and blocks,
+  /// so a single huge block, such as a megabyte-long paragraph, is parsed in
+  /// one go.
+  Future<Markdown> convertAsync(
+    String input, {
+    Duration budget = const Duration(milliseconds: 4),
+  }) async {
+    final micros = budget.inMicroseconds;
+    final stopwatch = Stopwatch()..start();
+    bool outOfBudget() => stopwatch.elapsedMicroseconds >= micros;
+
+    final lines = <String>[];
+    for (final line in LineSplitter.split(input)) {
+      lines.add(line);
+      if (!outOfBudget()) continue;
+      await yieldToUi();
+      stopwatch.reset();
+    }
+    if (lines.isEmpty) return const Markdown.empty();
+
+    final state = _BlockLoop(input, lines, 0);
+    while (true) {
+      final markdown = _runBlocks(state, outOfBudget);
+      if (markdown != null) return markdown;
+      await yieldToUi();
+      stopwatch.reset();
+    }
+  }
+
   /// Parses [input], the body of a quote nested [depth] levels deep.
   Markdown _convert(String input, int depth) {
     final lines = LineSplitter.split(input).toList(growable: false);
     if (lines.isEmpty) return const Markdown.empty();
-    final blocks = Queue<MD$Block>(); // Queue to accumulate blocks
+    return _runBlocks(_BlockLoop(input, lines, depth), null)!;
+  }
+
+  /// Runs the block loop of [state] to the end and returns the document, or
+  /// stops between two lines once [outOfBudget] says so and returns null; call
+  /// it again to carry on. Each call parses at least one line.
+  Markdown? _runBlocks(_BlockLoop state, bool Function()? outOfBudget) {
+    final _BlockLoop(:lines, :blocks, :paragraph, :depth) = state;
     final length = lines.length;
-    _TableRuns? tableRuns; // Built on the first valid delimiter row, if any.
 
     // Resolve the inline-math replacement table once; `null` disables math and
     // keeps `_parseInlineSpans` from touching it at all.
     final math =
         inlineMath ? (mathReplacements ?? kMarkdownMathCommands) : null;
-
-    final paragraph = StringBuffer(); // To accumulate lines for paragraphs
 
     void maybeCommitParagraph() {
       if (paragraph.isEmpty) return;
@@ -342,7 +380,12 @@ class MarkdownDecoder extends Converter<String, Markdown> {
       blocks.addLast(block);
     }
 
-    for (var i = 0; i < length; i++) {
+    final resumeAt = state.next;
+    for (var i = resumeAt; i < length; i++) {
+      if (outOfBudget != null && i > resumeAt && outOfBudget()) {
+        state.next = i;
+        return null;
+      }
       final line = lines[i];
 
       if (_isBlank(line)) {
@@ -522,24 +565,13 @@ class MarkdownDecoder extends Converter<String, Markdown> {
               // If the current item's indent is greater,
               // we continue traversing deeper into the list.
               final children = traverse(indent: item.intent);
-              if (items.isNotEmpty) {
-                // If we have a parent item, add children to it (after any it
-                // already has: `- a` / `    - b` / `  - c` nests both).
-                final parent = items.last;
-                items.last = parent.copyWith(
-                    children: List<MD$ListItem>.unmodifiable(
-                        <MD$ListItem>[...parent.children, ...children]));
-              } else {
-                // If this is the first item, just add children
-                items.add(MD$ListItem(
-                  marker: item.marker, // '•',
-                  text: item.text,
-                  spans: _parseInlineSpans(item.text, math: math),
-                  indent: item.intent,
-                  checked: item.checked,
-                  children: children,
-                ));
-              }
+              // Add children to the parent item, after any it already has
+              // (`- a` / `    - b` / `  - c` nests both). There always is one: a
+              // level starts with an item of its own indent.
+              final parent = items.last;
+              items.last = parent.copyWith(
+                  children: List<MD$ListItem>.unmodifiable(
+                      <MD$ListItem>[...parent.children, ...children]));
             } else {
               // If the indent is less, we stop traversing
               offset--; // Step back to reprocess this item
@@ -587,7 +619,7 @@ class MarkdownDecoder extends Converter<String, Markdown> {
         // Validate on cell counts before formatting any cell: a rejected
         // table hands its first line to the paragraph and the next line is
         // tried as a table again, so per-candidate work must stay O(1).
-        final runs = tableRuns ??= _TableRuns(lines);
+        final runs = state.tableRuns ??= _TableRuns(lines);
         final columns = runs.cells[i];
         final j = runs.rowsEnd(i + 2); // Skip the header and separator line
         if (columns > 0 && runs.allCellsEqual(i + 2, j, columns)) {
@@ -626,10 +658,32 @@ class MarkdownDecoder extends Converter<String, Markdown> {
     maybeCommitParagraph();
 
     return Markdown(
-      markdown: input,
+      markdown: state.input,
       blocks: List<MD$Block>.unmodifiable(blocks),
     );
   }
+}
+
+/// What the block loop of [MarkdownDecoder] carries between lines, so that it
+/// can stop and resume.
+class _BlockLoop {
+  _BlockLoop(this.input, this.lines, this.depth);
+
+  final String input;
+  final List<String> lines;
+  final int depth;
+
+  /// The blocks so far.
+  final Queue<MD$Block> blocks = Queue<MD$Block>();
+
+  /// The lines of the paragraph being accumulated.
+  final StringBuffer paragraph = StringBuffer();
+
+  /// Built on the first valid delimiter row, if any.
+  _TableRuns? tableRuns;
+
+  /// The index of the line to resume from.
+  int next = 0;
 }
 
 /// Lookup table of code units that can start an inline construct: emphasis
