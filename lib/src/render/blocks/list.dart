@@ -37,10 +37,8 @@ class _ListItemMetrics {
   late final Size size =
       Size(bulletPainter.width + contentPainter.width, height);
 
-  void dispose() {
-    bulletPainter.dispose();
-    contentPainter.dispose();
-  }
+  /// Disposes the item's own painter; [BlockPainter$List] owns the bullets.
+  void dispose() => contentPainter.dispose();
 }
 
 /// A class for painting a list block in markdown.
@@ -77,6 +75,9 @@ class BlockPainter$List
   final MarkdownThemeData theme;
   final List<MD$ListItem> _items;
   final List<_ListItemMetrics> _painters;
+
+  /// The laid-out marker painters, by marker text.
+  final Map<String, TextPainter> _bullets = <String, TextPainter>{};
 
   @override
   List<SelectableFragment> get fragments => _fragments;
@@ -158,7 +159,9 @@ class BlockPainter$List
               _ => item.marker,
             },
         };
-        final bulletPainter = TextPainter(
+        // Unconstrained, so one painter serves every item with this marker,
+        // at any width.
+        final bulletPainter = _bullets[bulletText] ??= TextPainter(
           text: TextSpan(text: '$bulletText ', style: theme.textStyle),
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
@@ -241,6 +244,10 @@ class BlockPainter$List
       metrics.dispose();
     }
     _painters.clear();
+    for (final painter in _bullets.values) {
+      painter.dispose();
+    }
+    _bullets.clear();
     _fragments = const <SelectableFragment>[];
   }
 }

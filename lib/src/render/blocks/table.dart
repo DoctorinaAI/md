@@ -190,7 +190,7 @@ class BlockPainter$Table
 
     final allRows = [header, ...rows];
     final naturalWidths = List<double>.filled(columns, 0.0);
-    final minWidths = List<double>.filled(columns, 0.0);
+    final headerStyle = theme.textStyle.copyWith(fontWeight: FontWeight.bold);
 
     // Create painters for each row and column and calculate natural widths
     _cellPainters = List.generate(allRows.length, (r) {
@@ -200,12 +200,11 @@ class BlockPainter$Table
           return TextPainter(textDirection: theme.textDirection);
         }
         final cell = row.cells[c];
-        final style = (r == 0)
-            ? theme.textStyle.copyWith(fontWeight: FontWeight.bold)
-            : null;
         final textPainter = TextPainter(
           text: paragraphFromMarkdownSpans(
-              spans: cell, theme: theme, textStyle: style),
+              spans: cell,
+              theme: theme,
+              textStyle: r == 0 ? headerStyle : null),
           textAlign: switch (_columnAlign(c)) {
             MD$TableColumnAlign.left => TextAlign.left,
             MD$TableColumnAlign.center => TextAlign.center,
@@ -222,27 +221,18 @@ class BlockPainter$Table
         naturalWidths[c] =
             math.max(naturalWidths[c], textPainter.width + padding * 2);
 
-        // Calculate min width (longest word). Pictures scale down to the
-        // column, so their alt text (U+FFFC in the painter) does not count.
-        final cellText = textPainter.plainText.replaceAll('\uFFFC', ' ');
-        final words = cellText.split(RegExp(r'\s+'));
-        if (words.isNotEmpty) {
-          final longestWord =
-              words.reduce((a, b) => a.length > b.length ? a : b);
-          final wordPainter = TextPainter(
-            text: TextSpan(text: longestWord, style: style),
-            textDirection: theme.textDirection,
-          )..layout();
-          minWidths[c] =
-              math.max(minWidths[c], wordPainter.width + padding * 2);
-          wordPainter.dispose();
-        }
-
         return textPainter;
       });
     });
 
-    _columnWidths.setAll(0, _distributeWidths(naturalWidths, minWidths, width));
+    // A table that fits keeps its natural widths, so the minimum widths, which
+    // cost a paragraph per cell, are only measured for one that does not.
+    _columnWidths.setAll(
+      0,
+      naturalWidths.reduce((a, b) => a + b) <= width
+          ? naturalWidths
+          : _distributeWidths(naturalWidths, _minWidths(headerStyle), width),
+    );
 
     final totalWidth = _columnWidths.reduce((a, b) => a + b);
 
@@ -311,6 +301,35 @@ class BlockPainter$Table
 
     return _size = Size(totalWidth, totalHeight);
   }
+
+  /// The width of each column's longest word plus padding, which the column
+  /// can not usefully shrink below.
+  List<double> _minWidths(TextStyle headerStyle) {
+    final minWidths = List<double>.filled(columns, 0.0);
+    for (var r = 0; r < _cellPainters.length; r++) {
+      final style = r == 0 ? headerStyle : null;
+      for (var c = 0; c < columns; c++) {
+        // A row may hold fewer cells than the table has columns.
+        if (_cellPainters[r][c].text == null) continue;
+        // Pictures scale down to the column, so their alt text (U+FFFC in the
+        // painter) does not count.
+        final cellText =
+            _cellPainters[r][c].plainText.replaceAll('\uFFFC', ' ');
+        final longestWord = cellText
+            .split(_whitespace)
+            .reduce((a, b) => a.length > b.length ? a : b);
+        final wordPainter = TextPainter(
+          text: TextSpan(text: longestWord, style: style),
+          textDirection: theme.textDirection,
+        )..layout();
+        minWidths[c] = math.max(minWidths[c], wordPainter.width + padding * 2);
+        wordPainter.dispose();
+      }
+    }
+    return minWidths;
+  }
+
+  static final RegExp _whitespace = RegExp(r'\s+');
 
   /// Rebuilds the selectable fragments (row-major: cells joined by `\t`, rows by
   /// `\n`) so they line up with `markdownBlockRenderedText`. Only the cells that
