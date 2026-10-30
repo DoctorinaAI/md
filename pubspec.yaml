@@ -8,7 +8,7 @@ description: >
   Fast Markdown parser and canvas renderer for Flutter with cross-widget text
   selection, streaming parsing and syntax highlighting.
 
-version: 0.3.0
+version: 0.3.1
 
 homepage: https://github.com/DoctorinaAI/md
 repository: https://github.com/DoctorinaAI/md

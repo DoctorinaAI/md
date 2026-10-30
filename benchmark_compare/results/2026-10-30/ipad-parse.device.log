@@ -1,0 +1,16 @@
+Saved signing certificate "Apple Development: plugfox@gmail.com (HUF8Z5J59J)" is not a valid development certificate. To clear, use "flutter config --clear-ios-signing-settings"
+Developer identity "Apple Development: Mikhail Matyunin (PRT533C3UU)" selected for iOS code signing
+Running Xcode build...                                          
+Xcode build done.                                           20.4s
+Installing and launching...                                         3.4s
+VMServiceFlutterDriver: Connecting to Flutter application at http://127.0.0.1:54464/AoBZy2JDa-c=/
+VMServiceFlutterDriver: Isolate found with number: 8768098960038163
+VMServiceFlutterDriver: Isolate 8768098960038163 is runnable.
+VMServiceFlutterDriver: Isolate is paused at start.
+VMServiceFlutterDriver: Attempting to resume isolate
+flutter: 00:00 +0: parse
+VMServiceFlutterDriver: Connected to Flutter application.
+flutter: 00:07 +1: (tearDownAll)
+flutter: 00:07 +2: All tests passed!
+All tests passed.
+Failed to stop app

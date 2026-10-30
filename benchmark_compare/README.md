@@ -8,6 +8,10 @@ and **rendering**.
 It lives inside the repo (path dependency on `../`) but is excluded from
 `flutter_md` publishing via the root `.pubignore`.
 
+> Current results per device, with hardware and versions:
+> [`docs/benchmarks.md`](../docs/benchmarks.md). The figures below are from an
+> earlier run on Linux.
+
 ## Results at a glance
 
 Measured on an i7-13700K (Flutter 3.41.6), all three libraries given identical
@@ -32,6 +36,8 @@ normalized styles. Full tables in **[`RESULTS.md`](RESULTS.md)**.
 | `benchmark/parser_benchmark.dart` | **Parser** cost via `benchmark_harness`: `flutter_md` vs the `markdown` package (which `flutter_markdown` uses internally). | `dart run benchmark/parser_benchmark.dart` |
 | `test/render_benchmark_test.dart` | **Render** cost via widget tests: end-to-end string → painted pixels for all three libraries (headless). | `flutter test test/render_benchmark_test.dart` |
 | `integration_test/scroll_perf_test.dart` + `test_driver/perf_driver.dart` | **Profile-mode** confirmation: real frame build/raster times while scrolling a feed, captured as a `TimelineSummary`. | see below |
+| `integration_test/device_bench_test.dart` + `tool/device_bench.sh` | **On-device** suite: pipeline stages, first frame and scroll per library, saved with the environment. Works on physical iOS, Android and desktop. | `tool/device_bench.sh <device> <out-dir> <label>` |
+| `tool/summarize_device.dart` | Formats those runs into the tables of `docs/benchmarks.md`. | `dart run tool/summarize_device.dart <out-dir>` |
 | `tool/summarize_timeline.dart` | Formats the profile-mode JSON into a table. | `dart run tool/summarize_timeline.dart` |
 
 ## Running

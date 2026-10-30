@@ -28,7 +28,9 @@ dependencies:
 
   # The two libraries we compare against.
   flutter_markdown: ^0.7.7+1 # discontinued; the last published release
-  gpt_markdown: ^1.1.8
+  gpt_markdown: ^1.4.0
+  # gpt_markdown 1.4 looks up the Material of this package, not Flutter's.
+  material_ui: any
 
   # The parser engine that flutter_markdown uses under the hood. We benchmark it
   # directly so the parser comparison is apples-to-apples (flutter_markdown does

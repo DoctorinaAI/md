@@ -20,6 +20,7 @@ import 'package:flutter_markdown/flutter_markdown.dart' as fm;
 import 'package:flutter_md/flutter_md.dart' as fmd;
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:material_ui/material_ui.dart' as mui;
 
 /// Base body text: identical for all three libraries.
 const double kFontSize = 14;
@@ -107,6 +108,9 @@ final Map<String, StyledFactory> styledLibraries = <String, StyledFactory>{
       ),
   'gpt_markdown': (context, src) => GptMarkdownTheme(
         gptThemeData: gptMarkdownTheme(context),
-        child: GptMarkdown(src, style: kBaseTextStyle),
+        child: mui.Material(
+          type: mui.MaterialType.transparency,
+          child: GptMarkdown(src, style: kBaseTextStyle),
+        ),
       ),
 };

@@ -1,7 +1,7 @@
 # Development
 
 Commands, CI, conventions, benchmarks, and repo layout. Package `flutter_md`
-(`0.3.0`); Dart `>=3.6.0 <4.0.0`, Flutter `>=3.29.0`.
+(`0.3.1`); Dart `>=3.6.0 <4.0.0`, Flutter `>=3.29.0`.
 
 ## Commands
 
@@ -34,7 +34,9 @@ dart run benchmark/compare.dart --save        # write baseline → benchmark/.ba
 dart run benchmark/compare.dart               # compare current vs saved baseline, prints delta %
 dart compile exe benchmark/parser_benchmark.dart -o /tmp/pb && /tmp/pb   # stabler AOT numbers
 dart run benchmark/hostile_benchmark.dart     # scaling on quadratic-prone inputs (growth column: 8x = linear)
+dart run benchmark/async_benchmark.dart       # parsing in slices: total time and the longest pause for the UI
 
+flutter test benchmark/code_benchmark.dart                                      # fenced code, with and without highlighting
 flutter test benchmark/render_benchmark.dart                                    # vs benchmark/.render_baseline.txt
 flutter test benchmark/render_benchmark.dart --dart-define=RENDER_BASELINE=save # record new baseline
 ```
@@ -46,6 +48,9 @@ Render tiers (doc = 50 mixed blocks, width 400): `layout_large`, `paint_miss`
 drag+pump frames over a `ListView`). The test **asserts** `paint_hit < paint_miss`
 and `selection_drag < paint_miss / 3` — regressions fail. Timings are relative
 (headless engine); confirm real FPS with `flutter run --profile` + DevTools.
+
+On-device numbers, per device with hardware and versions, are in
+[`benchmarks.md`](benchmarks.md), produced by `benchmark_compare/tool/device_bench.sh`.
 
 Parser scenarios live in `benchmark/scenarios.dart` (`prose, inline, links, lists,
 table, code, quotes, escapes, currency, pathological, mixed`). `compare.dart` uses
@@ -69,6 +74,12 @@ job, steps in order (any non-zero fails):
 **`deploy.yml`** (name `Deploy to Pub.dev`) — on `workflow_dispatch` and version
 tags `[0-9]+.[0-9]+.[0-9]+*`; delegates to `dart-lang/setup-dart` publish workflow
 (OIDC). Benchmarks are never run in CI.
+
+**`pages.yml`** (name `Deploy demo to GitHub Pages`) — on `workflow_dispatch` and
+pushes to `master` that touch `lib/`, `example/` sources or `pubspec.yaml`; builds
+`example/` for the web with `--base-href /md/` and publishes it to
+<https://doctorinaai.github.io/md/>. Needs **Settings → Pages → Source: GitHub
+Actions** on the repository.
 
 ## Lint rules that bite (`analysis_options.yaml`)
 
