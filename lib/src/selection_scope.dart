@@ -275,6 +275,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _platform = Theme.of(context).platform;
     _applySelectionColor();
     _scrollNotificationObserver?.removeListener(_onAncestorScrollNotification);
     _scrollNotificationObserver = ScrollNotificationObserver.maybeOf(context);
@@ -438,7 +439,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
   bool get _handlesEnabled {
     if (!widget.enabled) return false;
     if (!_ownsChromeForCurrentSelection) return false;
-    return switch (Theme.of(context).platform) {
+    return switch (_platform) {
       TargetPlatform.android ||
       TargetPlatform.iOS ||
       TargetPlatform.fuchsia =>
@@ -457,7 +458,14 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
     };
   }
 
-  bool get _isDesktopPlatform => switch (Theme.of(context).platform) {
+  /// The theme's platform, read in [didChangeDependencies].
+  ///
+  /// The controller listener needs it, and a host may notify from a widget's
+  /// dispose (a chat body leaving the list clears the selection) while this
+  /// scope is deactivated, when an ancestor lookup such as `Theme.of` throws.
+  late TargetPlatform _platform;
+
+  bool get _isDesktopPlatform => switch (_platform) {
         TargetPlatform.linux ||
         TargetPlatform.macOS ||
         TargetPlatform.windows =>
@@ -467,7 +475,7 @@ class MarkdownSelectionScopeState extends State<MarkdownSelectionScope>
 
   TextSelectionControls get _effectiveControls =>
       widget.selectionControls ??
-      switch (Theme.of(context).platform) {
+      switch (_platform) {
         TargetPlatform.android ||
         TargetPlatform.fuchsia =>
           materialTextSelectionHandleControls,

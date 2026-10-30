@@ -1,3 +1,13 @@
+## Unreleased
+
+### Selection
+- **FIXED**: "Looking up a deactivated widget's ancestor is unsafe" from
+  `MarkdownSelectionScope`'s controller listener. Since the desktop-menu fix in
+  0.3.0 it reads `Theme.of(context)` on every clear, and a host that clears the
+  selection or re-registers documents from a widget's `dispose` (a chat body
+  leaving a virtualized list) notifies while the scope above that body is
+  deactivated. The scope now reads the platform in `didChangeDependencies`.
+
 ## 0.3.0
 
 > **Upgrading from 0.2.x?** See the
