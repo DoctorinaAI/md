@@ -36,11 +36,6 @@ class _ListItemMetrics {
       math.max(bulletPainter.height, contentPainter.height);
   late final Size size =
       Size(bulletPainter.width + contentPainter.width, height);
-
-  void dispose() {
-    bulletPainter.dispose();
-    contentPainter.dispose();
-  }
 }
 
 /// A class for painting a list block in markdown.
@@ -62,7 +57,7 @@ class BlockPainter$List
   bool get selectionHighlightAboveCachedContent => _fills || _hasImages;
   final bool _fills;
 
-  /// Whether the laid-out item text holds a picture.
+  /// Whether the item text holds a picture.
   bool _hasImages = false;
 
   static bool _listItemsPaintOpaqueBackground(List<MD$ListItem> items) {
@@ -78,13 +73,24 @@ class BlockPainter$List
   final List<MD$ListItem> _items;
   final List<_ListItemMetrics> _painters;
 
-  @override
-  List<SelectableFragment> get fragments => _fragments;
-  List<SelectableFragment> _fragments = const <SelectableFragment>[];
+  /// The item text painters in depth-first order, built by the first layout
+  /// and kept: the text of an item is the same at every width.
+  final List<TextPainter> _contentPainters = <TextPainter>[];
+
+  /// The width of the last layout, when it can be reused as is.
+  double? _laidOutWidth;
+
+  /// The laid-out marker painters, by marker text.
+  final Map<String, TextPainter> _bullets = <String, TextPainter>{};
 
   @override
-  String get renderedText => _renderedText;
-  String _renderedText = '';
+  List<SelectableFragment> get fragments => _fragments ??= _buildFragments();
+  List<SelectableFragment>? _fragments = const <SelectableFragment>[];
+
+  @override
+  String get renderedText => _renderedText ??=
+      fragments.map((f) => markdownModelText(f.painter)).join('\n');
+  String? _renderedText = '';
 
   // Indentation for the entire list block.
   static const double _baseIndent = 8.0;
@@ -135,14 +141,14 @@ class BlockPainter$List
 
   @override
   Size layout(double width) {
-    for (final painter in _painters) {
-      painter.dispose();
-    }
+    // Pictures can change size between two layouts at one width.
+    if (width == _laidOutWidth) return _size;
+    _laidOutWidth = theme.imageResolver == null ? width : null;
     _painters.clear();
-    _hasImages = false;
 
     double currentHeight = 0;
     double maxContentWidth = 0;
+    var next = 0;
     // Right-to-left lists put the bullet on the right, content to its left.
     final rtl = theme.textDirection == TextDirection.rtl && width.isFinite;
 
@@ -158,22 +164,33 @@ class BlockPainter$List
               _ => item.marker,
             },
         };
-        final bulletPainter = TextPainter(
+        // Unconstrained, so one painter serves every item with this marker,
+        // at any width.
+        final bulletPainter = _bullets[bulletText] ??= TextPainter(
           text: TextSpan(text: '$bulletText ', style: theme.textStyle),
           textDirection: theme.textDirection,
           textScaler: theme.textScaler,
         )..layout();
 
-        final contentPainter = TextPainter(
-          text: paragraphFromMarkdownSpans(spans: item.spans, theme: theme),
-          textDirection: theme.textDirection,
-          textScaler: theme.textScaler,
-        );
+        final TextPainter contentPainter;
+        if (next < _contentPainters.length) {
+          contentPainter = _contentPainters[next];
+        } else {
+          contentPainter = TextPainter(
+            text: paragraphFromMarkdownSpans(spans: item.spans, theme: theme),
+            textDirection: theme.textDirection,
+            textScaler: theme.textScaler,
+          );
+          _contentPainters.add(contentPainter);
+          _hasImages = _hasImages ||
+              (theme.imageResolver != null &&
+                  markdownSpanHasImages(contentPainter.text));
+        }
+        next++;
         layoutMarkdownText(
           contentPainter,
           maxWidth: math.max(0, width - indent - bulletPainter.width),
         );
-        _hasImages = _hasImages || markdownSpanHasImages(contentPainter.text);
 
         final bulletX = rtl ? width - indent - bulletPainter.width : indent;
         final metrics = _ListItemMetrics(
@@ -200,13 +217,15 @@ class BlockPainter$List
     }
 
     layoutItems(_items, 0);
-    _rebuildFragments();
+    _fragments = null;
+    _renderedText = null;
     return _size = Size(maxContentWidth, currentHeight);
   }
 
-  /// Rebuilds the selectable fragments from the laid-out item metrics. Items
-  /// (depth-first, matching `markdownBlockRenderedText`) are joined by `\n`.
-  void _rebuildFragments() {
+  /// The selectable fragments of the laid-out item metrics, built when
+  /// selection first asks. Items (depth-first, matching
+  /// `markdownBlockRenderedText`) are joined by `\n`.
+  List<SelectableFragment> _buildFragments() {
     final frags = <SelectableFragment>[];
     var textPos = 0;
     for (final metrics in _painters) {
@@ -218,8 +237,7 @@ class BlockPainter$List
       ));
       textPos += markdownModelText(metrics.contentPainter).length;
     }
-    _fragments = frags;
-    _renderedText = frags.map((f) => markdownModelText(f.painter)).join('\n');
+    return frags;
   }
 
   @override
@@ -237,10 +255,17 @@ class BlockPainter$List
 
   @override
   void dispose() {
-    for (final metrics in _painters) {
-      metrics.dispose();
+    for (final painter in _contentPainters) {
+      painter.dispose();
     }
+    _contentPainters.clear();
     _painters.clear();
+    _laidOutWidth = null;
+    for (final painter in _bullets.values) {
+      painter.dispose();
+    }
+    _bullets.clear();
     _fragments = const <SelectableFragment>[];
+    _renderedText = '';
   }
 }

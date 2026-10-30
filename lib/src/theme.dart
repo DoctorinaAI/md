@@ -1,6 +1,7 @@
 import 'dart:collection';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, listEquals, mapEquals;
 import 'package:flutter/material.dart';
 import 'package:meta/meta.dart' as meta show internal;
 
@@ -108,6 +109,41 @@ class MarkdownThemeData implements ThemeExtension<MarkdownThemeData> {
             monospaceFontFamilyFallback ?? _defaultMonospaceFontFamilyFallback,
         _headingStyles = List<TextStyle?>.filled(8, null),
         _textStyles = HashMap<int, TextStyle>();
+
+  /// Whether block painters built with this theme and with [other] draw and
+  /// measure the same. Hooks compare by identity, so a closure written inline
+  /// in a `build` method makes two themes differ.
+  @meta.internal
+  bool paintsLike(MarkdownThemeData other) =>
+      identical(this, other) ||
+      (textDirection == other.textDirection &&
+          textScaler == other.textScaler &&
+          textStyle == other.textStyle &&
+          h1Style == other.h1Style &&
+          h2Style == other.h2Style &&
+          h3Style == other.h3Style &&
+          h4Style == other.h4Style &&
+          h5Style == other.h5Style &&
+          h6Style == other.h6Style &&
+          quoteStyle == other.quoteStyle &&
+          linkColor == other.linkColor &&
+          linkStyle == other.linkStyle &&
+          surfaceColor == other.surfaceColor &&
+          highlightBackgroundColor == other.highlightBackgroundColor &&
+          monospaceBackgroundColor == other.monospaceBackgroundColor &&
+          monospaceFontFamily == other.monospaceFontFamily &&
+          listEquals(
+            monospaceFontFamilyFallback,
+            other.monospaceFontFamilyFallback,
+          ) &&
+          dividerColor == other.dividerColor &&
+          mapEquals(alertColors, other.alertColors) &&
+          blockFilter == other.blockFilter &&
+          spanFilter == other.spanFilter &&
+          builder == other.builder &&
+          onLinkTap == other.onLinkTap &&
+          highlighter == other.highlighter &&
+          imageResolver == other.imageResolver);
 
   /// Creates a [MarkdownThemeData] from the given [ThemeData].
   factory MarkdownThemeData.mergeTheme(

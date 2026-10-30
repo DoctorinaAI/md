@@ -309,7 +309,8 @@ TextRange markdownWordBoundary(TextPainter painter, Offset local) {
 /// The model text of [painter]: its plain text with every image slot replaced
 /// by the model text it stands for.
 @meta.internal
-String markdownModelText(TextPainter painter) => _mapOf(painter).modelText;
+String markdownModelText(TextPainter painter) =>
+    _mapOf(painter).modelText ?? painter.plainText;
 
 /// Whether [span] contains a [MarkdownImageSpan] (a picture or link icon).
 @meta.internal
@@ -366,7 +367,8 @@ final class _TextMap {
   /// The painter text this map was built from (identity cache key).
   final InlineSpan? text;
 
-  final String modelText;
+  /// The model text, or null when it equals the painter's plain text.
+  final String? modelText;
 
   /// `(painterStart, modelStart, modelLength)` per [MarkdownImageSpan], or
   /// null when the text has none (offsets map one to one).
@@ -381,10 +383,28 @@ final class _TextMap {
 
 final Expando<_TextMap> _textMaps = Expando<_TextMap>('markdownTextMap');
 
+bool _hasPlaceholders(InlineSpan? text) {
+  var found = false;
+  text?.visitChildren((span) {
+    found = span is PlaceholderSpan;
+    return !found;
+  });
+  return found;
+}
+
 _TextMap _mapOf(TextPainter painter) {
   final text = painter.text;
   final cached = _textMaps[painter];
   if (cached != null && identical(cached.text, text)) return cached;
+  if (!_hasPlaceholders(text)) {
+    return _textMaps[painter] = _TextMap(
+      text,
+      null,
+      null,
+      const <PlaceholderSpan>[],
+      const <int>[],
+    );
+  }
   final placeholders = <PlaceholderSpan>[];
   final placeholderOffsets = <int>[];
   final segments = <int>[];
@@ -415,7 +435,7 @@ _TextMap _mapOf(TextPainter painter) {
   final map = segments.isEmpty
       ? _TextMap(
           text,
-          painter.plainText,
+          null,
           null,
           placeholders,
           placeholderOffsets,

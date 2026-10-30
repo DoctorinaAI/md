@@ -1,5 +1,15 @@
 ## Unreleased
 
+### Rendering
+- **IMPROVED**: Layout is cheaper with identical output: up to 22% off a first
+  frame of a large mixed document, up to 14% on lists. A table that fits no
+  longer measures the longest word of every cell, list items with the same
+  marker share one laid-out painter, and unstyled spans skip re-encoding the
+  parent style.
+- **CHANGED**: `paragraphFromMarkdownSpans` leaves `style` null on an unstyled
+  child span, which inherits the parent `TextSpan`'s style. The result looks
+  the same; code reading `child.style` directly sees null.
+
 ### Parser
 - **FIXED**: A paragraph with more than 65535 links or images hung the parser
   in an endless loop. Links are now matched by a cursor, with no size limit.

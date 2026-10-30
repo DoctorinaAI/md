@@ -125,12 +125,20 @@ class BlockPainter$Quote
   Size _size = Size.zero;
 
   @override
-  List<SelectableFragment> get fragments => _fragments;
-  List<SelectableFragment> _fragments = const <SelectableFragment>[];
+  List<SelectableFragment> get fragments {
+    if (_fragments == null) _rebuildFragments();
+    return _fragments!;
+  }
+
+  List<SelectableFragment>? _fragments = const <SelectableFragment>[];
 
   @override
-  String get renderedText => _renderedText;
-  String _renderedText = '';
+  String get renderedText {
+    if (_renderedText == null) _rebuildFragments();
+    return _renderedText!;
+  }
+
+  String? _renderedText = '';
 
   /// Vertical offsets of each nested child within the quote content column.
   List<double> _childOffsets = const <double>[];
@@ -214,10 +222,8 @@ class BlockPainter$Quote
         _leafPainter.size.width + _contentLeft,
         _leafPainter.size.height,
       );
-      _fragments = <SelectableFragment>[
-        SelectableFragment(_leafPainter, Offset(_leafLeft, 0), 0),
-      ];
-      _renderedText = markdownModelText(_leafPainter);
+      _fragments = null;
+      _renderedText = null;
       _childOffsets = const <double>[];
       _childOrigins = const <Offset>[];
       return _size;
@@ -234,14 +240,24 @@ class BlockPainter$Quote
     }
     _childOffsets = offsets;
     _size = Size(maxChildWidth + _contentLeft, y);
-    _rebuildFragments();
-    return _size;
-  }
-
-  void _rebuildFragments() {
     _childOrigins = <Offset>[
       for (final dy in _childOffsets) Offset(_columnLeft, dy),
     ];
+    _fragments = null;
+    _renderedText = null;
+    return _size;
+  }
+
+  /// Built when selection first asks: most documents are never selected.
+  void _rebuildFragments() {
+    final leaf = _leafPainter;
+    if (leaf != null) {
+      _fragments = <SelectableFragment>[
+        SelectableFragment(leaf, Offset(_leafLeft, 0), 0),
+      ];
+      _renderedText = markdownModelText(leaf);
+      return;
+    }
     final (frags, text) =
         nestedBlockFragments(_children, _childOrigins, _modelTexts);
     _fragments = frags;
@@ -295,6 +311,8 @@ class BlockPainter$Quote
 
   @override
   void dispose() {
+    _fragments = const <SelectableFragment>[];
+    _renderedText = '';
     _leafPainter?.dispose();
     for (final child in _children) {
       child.dispose();

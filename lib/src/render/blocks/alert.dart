@@ -132,12 +132,20 @@ class BlockPainter$Alert
   Size _size = Size.zero;
 
   @override
-  List<SelectableFragment> get fragments => _fragments;
-  List<SelectableFragment> _fragments = const <SelectableFragment>[];
+  List<SelectableFragment> get fragments {
+    if (_fragments == null) _rebuildFragments();
+    return _fragments!;
+  }
+
+  List<SelectableFragment>? _fragments = const <SelectableFragment>[];
 
   @override
-  String get renderedText => _renderedText;
-  String _renderedText = '';
+  String get renderedText {
+    if (_renderedText == null) _rebuildFragments();
+    return _renderedText!;
+  }
+
+  String? _renderedText = '';
 
   /// Whether the body has any content to paint.
   bool _hasBody = false;
@@ -214,13 +222,6 @@ class BlockPainter$Alert
       if (_hasBody) {
         bodyWidth = _bodyPainter.width;
         bodyHeight = _bodyPainter.height;
-        _fragments = <SelectableFragment>[
-          SelectableFragment(_bodyPainter, _bodyOrigin, 0),
-        ];
-        _renderedText = markdownModelText(_bodyPainter);
-      } else {
-        _fragments = const <SelectableFragment>[];
-        _renderedText = '';
       }
       _childOffsets = const <double>[];
       _childOrigins = const <Offset>[];
@@ -236,8 +237,12 @@ class BlockPainter$Alert
       _childOffsets = offsets;
       bodyHeight = y;
       _hasBody = bodyHeight > 0;
-      _rebuildFragments();
+      _childOrigins = <Offset>[
+        for (final dy in _childOffsets) Offset(_columnLeft, _bodyTop + dy),
+      ];
     }
+    _fragments = null;
+    _renderedText = null;
 
     final contentWidth = math.max(titlePainter.width, bodyWidth);
     final contentHeight =
@@ -248,10 +253,16 @@ class BlockPainter$Alert
     );
   }
 
+  /// Built when selection first asks: most documents are never selected.
   void _rebuildFragments() {
-    _childOrigins = <Offset>[
-      for (final dy in _childOffsets) Offset(_columnLeft, _bodyTop + dy),
-    ];
+    final body = _bodyPainter;
+    if (body != null) {
+      _fragments = _hasBody
+          ? <SelectableFragment>[SelectableFragment(body, _bodyOrigin, 0)]
+          : const <SelectableFragment>[];
+      _renderedText = _hasBody ? markdownModelText(body) : '';
+      return;
+    }
     final (frags, text) =
         nestedBlockFragments(_children, _childOrigins, _modelTexts);
     _fragments = frags;
@@ -325,6 +336,8 @@ class BlockPainter$Alert
 
   @override
   void dispose() {
+    _fragments = const <SelectableFragment>[];
+    _renderedText = '';
     titlePainter.dispose();
     _bodyPainter?.dispose();
     for (final child in _children) {
