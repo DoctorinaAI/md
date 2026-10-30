@@ -55,6 +55,11 @@ const _range = MarkdownSelection(
   extent: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 5),
 );
 
+const _widerRange = MarkdownSelection(
+  base: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 0),
+  extent: MarkdownPosition(documentId: 'd', blockIndex: 0, offset: 6),
+);
+
 MarkdownSelectionScopeState _state(WidgetTester t) =>
     t.state<MarkdownSelectionScopeState>(find.byType(MarkdownSelectionScope));
 
@@ -267,8 +272,211 @@ void main() {
           expect(c.selection, isNull);
         });
       });
+
+      // The listener takes other branches with a live range: the toolbar
+      // restore and the overlay sync, both of which reach for the context.
+      testWidgets(
+          're-registering a document from a disposing child keeps the range '
+          '(${platform.name})', (tester) async {
+        await _withPlatform(platform, () async {
+          final c = _ctrl('Hello selectable world');
+          addTearDown(c.dispose);
+          await tester.pumpWidget(MaterialApp(
+            home: MarkdownSelectionScope(
+              controller: c,
+              child: _OnDispose(() {
+                c.putDocument(
+                  'd',
+                  Markdown.fromString('Hello selectable world, updated'),
+                );
+                c.toolbarWanted = true;
+              }),
+            ),
+          ));
+          c.selection = _range;
+          await tester.pump();
+
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump();
+          expect(tester.takeException(), isNull);
+          expect(c.selection, _range);
+        });
+      });
+
+      testWidgets(
+          'removing the document from a disposing child does not look up '
+          'ancestors (${platform.name})', (tester) async {
+        await _withPlatform(platform, () async {
+          final c = _ctrl('Hello selectable world');
+          addTearDown(c.dispose);
+          await tester.pumpWidget(MaterialApp(
+            home: MarkdownSelectionScope(
+              controller: c,
+              child: _OnDispose(() => c.removeDocument('d')),
+            ),
+          ));
+          c.selection = _range;
+          await tester.pump();
+
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump();
+          expect(tester.takeException(), isNull);
+        });
+      });
     }
+
+    testWidgets('a scope that outlives the disposing child still works',
+        (tester) async {
+      final c = _ctrl('Hello selectable world');
+      addTearDown(c.dispose);
+      Widget app({required bool child}) => MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.android),
+            home: MarkdownSelectionScope(
+              controller: c,
+              child: child ? _OnDispose(c.clear) : const SizedBox(),
+            ),
+          );
+      await tester.pumpWidget(app(child: true));
+      c.selection = _range;
+      await tester.pump();
+
+      await tester.pumpWidget(app(child: false));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(c.selection, isNull);
+
+      c.selection = _range;
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
   });
+
+  group('platform', () {
+    Finder handles() => find.byWidgetPredicate(
+          (w) => w.runtimeType.toString().contains('SelectionHandleOverlay'),
+        );
+
+    Widget app(
+      MarkdownSelectionController c,
+      TargetPlatform platform, {
+      Key? scopeKey,
+    }) =>
+        MaterialApp(
+          theme: ThemeData(platform: platform),
+          home: Scaffold(
+            body: MarkdownSelectionScope(
+              key: scopeKey,
+              controller: c,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: 400,
+                  child: MarkdownWidget(
+                    markdown: Markdown.fromString('Hello selectable world'),
+                    documentId: 'd',
+                    controller: c,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('follows a theme platform change while mounted',
+        (tester) async {
+      final c = _ctrl('Hello selectable world');
+      addTearDown(c.dispose);
+      await tester.pumpWidget(app(c, TargetPlatform.android));
+      await tester.pumpAndSettle();
+      c.selection = _range;
+      await tester.pumpAndSettle();
+      expect(handles(), findsWidgets, reason: 'android shows handles');
+
+      await tester.pumpWidget(app(c, TargetPlatform.macOS));
+      await tester.pumpAndSettle();
+      c.selection = _widerRange;
+      await tester.pumpAndSettle();
+      expect(handles(), findsNothing, reason: 'macOS has none');
+
+      await tester.pumpWidget(app(c, TargetPlatform.android));
+      await tester.pumpAndSettle();
+      c.selection = _range;
+      await tester.pumpAndSettle();
+      expect(handles(), findsWidgets, reason: 'back on android');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reads the platform of a new parent after a reparent',
+        (tester) async {
+      final c = _ctrl('Hello selectable world');
+      addTearDown(c.dispose);
+      final key = GlobalKey<MarkdownSelectionScopeState>();
+      Widget scope() => MarkdownSelectionScope(
+            key: key,
+            controller: c,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 400,
+                child: MarkdownWidget(
+                  markdown: Markdown.fromString('Hello selectable world'),
+                  documentId: 'd',
+                  controller: c,
+                ),
+              ),
+            ),
+          );
+      Widget tree({required bool moved}) => MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.macOS),
+            home: Scaffold(
+              body: Column(
+                children: <Widget>[
+                  Expanded(child: moved ? const SizedBox() : scope()),
+                  Expanded(
+                    child: Theme(
+                      data: ThemeData(platform: TargetPlatform.android),
+                      child: moved ? scope() : const SizedBox(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+      await tester.pumpWidget(tree(moved: false));
+      await tester.pumpAndSettle();
+      c.selection = _range;
+      await tester.pumpAndSettle();
+      expect(handles(), findsNothing);
+
+      await tester.pumpWidget(tree(moved: true));
+      await tester.pumpAndSettle();
+      c.selection = _widerRange;
+      await tester.pumpAndSettle();
+      expect(handles(), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+/// Runs [callback] from `dispose`, like a chat body that leaves the list.
+class _OnDispose extends StatefulWidget {
+  const _OnDispose(this.callback);
+
+  final VoidCallback callback;
+
+  @override
+  State<_OnDispose> createState() => _OnDisposeState();
+}
+
+class _OnDisposeState extends State<_OnDispose> {
+  @override
+  void dispose() {
+    widget.callback();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox();
 }
 
 /// Clears [controller] when it is disposed, like a chat body that leaves the

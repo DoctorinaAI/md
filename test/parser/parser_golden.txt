@@ -488,3 +488,83 @@ TABLE aligns=[none,none]
       [0,2] style=0 "[e"
     cell1
       [0,5] style=0 "f](g)"
+@@@ hostile-heading-closing-variants
+H1
+  [0,1] style=0 "a"
+H2
+  [0,1] style=0 "b"
+H3
+  [0,1] style=0 "c"
+H1
+  [0,2] style=0 "d#"
+H1
+  [0,5] style=0 "e # f"
+H1
+  [0,1] style=0 "#"
+H1
+H1
+  [0,3] style=0 "g #"
+@@@ hostile-heading-inner-spaces
+H1
+  [0,12] style=0 "a          b"
+@@@ hostile-link-in-code-then-link
+P
+  [1,7] style=16 "[a](b)"
+  [8,9] style=0 " "
+  [9,15] style=32 "c" {href="d", type="link", url="d"}
+  [15,16] style=0 " "
+  [17,24] style=16 "![e](f)"
+  [25,26] style=0 " "
+  [26,33] style=64 "g" {src="h", type="image", url="h"}
+@@@ hostile-escaped-bang-link
+P
+  [0,8] style=0 "![a](b) "
+  [9,15] style=32 "c" {href="d", type="link", url="d"}
+@@@ hostile-adjacent-links
+P
+  [0,7] style=64 "a" {src="1", type="image", url="1"}
+  [7,14] style=64 "b" {src="2", type="image", url="2"}
+  [14,20] style=32 "c" {href="3", type="link", url="3"}
+  [22,28] style=34 "d" {href="4", type="link", url="4"}
+@@@ hostile-closer-past-opener
+P
+  [1,7] style=1 "a *b c"
+  [8,12] style=0 " d* "
+  [14,17] style=2 "e *"
+  [18,21] style=3 "f g"
+  [23,26] style=1 " h*"
+  [27,28] style=0 " "
+  [29,35] style=1 "i _j k"
+  [36,39] style=0 " l_"
+@@@ hostile-closer-escaped
+P
+  [1,5] style=1 "a* b"
+  [7,8] style=0 " "
+  [10,15] style=2 "c** d"
+  [18,19] style=0 " "
+  [20,25] style=16 "e\\` f"
+  [26,30] style=0 " `g`"
+@@@ hostile-closer-run-alignment
+P
+  [3,4] style=3 "a"
+  [7,8] style=0 " "
+  [10,12] style=8 "~b"
+  [14,16] style=0 "~ "
+  [18,20] style=128 "=c"
+  [22,24] style=0 "= "
+  [26,28] style=256 "|d"
+  [30,32] style=0 "| "
+  [34,35] style=4 "_"
+  [36,37] style=5 "e"
+  [39,40] style=1 "_"
+@@@ hostile-fence-quote-depth-2
+Q indent=1
+  Q indent=1
+    CODE lang="" text="code"
+  P
+    [0,5] style=0 "after"
+@@@ hostile-fence-quote-unspaced
+Q indent=1
+  Q indent=1
+    Q indent=1
+      CODE lang="" text="code"

@@ -368,4 +368,18 @@ const Map<String, String> _corpus = <String, String>{
           '|a|b|c|\n|-|-|-|\n|1|2|3|',
   'patho-table-cells-with-markers':
       '| *a | b* |\n|---|---|\n| `c | d` |\n| [e | f](g) |',
+
+  // Shapes of the follow-up linear rewrites: heading scan, link cursor,
+  // closer cursors, quote depth.
+  'hostile-heading-closing-variants':
+      '# a #\n## b ##  \n### c\t#\n# d#\n# e # f\n# # #\n#  \t \n# g \\#',
+  'hostile-heading-inner-spaces': '# a          b          ',
+  'hostile-link-in-code-then-link': '`[a](b)` [c](d) `![e](f)` ![g](h)',
+  'hostile-escaped-bang-link': r'\![a](b) [c](d)',
+  'hostile-adjacent-links': '![a](1)![b](2)[c](3)**[d](4)**',
+  'hostile-closer-past-opener': '*a *b c* d* **e **f g** h** _i _j k_ l_',
+  'hostile-closer-escaped': r'*a\* b* **c\** d** `e\` f` \`g`',
+  'hostile-closer-run-alignment': '***a*** ~~~b~~~ ===c=== |||d||| ____e____',
+  'hostile-fence-quote-depth-2': '> > ```\n> > code\n> > ```\n> after',
+  'hostile-fence-quote-unspaced': '>>>```\n>>>code\n>>>```',
 };
