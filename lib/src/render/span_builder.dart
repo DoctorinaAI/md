@@ -74,9 +74,13 @@ TextSpan paragraphFromMarkdownSpans({
   final merge = textStyle != null;
   TextSpan mapper(MD$Span span) => TextSpan(
         text: span.text,
+        // An unstyled span adds nothing to the parent style below, and leaving
+        // it out skips encoding that style for the paragraph.
         style: merge
             ? theme.textStyleFor(span.style).merge(style)
-            : theme.textStyleFor(span.style),
+            : span.style == MD$Style.none
+                ? null
+                : theme.textStyleFor(span.style),
         recognizer: span.style.contains(MD$Style.link)
             ? _buildTapRecognizer(span, theme.onLinkTap)
             : null,

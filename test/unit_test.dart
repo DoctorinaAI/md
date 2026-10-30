@@ -42,6 +42,7 @@ import 'selection/selection_test.dart' as selection_test;
 import 'selection/selection_widget_test.dart' as selection_widget_test;
 import 'theme/theme_test.dart' as theme_test;
 import 'widget/block_painters_test.dart' as block_painters_test;
+import 'widget/layout_optimizations_test.dart' as layout_optimizations_test;
 import 'widget/render_coverage_test.dart' as render_coverage_test;
 import 'widget/inline_image_test.dart' as inline_image_test;
 import 'widget/render_object_test.dart' as render_object_test;
@@ -87,6 +88,7 @@ void main() => group('Unit', () {
       render_test.main();
       render_object_test.main();
       block_painters_test.main();
+      layout_optimizations_test.main();
       render_coverage_test.main();
       inline_image_test.main();
       rtl_test.main();
