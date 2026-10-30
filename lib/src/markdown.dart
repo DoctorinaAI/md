@@ -36,6 +36,19 @@ final class Markdown {
       (inlineMath ? const MarkdownDecoder(inlineMath: true) : markdownDecoder)
           .convert(markdown);
 
+  /// Parses [markdown] like [Markdown.fromString], without holding the UI for
+  /// long: after each [budget] of work it pauses, until the end of the frame
+  /// when one is on its way. For a document too long to parse within a frame.
+  ///
+  /// For a custom command table, see [MarkdownDecoder.convertAsync].
+  static Future<Markdown> fromStringAsync(
+    String markdown, {
+    bool inlineMath = false,
+    Duration budget = const Duration(milliseconds: 4),
+  }) =>
+      MarkdownDecoder(inlineMath: inlineMath)
+          .convertAsync(markdown, budget: budget);
+
   /// The original markdown string.
   final String markdown;
 

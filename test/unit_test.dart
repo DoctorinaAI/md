@@ -4,6 +4,7 @@ import 'coverage_gaps_test.dart' as coverage_gaps_test;
 import 'highlight/grammar_coverage_test.dart' as grammar_coverage_test;
 import 'highlight/highlight_test.dart' as highlight_test;
 import 'nodes/nodes_test.dart' as nodes_test;
+import 'parser/async_test.dart' as async_test;
 import 'parser/block_test.dart' as block_test;
 import 'parser/edge_cases_test.dart' as edge_cases_test;
 import 'parser/gfm_test.dart' as gfm_test;
@@ -52,6 +53,7 @@ import 'widget/widget_test.dart' as widget_test;
 void main() => group('Unit', () {
       parser_test.main();
       hostile_input_test.main();
+      async_test.main();
       block_test.main();
       inline_test.main();
       gfm_test.main();
